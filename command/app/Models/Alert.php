@@ -11,7 +11,7 @@ class Alert extends Model
 
     protected function casts(): array
     {
-        return ['data' => 'array', 'resolved_at' => 'datetime'];
+        return ['data' => 'array', 'resolved_at' => 'datetime', 'opened_at' => 'datetime', 'escalated_at' => 'datetime'];
     }
 
     public function subject(): MorphTo

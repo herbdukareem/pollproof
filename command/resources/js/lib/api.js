@@ -60,6 +60,6 @@ export const api = {
     },
     post: (path, body) => request('POST', v1(path), body),
     patch: (path, body) => request('PATCH', v1(path), body),
-    delete: (path) => request('DELETE', v1(path)),
+    delete: (path, body) => request('DELETE', v1(path), body),
     url: v1,
 };

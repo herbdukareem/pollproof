@@ -20,7 +20,7 @@ async function submit() {
         await api.post('me/password', { ...form });
         done.value = true;
         await loadSession();
-        if (forced) router.replace(homeFor(session.user.role));
+        if (forced) router.replace(session.user.two_factor_required ? { name: 'security' } : homeFor(session.user.role));
     } catch (e) {
         errors.value = e.errors && Object.keys(e.errors).length ? e.errors : { password: [e.message] };
     } finally {

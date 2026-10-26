@@ -11,7 +11,7 @@ import { loadSession } from '../../lib/session';
 
 const res = useResource(() => api.get('campaign'));
 const d = computed(() => res.data.value);
-const form = reactive({ name: '', state_name: '', election_date: '', freeze_at: '' });
+const form = reactive({ name: '', state_name: '', election_date: '', freeze_at: '', checkin_deadline: '08:30', require_two_factor: false });
 const party = reactive({ code: '', name: '', is_ours: false });
 const editing = ref(null);
 const edit = reactive({ name: '', is_ours: false });
@@ -24,6 +24,8 @@ watch(d, (v) => v && Object.assign(form, {
     state_name: v.campaign.state_name,
     election_date: v.campaign.election_date?.slice(0, 10),
     freeze_at: v.campaign.freeze_at?.slice(0, 10) ?? '',
+    checkin_deadline: (v.campaign.checkin_deadline ?? '08:30').slice(0, 5),
+    require_two_factor: v.campaign.require_two_factor,
 }));
 
 async function act(key, fn, done) {
@@ -62,6 +64,8 @@ const removeParty = (p) => act(`d${p.id}`, () => api.delete(`parties/${p.id}`), 
                     <div><label class="label" for="c-date">Election day</label><input id="c-date" v-model="form.election_date" type="date" class="field" required /></div>
                     <div><label class="label" for="c-freeze">Setup freeze date</label><input id="c-freeze" v-model="form.freeze_at" type="date" class="field" /></div>
                 </div>
+                <div><label class="label" for="c-deadline">Agents must check in by</label><input id="c-deadline" v-model="form.checkin_deadline" type="time" class="field w-40" required /><p class="mt-1 text-xs text-ink-2">On election day, units without a verified check-in by this time raise an alert to the ward supervisor.</p></div>
+                <label class="flex items-start gap-3 rounded-xl border border-line p-3.5 text-sm"><input v-model="form.require_two_factor" type="checkbox" class="mt-0.5 h-5 w-5 accent-[#13213c]" /><span><b>Require two-step sign-in for all command-room staff.</b> <span class="text-ink-2">Anyone without it is asked to set it up at their next sign-in, before they can see anything.</span></span></label>
                 <p class="text-[13px] text-ink-2">From the freeze date, polling units, agents and supervisors can't change, so everyone works from the same list on election day. Reserves can still be sent to units.</p>
                 <div class="rounded-xl bg-mist p-3.5 text-[13px] text-ink-2">
                     <b class="text-ink">Winning rule tracked on the overview:</b> {{ Math.round(d.campaign.lga_share_threshold * 100) }}% of votes in at least {{ d.campaign.lga_count_fraction > 0.66 && d.campaign.lga_count_fraction < 0.67 ? 'two-thirds' : Math.round(d.campaign.lga_count_fraction * 100) + '%' }} of LGAs, as the Constitution requires for a governorship.

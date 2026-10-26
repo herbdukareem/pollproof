@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\TwoFactor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ class UserController extends Controller
                 'role_label' => $u->role->label(),
                 'active' => $u->isActive(),
                 'must_change_password' => $u->must_change_password,
+                'two_factor' => $u->hasTwoFactor(),
                 'last_active_at' => $u->last_active_at,
                 'is_me' => $u->id === $request->user()->id,
             ]),
@@ -96,6 +98,18 @@ class UserController extends Controller
         $this->audit->log($request->user(), 'user.password_reset', $user, [], $request->ip());
 
         return response()->json(['temporary_password' => $password]);
+    }
+
+    /** For someone who lost their phone: they set two-step sign-in up again at their next sign-in. */
+    public function resetTwoFactor(Request $request, User $user, TwoFactor $twoFactor): JsonResponse
+    {
+        $this->authorizeTarget($request->user(), $user);
+        abort_if($user->id === $request->user()->id, 422, 'Turn off your own two-step sign-in from your account page.');
+        $twoFactor->disable($user);
+        $this->signOutEverywhere($user);
+        $this->audit->log($request->user(), 'user.two_factor_reset', $user, [], $request->ip());
+
+        return response()->json(['two_factor' => false]);
     }
 
     private function authorizeTarget(User $me, User $user): void

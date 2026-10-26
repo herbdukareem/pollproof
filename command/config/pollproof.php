@@ -6,6 +6,9 @@ return [
     'otp_ttl_minutes' => (int) env('POLLPROOF_OTP_TTL_MINUTES', 10),
     'evidence_disk' => env('POLLPROOF_EVIDENCE_DISK', 'local'),
 
+    // Election-day times (check-in deadline) are in this zone.
+    'timezone' => env('POLLPROOF_TIMEZONE', 'Africa/Lagos'),
+
     // Link sent to agents in the invite SMS.
     'app_download_url' => env('POLLPROOF_APP_URL', 'https://pollproof.ng/app'),
 

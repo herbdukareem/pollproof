@@ -41,6 +41,7 @@ const add = () => act('add', async () => {
     Object.assign(form, { open: false, name: '', email: '' });
 });
 const setRole = (u, role) => act(`r${u.id}`, () => api.patch(`users/${u.id}`, { role }));
+const resetTwoFactor = (u) => act(`t${u.id}`, () => api.post(`users/${u.id}/reset-two-factor`, {}));
 const toggle = (u) => act(`a${u.id}`, () => api.patch(`users/${u.id}`, { active: !u.active }));
 const reset = (u) => act(`p${u.id}`, async () => {
     const res = await api.post(`users/${u.id}/reset-password`, {});
@@ -59,7 +60,7 @@ async function copy() {
 </script>
 
 <template>
-    <PageHeader title="Users and roles" :subtitle="d ? `${d.data.filter((u) => u.active).length} command-room users. Field staff are managed in the roster and supervisor screens.` : ''" :updated-at="users.updatedAt.value" :loading="users.loading.value" @refresh="users.load">
+    <PageHeader title="Users and roles" :subtitle="d ? `${d.data.filter((u) => u.active).length} command-room users · ${d.data.filter((u) => u.active && u.two_factor).length} with two-step sign-in. Field staff are managed in the roster and supervisor screens.` : ''" :updated-at="users.updatedAt.value" :loading="users.loading.value" @refresh="users.load">
         <template #actions>
             <button class="btn-primary" @click="form.open = !form.open"><Icon name="plus" :size="16" /> Add user</button>
         </template>
@@ -115,8 +116,8 @@ async function copy() {
                 <input v-model="search" class="field h-10 max-w-xs" placeholder="Search users" aria-label="Search users" />
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[820px] text-sm">
-                    <thead class="bg-mist"><tr><th class="th">User</th><th class="th">Role</th><th class="th">Status</th><th class="th">Last active</th><th class="th"></th></tr></thead>
+                <table class="w-full min-w-[920px] text-sm">
+                    <thead class="bg-mist"><tr><th class="th">User</th><th class="th">Role</th><th class="th">Status</th><th class="th">Two-step</th><th class="th">Last active</th><th class="th"></th></tr></thead>
                     <tbody>
                         <tr v-for="u in rows" :key="u.id" :class="u.active ? '' : 'opacity-60'">
                             <td class="td">
@@ -136,9 +137,11 @@ async function copy() {
                                 <Badge v-else-if="u.must_change_password" tone="warn">Temporary password</Badge>
                                 <Badge v-else tone="good">Active</Badge>
                             </td>
+                            <td class="td"><Badge :tone="u.two_factor ? 'good' : 'bad'">{{ u.two_factor ? 'On' : 'Not set up' }}</Badge></td>
                             <td class="td text-ink-2">{{ u.last_active_at ? dateTime(u.last_active_at) : 'Never' }}</td>
                             <td class="td">
                                 <div v-if="!u.is_me" class="flex justify-end gap-2">
+                                    <button v-if="u.active && u.two_factor" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `t${u.id}`" title="For a lost phone: they set it up again at next sign-in" @click="resetTwoFactor(u)">Reset two-step</button>
                                     <button v-if="u.active" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `p${u.id}`" @click="reset(u)">Reset password</button>
                                     <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `a${u.id}`" @click="toggle(u)">{{ u.active ? 'Deactivate' : 'Reactivate' }}</button>
                                 </div>

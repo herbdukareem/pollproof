@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
+use App\Services\AlertService;
 use App\Services\AuditLogger;
 use App\Services\Geo;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 
 class CheckInController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -63,6 +64,9 @@ class CheckInController extends Controller
             'captured_at' => $data['captured_at'],
         ]);
         $this->audit->log($user, 'checkin.created', $checkIn, ['status' => $checkIn->status, 'distance_m' => $distance], $request->ip());
+        if ($checkIn->counts()) {
+            $this->alerts->clear($campaign->id, "agent_absent:{$unit->id}");
+        }
 
         return response()->json(['id' => $checkIn->id, 'status' => $checkIn->status, 'distance_m' => $distance], 201);
     }
@@ -106,6 +110,9 @@ class CheckInController extends Controller
             'reviewed_at' => now(),
         ]);
         $this->audit->log($user, 'checkin.'.$data['decision'], $checkIn, [], $request->ip());
+        if ($checkIn->counts()) {
+            $this->alerts->clear($checkIn->campaign_id, "agent_absent:{$unit->id}");
+        }
 
         return response()->json(['id' => $checkIn->id, 'status' => $checkIn->status]);
     }

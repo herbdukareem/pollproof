@@ -17,6 +17,7 @@ export const NAV = [
     { name: 'supervisors', label: 'Supervisors', path: '/setup/supervisors', icon: 'tree', roles: SETUP, section: 'Setup' },
     { name: 'users', label: 'Users and roles', path: '/admin/users', icon: 'key', roles: ['dg'], section: 'Admin' },
     { name: 'campaign', label: 'Campaign', path: '/admin/campaign', icon: 'settings', roles: ['dg'], section: 'Admin' },
+    { name: 'notifications', label: 'Notifications', path: '/admin/notifications', icon: 'bell', roles: ['dg'], section: 'Admin' },
     { name: 'stipends', label: 'Stipends', path: '/stipends', icon: 'wallet', roles: ['finance', 'dg'], section: 'Admin' },
     { name: 'audit', label: 'Audit log', path: '/audit', icon: 'shield', roles: ['legal', 'dg'], section: 'Admin' },
 ];

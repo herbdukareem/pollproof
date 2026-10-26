@@ -19,7 +19,7 @@ class CampaignController extends Controller
         $campaign = $request->user()->campaign;
 
         return response()->json([
-            'campaign' => $campaign->only(['id', 'name', 'state_name', 'election_date', 'freeze_at', 'geofence_radius_m', 'max_gps_accuracy_m', 'require_selfie', 'lga_share_threshold', 'lga_count_fraction']),
+            'campaign' => $campaign->only(['id', 'name', 'state_name', 'election_date', 'freeze_at', 'geofence_radius_m', 'max_gps_accuracy_m', 'require_selfie', 'require_two_factor', 'checkin_deadline', 'lga_share_threshold', 'lga_count_fraction']),
             'frozen' => $campaign->isFrozen(),
             'parties' => $campaign->parties()->withCount('votes')->get()->map(fn ($p) => [
                 'id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'is_ours' => $p->is_ours, 'sort_order' => $p->sort_order, 'has_votes' => $p->votes_count > 0,
@@ -38,6 +38,8 @@ class CampaignController extends Controller
             'geofence_radius_m' => ['sometimes', 'integer', 'between:25,1000'],
             'max_gps_accuracy_m' => ['sometimes', 'integer', 'between:5,200'],
             'require_selfie' => ['sometimes', 'boolean'],
+            'require_two_factor' => ['sometimes', 'boolean'],
+            'checkin_deadline' => ['sometimes', 'date_format:H:i'],
         ]);
         $before = $campaign->only(array_keys($data));
         $campaign->update($data);

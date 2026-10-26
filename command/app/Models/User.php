@@ -18,7 +18,7 @@ class User extends Authenticatable
 
     protected $guarded = ['id'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected function casts(): array
     {
@@ -36,6 +36,9 @@ class User extends Authenticatable
             'trained_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'unavailable_at' => 'datetime',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -67,6 +70,17 @@ class User extends Authenticatable
     public function checkIns(): HasMany
     {
         return $this->hasMany(CheckIn::class);
+    }
+
+    public function hasTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
+    }
+
+    /** Staff in a campaign that requires two-step sign-in, who haven't set it up yet. */
+    public function needsTwoFactorSetup(): bool
+    {
+        return ! $this->role->isField() && ! $this->hasTwoFactor() && (bool) $this->campaign?->require_two_factor;
     }
 
     public function isActive(): bool

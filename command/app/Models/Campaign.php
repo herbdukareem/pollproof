@@ -17,7 +17,18 @@ class Campaign extends Model
             'lga_count_fraction' => 'float',
             'freeze_at' => 'date',
             'require_selfie' => 'boolean',
+            'require_two_factor' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(fn (Campaign $campaign) => NotificationRule::seedDefaults($campaign));
+    }
+
+    public function notificationRules(): HasMany
+    {
+        return $this->hasMany(NotificationRule::class);
     }
 
     /** After the freeze date the polling-unit list, roster and supervisors can no longer be changed. */

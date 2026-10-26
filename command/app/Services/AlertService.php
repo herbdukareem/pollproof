@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\NotifyAlert;
 use App\Models\Alert;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,6 +15,7 @@ final class AlertService
     public function raise(int $campaignId, string $type, string $severity, string $dedupeKey, string $title, string $detail, ?Model $subject = null, array $data = []): Alert
     {
         $alert = Alert::firstOrNew(['campaign_id' => $campaignId, 'dedupe_key' => $dedupeKey]);
+        $wasOpen = $alert->exists && $alert->status !== 'resolved';
         // Someone already dealt with exactly this problem: don't reopen it on a routine re-check.
         if ($alert->exists && $alert->status === 'resolved' && self::normalise($alert->data ?? []) === self::normalise($data)) {
             return $alert;
@@ -31,7 +33,16 @@ final class AlertService
         if ($subject) {
             $alert->subject()->associate($subject);
         }
+        if (! $wasOpen) {
+            $alert->opened_at = now();
+            $alert->escalated_at = null;
+        }
         $alert->save();
+
+        // Only a new or reopened problem tells people; a refresh of an open one doesn't repeat the message.
+        if (! $wasOpen) {
+            NotifyAlert::dispatch($alert->id)->afterCommit();
+        }
 
         return $alert;
     }

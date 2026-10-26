@@ -28,6 +28,9 @@ const paths = {
     send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
     plus: 'M12 5v14M5 12h14',
     lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+    bell: 'M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16l-2-2zM10 21h4',
+    gavel: 'M14 4l6 6M11 7l6 6M9 9l-6 6 3 3 6-6M13 20h8',
+    archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
 };
 </script>
 

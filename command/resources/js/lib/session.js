@@ -17,9 +17,20 @@ export async function loadSession() {
     return session.user;
 }
 
+/** Returns the user, or { twoFactor: true } when a code from the authenticator app is needed next. */
 export async function signIn(email, password) {
     await ensureCsrfCookie();
-    await request('POST', '/session', { email, password });
+    const res = await request('POST', '/session', { email, password });
+    if (res?.two_factor) return { twoFactor: true };
+    return finishSignIn();
+}
+
+export async function signInWithCode(code) {
+    await request('POST', '/session/two-factor', { code });
+    return finishSignIn();
+}
+
+async function finishSignIn() {
     const user = await loadSession();
     if (!user) {
         // Signed in, but the API did not accept the session cookie: the host is missing from SANCTUM_STATEFUL_DOMAINS.

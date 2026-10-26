@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
+use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\PollingUnitController;
 use App\Http\Controllers\Api\ReadinessController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\SmsWebhookController;
 use App\Http\Controllers\Api\StipendController;
 use App\Http\Controllers\Api\StructureController;
 use App\Http\Controllers\Api\TallyController;
+use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +41,15 @@ Route::prefix('v1')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::post('me/password', [AccountController::class, 'password'])->middleware('throttle:10,1');
+        Route::get('me/notices', [NoticeController::class, 'index']);
+        Route::post('me/notices/read', [NoticeController::class, 'read']);
+        Route::middleware('throttle:10,1')->group(function () {
+            Route::get('me/two-factor', [TwoFactorController::class, 'show']);
+            Route::post('me/two-factor', [TwoFactorController::class, 'start']);
+            Route::post('me/two-factor/confirm', [TwoFactorController::class, 'confirm']);
+            Route::post('me/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes']);
+            Route::delete('me/two-factor', [TwoFactorController::class, 'destroy']);
+        });
 
         // Agent app
         Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->post('devices', [DeviceController::class, 'store']);
@@ -134,6 +145,10 @@ Route::prefix('v1')->group(function () {
             Route::post('users', [UserController::class, 'store']);
             Route::patch('users/{user}', [UserController::class, 'update']);
             Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
+            Route::post('users/{user}/reset-two-factor', [UserController::class, 'resetTwoFactor']);
+            Route::get('notification-rules', [NoticeController::class, 'rules']);
+            Route::patch('notification-rules/{rule}', [NoticeController::class, 'updateRule']);
+            Route::post('notification-rules/test', [NoticeController::class, 'test'])->middleware('throttle:3,1');
         });
     });
 });

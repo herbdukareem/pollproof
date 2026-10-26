@@ -5,6 +5,7 @@ import PinLogo from './PinLogo.vue';
 import Icon from './Icon.vue';
 import { session, signOut } from '../lib/session';
 import { sectionsFor } from '../lib/nav';
+import NoticeBell from './NoticeBell.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -58,8 +59,9 @@ async function logout() {
                 <div class="min-w-0 flex-1 truncate text-sm text-ink-2">
                     Signed in as <b class="text-ink">{{ session.user?.name }}</b> <template v-if="session.user?.role_label !== session.user?.name">· {{ session.user?.role_label }}</template>
                 </div>
+                <NoticeBell />
                 <div class="hidden h-10 w-10 items-center justify-center rounded-full bg-navy text-sm font-bold text-white sm:flex" aria-hidden="true">{{ initials }}</div>
-                <RouterLink to="/account/password" class="btn-outline hidden sm:inline-flex" title="Change password"><Icon name="key" :size="16" /><span class="sr-only">Change password</span></RouterLink>
+                <RouterLink to="/account/security" class="btn-outline hidden sm:inline-flex" title="Password and two-step sign-in"><Icon name="key" :size="16" /><span class="sr-only">Password and two-step sign-in</span></RouterLink>
                 <button class="btn-outline" @click="logout"><Icon name="logout" :size="16" /> Sign out</button>
             </header>
             <main class="flex-1 px-4 py-6 sm:px-7">

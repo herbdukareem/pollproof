@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
+use App\Services\SignInMonitor;
+use App\Services\TwoFactor;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +17,12 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly OtpService $otp, private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly OtpService $otp,
+        private readonly AuditLogger $audit,
+        private readonly SignInMonitor $monitor,
+        private readonly TwoFactor $twoFactor,
+    ) {}
 
     /** Field staff ask for a one-time code by SMS. Always answers the same way, so it can't be used to probe numbers. */
     public function requestOtp(Request $request): JsonResponse
@@ -50,11 +57,20 @@ class AuthController extends Controller
     /** Command-room staff sign in with email and password. */
     public function login(Request $request): JsonResponse
     {
-        $data = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string']]);
+        $data = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string'], 'code' => ['nullable', 'string', 'max:20']]);
         $user = User::where('email', $data['email'])->first();
         if (! $user || ! $user->isActive() || ! $user->password || ! Hash::check($data['password'], $user->password) || $user->role->isField()) {
-            $this->audit->log($user, 'auth.failed_login', null, ['email' => $data['email']], $request->ip(), $user?->campaign_id);
+            $this->monitor->failed($user, 'auth.failed_login', ['email' => $data['email']], $request->ip());
             throw ValidationException::withMessages(['email' => 'These details do not match our records.']);
+        }
+        if ($user->hasTwoFactor()) {
+            if (empty($data['code'])) {
+                return response()->json(['message' => 'Enter the code from your authenticator app.', 'two_factor_required' => true, 'errors' => ['code' => ['Enter the code from your authenticator app.']]], 422);
+            }
+            if (! $this->twoFactor->check($user, $data['code'])) {
+                $this->monitor->failed($user, 'auth.failed_two_factor', [], $request->ip());
+                throw ValidationException::withMessages(['code' => 'That code is not right.']);
+            }
         }
         $this->audit->log($user, 'auth.login', null, [], $request->ip());
 
@@ -73,7 +89,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['campaign:id,name,state_name,election_date', 'pollingUnit.ward.lga', 'ward.lga', 'lga']);
+        $user = $request->user()->load(['campaign:id,name,state_name,election_date,require_two_factor', 'pollingUnit.ward.lga', 'ward.lga', 'lga']);
 
         return response()->json([
             'id' => $user->id,
@@ -83,6 +99,8 @@ class AuthController extends Controller
             'role_label' => $user->role->label(),
             'is_reserve' => $user->is_reserve,
             'must_change_password' => $user->must_change_password,
+            'two_factor_enabled' => $user->hasTwoFactor(),
+            'two_factor_required' => $user->needsTwoFactorSetup(),
             'campaign' => $user->campaign,
             'polling_unit' => $user->pollingUnit ? [
                 'id' => $user->pollingUnit->id,
