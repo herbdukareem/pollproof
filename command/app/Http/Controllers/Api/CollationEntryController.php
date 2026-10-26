@@ -19,6 +19,7 @@ class CollationEntryController extends Controller
     /** Record declared EC8B/EC8C/EC8D figures and compare them with our units straight away. */
     public function store(Request $request): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $data = $request->validate([
             'level' => ['required', 'in:ward,lga,state'],

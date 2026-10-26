@@ -15,6 +15,7 @@ class IrevEntryController extends Controller
     /** A data officer records what IReV shows for a unit (or that it is missing). */
     public function store(Request $request, Reconciler $reconciler, AuditLogger $audit): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $data = $request->validate([
             'polling_unit_id' => ['required', 'integer'],

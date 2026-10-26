@@ -27,7 +27,9 @@ createdb -O pollproof pollproof_test
 php artisan migrate --seed       # demo state: 2 LGAs, 4 wards, 12 units, 4 parties
 php artisan db:seed --class=ElectionDaySeeder   # optional: plays a short election day through the API
 php artisan serve                # open http://localhost:8000 and sign in
-php artisan queue:work           # sends invites and reminders (bulk SMS go through the queue)
+php artisan db:seed --class=AfterElectionSeeder # optional: a declaration and an open petition
+php artisan queue:work           # sends SMS, email and in-app notifications (all go through the queue)
+php artisan schedule:work        # every minute: escalations, check-in deadline, verify backlog
 php artisan test
 ```
 
@@ -61,6 +63,11 @@ The Vue app lives in `resources/js` and is served by a catch-all route to `resou
 | **Admin:** users and roles, temporary passwords, deactivation | `/admin/users` | DG |
 | **Admin:** election date, freeze date, parties | `/admin/campaign` | DG |
 | Change password (forced after a temporary one) | `/account/password` | everyone |
+| Two-step sign-in set-up, recovery codes | `/account/security` | everyone |
+| **After:** declared result vs our records, records lock, data retention, printable report | `/after/closeout` | DG (legal and situation room read) |
+| **After:** petition grounds and answers, tasks, reply bundle | `/after/tribunal` | legal, DG |
+| **Admin:** who is told about each alert, by which channel, and escalation | `/admin/notifications` | DG |
+| Notification bell (every screen) | header | everyone |
 
 The router enforces roles for navigation; the API enforces them for data.
 
@@ -73,6 +80,20 @@ The router enforces roles for navigation; the API enforces them for data.
 5. **Invites**: agents get the app link and their agent ID by SMS. In the app they register a signing key, send a practice result, pass the 10-question quiz (8 to pass) and confirm they will be there.
 6. **Readiness**: the funnel from assigned to confirmed, by LGA, with one-tap SMS reminders. Agents can reply `YES` or `NO` to the confirmation SMS; a NO raises an alert so a reserve is sent.
 7. **Freeze**: from the freeze date, structure, roster and supervisors are locked (HTTP 423). Sending reserves still works.
+
+## Two-step sign-in
+
+Staff can turn on authenticator-app codes (TOTP, RFC 6238) under the key icon; the DG can require it for everyone under Campaign, after which anyone without it is sent to set it up before they can do anything else (the API enforces this too, as it does for temporary passwords). Each person gets eight one-time recovery codes. A lost phone is handled by the DG's "Reset two-step" on Users and roles. Secrets are stored encrypted with `APP_KEY`; codes can't be reused. For token sign-in (`POST auth/login`) send `code` as well; without it the response is 422 with `two_factor_required: true`. Three failed sign-ins for one account in 15 minutes alert the DG.
+
+## Notifications and escalation
+
+Every alert type has a rule: who is told first, by which channels (in-app, SMS, email), and who is told if it is still open, not acknowledged, after N minutes. Supervisors and collation agents only hear about their own LGA or ward. New and reopened alerts notify; a refresh of an open alert doesn't repeat the message. The scheduler (`pollproof:watch`, every minute) escalates, raises "no agent checked in by 8:30 am" for each unit on election day (deadline set under Campaign, in `POLLPROOF_TIMEZONE`, default Africa/Lagos), and raises a verification-backlog alert above 20 waiting results. The agent app reads its notices from `GET me/notices`.
+
+## After the election
+
+The DG records the official declaration under Close-out. From then on results, collation, IReV, check-ins, incidents and reserve moves are read-only (HTTP 423), and the declared figures are compared with our signed records. The DG chooses what happens to the data; deletion is refused while a tribunal case is open.
+
+The tribunal workspace holds each petition's grounds, our answer to each, the polling units it relies on, and the legal team's tasks. **Build reply bundle** downloads a ZIP with `grounds.md`, each cited unit's evidence (`evidence.json`, EC8A photos, IReV screenshots), the hash-chained `audit-log.csv`, and `MANIFEST.sha256` so counsel can check nothing changed (`sha256sum -c MANIFEST.sha256`).
 
 ## SMS
 
@@ -155,6 +176,8 @@ All routes are under `/api/v1`. The phone authenticates with `Authorization: Bea
 | POST | `onboarding/quiz` | field staff | `{answers: {q1: "b", …}}`; marked on the server |
 | POST | `onboarding/confirm` | field staff | `{available, note}` with `available` true or false for election day |
 | POST | `me/password` | command room | Change password |
+| GET/POST/DELETE | `me/two-factor` · POST `me/two-factor/confirm`, `me/two-factor/recovery-codes` | command room | Two-step sign-in |
+| GET | `me/notices` · POST `me/notices/read` | everyone | Notifications for the signed-in person |
 | GET | `tally` | command room | Totals, per-LGA shares, 25%-in-⅔ test |
 | GET | `units` | command room | Units with reporting status; filters `status`, `lga_id`, `ward_id`, `search` |
 | GET | `results-queue` · POST `results/{id}/approve` · `send-back` | verifier | Second check |
@@ -171,7 +194,11 @@ All routes are under `/api/v1`. The phone authenticates with `Authorization: Bea
 | POST | `supervisors/import`, `supervisors` | DG, situation room | Supervisor CSV or one post |
 | POST | `readiness/remind` | DG, situation room | SMS to `not_installed`, `not_trained` or `not_confirmed` |
 | GET/PATCH | `campaign` · POST/PATCH/DELETE `parties` | DG | Campaign settings and the ballot |
-| GET/POST/PATCH | `users` · POST `users/{id}/reset-password` | DG | Command-room accounts |
+| GET/POST/PATCH | `users` · POST `users/{id}/reset-password`, `users/{id}/reset-two-factor` | DG | Command-room accounts |
+| GET/PATCH | `notification-rules` · POST `notification-rules/test` | DG | Alert routing and a test send |
+| GET | `closeout` · POST `closeout/declare`, `closeout/retention` | DG (read: legal, situation room) | Declaration and data retention |
+| GET/POST/PATCH | `tribunal-cases`, `tribunal-cases/{id}/grounds`, `tribunal-grounds/{id}`, `tribunal-cases/{id}/tasks`, `tribunal-tasks/{id}` | legal, DG | Tribunal workspace |
+| GET | `tribunal-cases/{id}/bundle` | legal, DG | Reply bundle ZIP |
 
 ## Commands
 
@@ -182,10 +209,8 @@ php artisan pollproof:verify-audit {campaign}
 
 ## Not built yet
 
-- Two-step verification for command-room sign-in.
-- Automatic escalation of unanswered incidents up the supervisor chain.
-- A server-generated PDF of evidence bundles; today the web app's evidence page prints to PDF from the browser.
-- Encryption at rest per campaign and object storage for photos; photos use the `local` disk.
-- After-election screens (close-out, tribunal workspace) and the notifications screen.
+- The Flutter agent app (the API it needs is in place).
+- WhatsApp delivery for notifications.
 - A map view of units; GPS pins are typed or set from the app.
-- The Flutter agent app.
+- A server-generated PDF of evidence and the campaign report; today both print to PDF from the browser.
+- Encryption at rest per campaign and object storage for photos; photos use the `local` disk.

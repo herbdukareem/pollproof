@@ -32,6 +32,10 @@ class SmsWebhookController extends Controller
             return response()->json(['reply' => 'This number is not registered with PollProof.']);
         }
 
+        if ($agent->campaign->isDeclared()) {
+            return response()->json(['reply' => 'The result has been declared. PollProof is no longer taking results.']);
+        }
+
         // Replies to the eve-of-election confirmation message.
         if (preg_match('/^\s*(yes|no|y|n)\b\W*(.*)$/is', $data['text'], $m)) {
             $yes = in_array(strtolower($m[1]), ['yes', 'y'], true);

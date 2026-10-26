@@ -16,6 +16,7 @@ class AgentController extends Controller
     /** Send a reserve (or any agent) to a polling unit; whoever held it loses access to it. */
     public function assign(Request $request, User $agent, AuditLogger $audit): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         abort_unless($agent->campaign_id === $user->campaign_id && $agent->hasRole(Role::Agent), 404);
         $data = $request->validate(['polling_unit_id' => ['required', 'integer']]);

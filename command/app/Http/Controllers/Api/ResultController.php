@@ -19,6 +19,7 @@ class ResultController extends Controller
     /** An agent submits the signed EC8A result for their unit. */
     public function store(Request $request): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $unit = $user->pollingUnit;
         abort_unless($unit, 422, 'You are not assigned to a polling unit.');
@@ -73,6 +74,7 @@ class ResultController extends Controller
     /** Upload the EC8A photo later, e.g. after the figures went by SMS. The photo must match the signed fingerprint. */
     public function attachPhoto(Request $request, ResultSubmission $result): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         abort_unless($result->user_id === $user->id, 404);
         $request->validate(['photo' => ['required', 'image', 'max:10240']]);
@@ -122,11 +124,15 @@ class ResultController extends Controller
 
     public function approve(Request $request, ResultSubmission $result): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
+
         return $this->review($request, $result, ResultSubmission::APPROVED);
     }
 
     public function sendBack(Request $request, ResultSubmission $result): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
+
         return $this->review($request, $result, ResultSubmission::SENT_BACK);
     }
 

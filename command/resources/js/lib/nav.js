@@ -15,6 +15,8 @@ export const NAV = [
     { name: 'structure', label: 'Structure', path: '/setup/structure', icon: 'map', roles: SETUP, section: 'Setup' },
     { name: 'roster', label: 'Agent roster', path: '/setup/roster', icon: 'list', roles: SETUP, section: 'Setup' },
     { name: 'supervisors', label: 'Supervisors', path: '/setup/supervisors', icon: 'tree', roles: SETUP, section: 'Setup' },
+    { name: 'closeout', label: 'Close-out', path: '/after/closeout', icon: 'archive', roles: ['dg', 'legal', 'situation_room'], section: 'After the election' },
+    { name: 'tribunal', label: 'Tribunal workspace', path: '/after/tribunal', icon: 'gavel', roles: ['legal', 'dg'], section: 'After the election' },
     { name: 'users', label: 'Users and roles', path: '/admin/users', icon: 'key', roles: ['dg'], section: 'Admin' },
     { name: 'campaign', label: 'Campaign', path: '/admin/campaign', icon: 'settings', roles: ['dg'], section: 'Admin' },
     { name: 'notifications', label: 'Notifications', path: '/admin/notifications', icon: 'bell', roles: ['dg'], section: 'Admin' },

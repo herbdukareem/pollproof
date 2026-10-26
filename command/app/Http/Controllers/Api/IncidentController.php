@@ -17,6 +17,7 @@ class IncidentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $data = $request->validate([
             'type' => ['required', 'in:'.implode(',', self::TYPES)],

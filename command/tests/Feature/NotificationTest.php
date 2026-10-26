@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\Alert;
 use App\Models\Notice;
 use App\Models\NotificationRule;
+use App\Services\AlertService;
 use App\Services\ElectionWatch;
 use App\Services\Sms\LogSmsSender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,7 +57,7 @@ class NotificationTest extends TestCase
     public function test_an_alert_nobody_acts_on_is_escalated_once(): void
     {
         $dg = $this->staff(Role::Dg);
-        $alert = app(\App\Services\AlertService::class)->raise($this->campaign->id, 'overvote', 'high', 'overvote:test', 'PU1: votes exceed accreditation', 'Detail', $this->units['PU1']);
+        $alert = app(AlertService::class)->raise($this->campaign->id, 'overvote', 'high', 'overvote:test', 'PU1: votes exceed accreditation', 'Detail', $this->units['PU1']);
         $watch = app(ElectionWatch::class);
 
         $this->assertSame(0, $watch->escalate($this->campaign, now()->addMinutes(4)));
@@ -65,7 +66,7 @@ class NotificationTest extends TestCase
         $this->assertSame('No action after 5 min: PU1: votes exceed accreditation', Notice::where('user_id', $dg->id)->value('title'));
 
         // Acknowledged alerts are not escalated.
-        $other = app(\App\Services\AlertService::class)->raise($this->campaign->id, 'overvote', 'high', 'overvote:two', 'PU2', 'Detail', $this->units['PU2']);
+        $other = app(AlertService::class)->raise($this->campaign->id, 'overvote', 'high', 'overvote:two', 'PU2', 'Detail', $this->units['PU2']);
         $other->update(['status' => 'acknowledged']);
         $this->assertSame(0, $watch->escalate($this->campaign, now()->addMinutes(30)));
     }
@@ -93,7 +94,7 @@ class NotificationTest extends TestCase
     public function test_people_read_their_notices_and_the_dg_edits_rules(): void
     {
         $dg = $this->actingAsUser($this->staff(Role::Dg));
-        app(\App\Services\AlertService::class)->raise($this->campaign->id, 'failed_logins', 'high', 'failed_logins:x', 'Three failed sign-ins', 'Detail', $dg);
+        app(AlertService::class)->raise($this->campaign->id, 'failed_logins', 'high', 'failed_logins:x', 'Three failed sign-ins', 'Detail', $dg);
         $this->getJson('/api/v1/me/notices')->assertOk()->assertJsonPath('unread', 1)->assertJsonPath('data.0.url', '/admin/users');
         $this->postJson('/api/v1/me/notices/read')->assertJsonPath('unread', 0);
 

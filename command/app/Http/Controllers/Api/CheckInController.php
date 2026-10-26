@@ -17,6 +17,7 @@ class CheckInController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $unit = $user->pollingUnit;
         abort_unless($unit, 422, 'You are not assigned to a polling unit.');
@@ -97,6 +98,7 @@ class CheckInController extends Controller
     /** Supervisors approve or reject check-ins made outside the unit area. */
     public function review(Request $request, CheckIn $checkIn): JsonResponse
     {
+        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         abort_unless($checkIn->campaign_id === $user->campaign_id, 404);
         $unit = $checkIn->pollingUnit()->with('ward')->first();

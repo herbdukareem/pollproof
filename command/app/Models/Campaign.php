@@ -18,6 +18,9 @@ class Campaign extends Model
             'freeze_at' => 'date',
             'require_selfie' => 'boolean',
             'require_two_factor' => 'boolean',
+            'declared_at' => 'datetime',
+            'declared_votes' => 'array',
+            'retention_set_at' => 'datetime',
         ];
     }
 
@@ -42,6 +45,24 @@ class Campaign extends Model
         if ($this->isFrozen()) {
             abort(423, 'Setup was locked on '.$this->freeze_at->format('j M Y').'. Ask the DG to move the freeze date to make changes.');
         }
+    }
+
+    /** Election-day records (results, collation, IReV, check-ins) are read-only once the result is declared. */
+    public function isDeclared(): bool
+    {
+        return $this->declared_at !== null;
+    }
+
+    public function abortIfDeclared(): void
+    {
+        if ($this->isDeclared()) {
+            abort(423, 'Election-day records are read-only since the declaration on '.$this->declared_at->timezone(config('pollproof.timezone'))->format('j M Y').'.');
+        }
+    }
+
+    public function tribunalCases(): HasMany
+    {
+        return $this->hasMany(TribunalCase::class);
     }
 
     public function lgas(): HasMany

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\CheckInController;
+use App\Http\Controllers\Api\CloseoutController;
 use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\IncidentController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Api\SmsWebhookController;
 use App\Http\Controllers\Api\StipendController;
 use App\Http\Controllers\Api\StructureController;
 use App\Http\Controllers\Api\TallyController;
+use App\Http\Controllers\Api\TribunalController;
 use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
@@ -111,6 +113,24 @@ Route::prefix('v1')->group(function () {
             Route::get('units/{unit}/evidence', [UnitController::class, 'evidence']);
             Route::get('audit-logs', [AuditController::class, 'index']);
             Route::get('audit-logs/verify', [AuditController::class, 'verify']);
+        });
+
+        // After the election
+        Route::middleware('role:dg,legal,situation_room')->get('closeout', [CloseoutController::class, 'show']);
+        Route::middleware('role:dg')->group(function () {
+            Route::post('closeout/declare', [CloseoutController::class, 'declare']);
+            Route::post('closeout/retention', [CloseoutController::class, 'retention']);
+        });
+        Route::middleware('role:legal,dg')->group(function () {
+            Route::get('tribunal-cases', [TribunalController::class, 'index']);
+            Route::post('tribunal-cases', [TribunalController::class, 'store']);
+            Route::get('tribunal-cases/{case}', [TribunalController::class, 'show']);
+            Route::patch('tribunal-cases/{case}', [TribunalController::class, 'update']);
+            Route::post('tribunal-cases/{case}/grounds', [TribunalController::class, 'storeGround']);
+            Route::patch('tribunal-grounds/{ground}', [TribunalController::class, 'updateGround']);
+            Route::post('tribunal-cases/{case}/tasks', [TribunalController::class, 'storeTask']);
+            Route::patch('tribunal-tasks/{task}', [TribunalController::class, 'updateTask']);
+            Route::get('tribunal-cases/{case}/bundle', [TribunalController::class, 'bundle'])->middleware('throttle:10,1');
         });
 
         // Finance (the DG approves; finance prepares and exports)
