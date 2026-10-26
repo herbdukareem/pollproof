@@ -3,9 +3,9 @@ name: Command tests
 on:
   push:
     branches: [main]
-    paths: ['command/**', '.github/workflows/command-tests.yml']
+    paths: ['command/**', 'shared/**', '.github/workflows/command-tests.yml']
   pull_request:
-    paths: ['command/**', '.github/workflows/command-tests.yml']
+    paths: ['command/**', 'shared/**', '.github/workflows/command-tests.yml']
 
 permissions:
   contents: read

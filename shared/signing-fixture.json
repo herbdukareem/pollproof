@@ -1,0 +1,59 @@
+{
+    "seed_hex": "0707070707070707070707070707070707070707070707070707070707070707",
+    "public_key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+    "cases": [
+        {
+            "unit": "PU004",
+            "accredited": 448,
+            "rejected": 6,
+            "votes": {
+                "C": 22,
+                "A": 214,
+                "B": 187
+            },
+            "photo_sha256": null,
+            "latitude": "9.6139000",
+            "longitude": "6.5569123",
+            "captured_at": "2027-02-06T15:41:00Z",
+            "supersedes": null,
+            "canonical": "{\"accredited\":448,\"captured_at\":\"2027-02-06T15:41:00Z\",\"latitude\":\"9.6139000\",\"longitude\":\"6.5569123\",\"photo_sha256\":null,\"polling_unit\":\"PU004\",\"rejected\":6,\"supersedes\":null,\"votes\":{\"A\":214,\"B\":187,\"C\":22}}",
+            "sha256": "a97294e3563dbc86ade53e024f5f082d2749e198e150993346893e01d3384363",
+            "signature": "tGI207jJrXxblH3Ja146WodHrvs/vmXdKNUXoBmJhZddZ4r8tWaCB1WCp3CPaUeAeWsFeQaTKDv9KYo5gbxFCg=="
+        },
+        {
+            "unit": "PU004",
+            "accredited": 448,
+            "rejected": 6,
+            "votes": {
+                "A": 214,
+                "APC": 0,
+                "B": 187
+            },
+            "photo_sha256": "abababababababababababababababababababababababababababababababab",
+            "latitude": null,
+            "longitude": null,
+            "captured_at": "2027-02-06T16:02:11Z",
+            "supersedes": 41,
+            "canonical": "{\"accredited\":448,\"captured_at\":\"2027-02-06T16:02:11Z\",\"latitude\":null,\"longitude\":null,\"photo_sha256\":\"abababababababababababababababababababababababababababababababab\",\"polling_unit\":\"PU004\",\"rejected\":6,\"supersedes\":41,\"votes\":{\"A\":214,\"APC\":0,\"B\":187}}",
+            "sha256": "db804300e3692de35ec4031170481c6f0e6f099658dd3d39d299e9e30048e1b8",
+            "signature": "KfGMAzLuk+Y3ek+1OgoS8uQw90O2Je5mYjRiEgYe/EnEhjDK92XRYH8H54ZHMhM1apbqbl/6lJrvC1gJWwtlCg=="
+        },
+        {
+            "unit": "PRACTICE",
+            "accredited": 100,
+            "rejected": 2,
+            "votes": {
+                "A": 50,
+                "B": 48
+            },
+            "photo_sha256": null,
+            "latitude": "-0.1000000",
+            "longitude": "3.0000001",
+            "captured_at": "2027-01-20T14:00:00Z",
+            "supersedes": null,
+            "canonical": "{\"accredited\":100,\"captured_at\":\"2027-01-20T14:00:00Z\",\"latitude\":\"-0.1000000\",\"longitude\":\"3.0000001\",\"photo_sha256\":null,\"polling_unit\":\"PRACTICE\",\"rejected\":2,\"supersedes\":null,\"votes\":{\"A\":50,\"B\":48}}",
+            "sha256": "daaaa05f1424f586492c2c1aeffdc983fb04ddcade2a024c6c54092765b784ec",
+            "signature": "LIUQoNoTKQVVGJRAOk7SQBljFgtyEFxgeynv4aeAHDWjFaJrImfXBmYWeBXpr3JjDHzOqf4fFZjpDXEZLJdhCA=="
+        }
+    ]
+}

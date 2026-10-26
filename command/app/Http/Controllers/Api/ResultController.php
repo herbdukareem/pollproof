@@ -66,9 +66,11 @@ class ResultController extends Controller
             supersedesId: $data['supersedes_id'] ?? null,
             correctionReason: $data['correction_reason'] ?? null,
         );
-        $this->audit->log($user, $result->supersedes_id ? 'result.corrected' : 'result.submitted', $result, ['payload_hash' => $result->payload_hash], $request->ip());
+        if ($result->wasRecentlyCreated) {
+            $this->audit->log($user, $result->supersedes_id ? 'result.corrected' : 'result.submitted', $result, ['payload_hash' => $result->payload_hash], $request->ip());
+        }
 
-        return response()->json($this->present($result), 201);
+        return response()->json($this->present($result), $result->wasRecentlyCreated ? 201 : 200);
     }
 
     /** Upload the EC8A photo later, e.g. after the figures went by SMS. The photo must match the signed fingerprint. */

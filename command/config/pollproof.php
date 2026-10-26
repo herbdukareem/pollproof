@@ -9,6 +9,9 @@ return [
     // Election-day times (check-in deadline) are in this zone.
     'timezone' => env('POLLPROOF_TIMEZONE', 'Africa/Lagos'),
 
+    // Number agents text results and YES/NO replies to (shown in the app's fallback screen).
+    'sms_number' => env('POLLPROOF_SMS_NUMBER'),
+
     // Link sent to agents in the invite SMS.
     'app_download_url' => env('POLLPROOF_APP_URL', 'https://pollproof.ng/app'),
 

@@ -10,6 +10,8 @@ use App\Services\AuditLogger;
 use App\Services\Geo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CheckInController extends Controller
 {
@@ -29,7 +31,11 @@ class CheckInController extends Controller
             'captured_at' => ['required', 'date'],
             'selfie' => [$user->campaign->require_selfie ? 'required' : 'nullable', 'image', 'max:5120'],
             'request_review' => ['nullable', 'boolean'],
+            'client_ref' => ['nullable', 'uuid'],
         ]);
+        if (($data['client_ref'] ?? null) && ($seen = CheckIn::where('user_id', $user->id)->where('client_ref', $data['client_ref'])->first())) {
+            return response()->json(['id' => $seen->id, 'status' => $seen->status, 'distance_m' => $seen->distance_m]);
+        }
 
         $campaign = $user->campaign;
         $distance = ($unit->latitude !== null && $unit->longitude !== null)
@@ -63,6 +69,7 @@ class CheckInController extends Controller
             'status' => $inside ? CheckIn::VERIFIED : CheckIn::PENDING_REVIEW,
             'selfie_path' => $selfie,
             'captured_at' => $data['captured_at'],
+            'client_ref' => $data['client_ref'] ?? null,
         ]);
         $this->audit->log($user, 'checkin.created', $checkIn, ['status' => $checkIn->status, 'distance_m' => $distance], $request->ip());
         if ($checkIn->counts()) {
@@ -117,5 +124,17 @@ class CheckInController extends Controller
         }
 
         return response()->json(['id' => $checkIn->id, 'status' => $checkIn->status]);
+    }
+
+    /** The selfie sent with a check-in, for the supervisor deciding whether to approve it. */
+    public function selfie(Request $request, CheckIn $checkIn): StreamedResponse
+    {
+        $user = $request->user();
+        abort_unless($checkIn->campaign_id === $user->campaign_id && $checkIn->selfie_path, 404);
+        $unit = $checkIn->pollingUnit()->with('ward')->first();
+        abort_if($user->hasRole(Role::WardSupervisor) && $unit->ward_id !== $user->ward_id, 403);
+        abort_if($user->hasRole(Role::LgaSupervisor) && $unit->ward->lga_id !== $user->lga_id, 403);
+
+        return Storage::disk(config('pollproof.evidence_disk'))->response($checkIn->selfie_path);
     }
 }

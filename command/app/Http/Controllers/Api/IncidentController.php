@@ -28,7 +28,11 @@ class IncidentController extends Controller
             'occurred_at' => ['required', 'date'],
             'media' => ['nullable', 'array', 'max:5'],
             'media.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp,video/mp4,audio/mpeg,audio/mp4,audio/aac,audio/ogg', 'max:20480'],
+            'client_ref' => ['nullable', 'uuid'],
         ]);
+        if (($data['client_ref'] ?? null) && ($seen = Incident::where('user_id', $user->id)->where('client_ref', $data['client_ref'])->first())) {
+            return response()->json(['id' => $seen->id, 'status' => $seen->status]);
+        }
         $paths = collect($request->file('media', []))
             ->map(fn ($f) => $f->store("campaigns/{$user->campaign_id}/incidents", config('pollproof.evidence_disk')))
             ->all();
@@ -45,6 +49,7 @@ class IncidentController extends Controller
             'media_paths' => $paths,
             'occurred_at' => $data['occurred_at'],
             'updates' => [],
+            'client_ref' => $data['client_ref'] ?? null,
         ]);
         if ($incident->severity === 'high') {
             $where = $user->pollingUnit?->code ?? 'Unassigned agent';

@@ -127,6 +127,10 @@ Every write ──► hash-chained audit log
 - **Reconciliation runs on every write.** A new unit result re-checks the ward, LGA and state sheets that cover it and the unit's IReV entry. Alerts are de-duplicated per problem, clear themselves when the problem goes away, and stay resolved if someone resolved them and nothing has changed.
 - **Two people per result.** A verifier who did not submit the result approves it or sends it back with a note. Sent-back results drop out of tallies.
 
+## Retries from the app
+
+The app resends anything it isn't sure went through. Sending the same signed result again returns the first record (200) instead of an error, and check-ins and incidents carry a `client_ref` UUID so a repeat returns the original. `GET me` also gives the app the campaign's check-in rules, the SMS number (`POLLPROOF_SMS_NUMBER`), the agent's supervisor and today's progress.
+
 ## Result signing (contract for the mobile app)
 
 On first launch the phone generates an Ed25519 key pair and registers the public key with `POST /api/v1/devices`. Each result is signed over this canonical JSON:
@@ -139,6 +143,7 @@ On first launch the phone generates an Ed25519 key pair and registers the public
 - Integers as integers. Coordinates as strings with exactly 7 decimals, or `null`.
 - `captured_at` is the exact string the phone recorded, in UTC.
 - `votes` contains exactly the parties the phone sends. Parties left out are stored as zero.
+- The fixture in `shared/signing-fixture.json` is checked by `tests/Unit/SigningContractTest.php` and by the Flutter tests.
 - `photo_sha256` is the hex SHA-256 of the EC8A photo file. If the photo is uploaded later (`POST /results/{id}/photo`), it must hash to the same value.
 
 The request carries `device_id` and `signature` (base64 detached signature). The server stores `payload_hash` = SHA-256 of the canonical JSON; its first 8 hex characters are the fingerprint read back to the agent.
@@ -175,6 +180,7 @@ All routes are under `/api/v1`. The phone authenticates with `Authorization: Bea
 | POST | `onboarding/practice` | field staff | Practice result, signed exactly like a real one but for unit code `PRACTICE` |
 | POST | `onboarding/quiz` | field staff | `{answers: {q1: "b", …}}`; marked on the server |
 | POST | `onboarding/confirm` | field staff | `{available, note}` with `available` true or false for election day |
+| GET | `check-ins/{id}/selfie` | supervisors | The selfie sent with a check-in |
 | POST | `me/password` | command room | Change password |
 | GET/POST/DELETE | `me/two-factor` · POST `me/two-factor/confirm`, `me/two-factor/recovery-codes` | command room | Two-step sign-in |
 | GET | `me/notices` · POST `me/notices/read` | everyone | Notifications for the signed-in person |
@@ -209,7 +215,6 @@ php artisan pollproof:verify-audit {campaign}
 
 ## Not built yet
 
-- The Flutter agent app (the API it needs is in place).
 - WhatsApp delivery for notifications.
 - A map view of units; GPS pins are typed or set from the app.
 - A server-generated PDF of evidence and the campaign report; today both print to PDF from the browser.

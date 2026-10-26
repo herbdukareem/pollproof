@@ -60,6 +60,15 @@ final class ResultRecorder
             }
         }
 
+        // The phone retries when it can't tell whether a send went through. The same signed payload
+        // from the same agent is the same record, so return it instead of refusing or duplicating it.
+        $canonical = ResultSigner::canonical($unit->code, $accredited, $rejected, $signedVotes, $photoSha256, $latitude, $longitude, $capturedAt, $supersedesId);
+        $duplicate = ResultSubmission::where('polling_unit_id', $unit->id)->where('user_id', $agent->id)
+            ->where('payload_hash', ResultSigner::hash($canonical))->first();
+        if ($duplicate) {
+            return $duplicate;
+        }
+
         // A unit has one current result. Anything after it must be an explicit correction, except the
         // signed app copy of figures the agent first sent by SMS, which is linked automatically.
         $existing = ResultSubmission::where('polling_unit_id', $unit->id)->where('is_current', true)->first();
@@ -72,7 +81,6 @@ final class ResultRecorder
             }
         }
 
-        $canonical = ResultSigner::canonical($unit->code, $accredited, $rejected, $signedVotes, $photoSha256, $latitude, $longitude, $capturedAt, $supersedesId);
         $signatureValid = $device && $signature && ! $device->revoked_at
             && ResultSigner::verify($canonical, $signature, $device->public_key);
 

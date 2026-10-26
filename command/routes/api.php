@@ -74,6 +74,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:ward_supervisor,lga_supervisor,situation_room,dg')->group(function () {
             Route::get('check-ins', [CheckInController::class, 'index']);
             Route::post('check-ins/{checkIn}/review', [CheckInController::class, 'review']);
+            Route::get('check-ins/{checkIn}/selfie', [CheckInController::class, 'selfie']);
             Route::get('agents', AgentListController::class);
             Route::post('agents/{agent}/assign', [AgentController::class, 'assign']);
             Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);

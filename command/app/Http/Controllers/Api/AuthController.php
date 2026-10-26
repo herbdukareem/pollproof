@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
+use App\Models\Campaign;
+use App\Models\Incident;
+use App\Models\ResultSubmission;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
@@ -114,7 +118,48 @@ class AuthController extends Controller
             'ward' => $user->ward?->only(['id', 'code', 'name']),
             'lga' => ($user->lga ?? $user->ward?->lga)?->only(['id', 'code', 'name']),
             'parties' => $user->campaign?->parties()->get(['code', 'name', 'is_ours']),
+            'rules' => ($c = Campaign::find($user->campaign_id)) ? [
+                'geofence_radius_m' => $c->geofence_radius_m,
+                'max_gps_accuracy_m' => $c->max_gps_accuracy_m,
+                'require_selfie' => $c->require_selfie,
+                'sms_number' => config('pollproof.sms_number'),
+                'declared' => $c->isDeclared(),
+            ] : null,
+            'supervisor' => $this->supervisorFor($user),
+            'today' => $user->role === Role::Agent ? $this->agentToday($user) : null,
         ]);
+    }
+
+    /** Who this field user calls first: the ward supervisor, or for a ward supervisor their LGA supervisor. */
+    private function supervisorFor(User $user): ?array
+    {
+        if (! $user->role->isField() || $user->role === Role::LgaSupervisor) {
+            return null;
+        }
+        $wardId = $user->pollingUnit?->ward_id ?? $user->ward_id;
+        $lgaId = $user->pollingUnit?->ward?->lga_id ?? $user->lga_id ?? $user->ward?->lga_id;
+        $sup = $user->role !== Role::WardSupervisor && $wardId
+            ? User::where('campaign_id', $user->campaign_id)->where('role', Role::WardSupervisor)->where('ward_id', $wardId)->whereNull('deactivated_at')->first()
+            : null;
+        $sup ??= $lgaId ? User::where('campaign_id', $user->campaign_id)->where('role', Role::LgaSupervisor)->where('lga_id', $lgaId)->where('is_backup', false)->whereNull('deactivated_at')->first() : null;
+
+        return $sup ? ['name' => $sup->name, 'code' => $sup->code, 'phone' => $sup->phone, 'role' => $sup->role->label()] : null;
+    }
+
+    /** What the agent has done today, so a reinstalled app picks up where it left off. */
+    private function agentToday(User $user): array
+    {
+        $checkIn = $user->checkIns()->latest('id')->first();
+        $result = ResultSubmission::where('user_id', $user->id)->where('polling_unit_id', $user->polling_unit_id)->where('is_current', true)->first();
+
+        return [
+            'check_in' => $checkIn ? ['id' => $checkIn->id, 'status' => $checkIn->status, 'counts' => $checkIn->counts(), 'distance_m' => $checkIn->distance_m, 'at' => $checkIn->captured_at] : null,
+            'result' => $result ? [
+                'id' => $result->id, 'status' => $result->status, 'fingerprint' => $result->fingerprint(), 'total_cast' => $result->total_cast,
+                'has_photo' => $result->photo_path !== null, 'review_note' => $result->review_note, 'captured_at' => $result->captured_at, 'channel' => $result->channel,
+            ] : null,
+            'incidents' => $user->hasMany(Incident::class)->count(),
+        ];
     }
 
     private function tokenResponse(User $user, string $name): JsonResponse
