@@ -4,12 +4,12 @@ import { useRoute, useRouter } from 'vue-router';
 import PinLogo from './PinLogo.vue';
 import Icon from './Icon.vue';
 import { session, signOut } from '../lib/session';
-import { navFor } from '../lib/nav';
+import { sectionsFor } from '../lib/nav';
 
 const route = useRoute();
 const router = useRouter();
 const open = ref(false);
-const items = computed(() => navFor(session.user?.role));
+const sections = computed(() => sectionsFor(session.user?.role));
 const initials = computed(() => (session.user?.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase());
 
 watch(() => route.fullPath, () => (open.value = false));
@@ -30,17 +30,20 @@ async function logout() {
                 <PinLogo :size="30" />
                 <span class="text-[21px] tracking-tight"><b class="font-extrabold">Poll</b><span class="font-medium">Proof</span></span>
             </RouterLink>
-            <nav aria-label="Main" class="flex flex-col gap-1">
-                <RouterLink
-                    v-for="item in items"
-                    :key="item.name"
-                    :to="item.path"
-                    class="flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] text-[#c9d1de] hover:bg-navy-2 hover:text-white"
-                    active-class="!bg-navy-3 !text-white font-bold"
-                >
-                    <Icon :name="item.icon" />
-                    {{ item.label }}
-                </RouterLink>
+            <nav aria-label="Main" class="-mr-2 flex flex-col gap-4 overflow-y-auto pr-2">
+                <div v-for="section in sections" :key="section.title" class="flex flex-col gap-0.5">
+                    <div v-if="sections.length > 1" class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase">{{ section.title }}</div>
+                    <RouterLink
+                        v-for="item in section.items"
+                        :key="item.name"
+                        :to="item.path"
+                        class="flex h-10 items-center gap-3 rounded-xl px-3 text-[14.5px] text-[#c9d1de] hover:bg-navy-2 hover:text-white"
+                        active-class="!bg-navy-3 !text-white font-bold"
+                    >
+                        <Icon :name="item.icon" />
+                        {{ item.label }}
+                    </RouterLink>
+                </div>
             </nav>
             <div class="mt-auto rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]">
                 <div class="font-bold text-white">{{ session.user?.campaign?.name }}</div>
@@ -56,6 +59,7 @@ async function logout() {
                     Signed in as <b class="text-ink">{{ session.user?.name }}</b> <template v-if="session.user?.role_label !== session.user?.name">· {{ session.user?.role_label }}</template>
                 </div>
                 <div class="hidden h-10 w-10 items-center justify-center rounded-full bg-navy text-sm font-bold text-white sm:flex" aria-hidden="true">{{ initials }}</div>
+                <RouterLink to="/account/password" class="btn-outline hidden sm:inline-flex" title="Change password"><Icon name="key" :size="16" /><span class="sr-only">Change password</span></RouterLink>
                 <button class="btn-outline" @click="logout"><Icon name="logout" :size="16" /> Sign out</button>
             </header>
             <main class="flex-1 px-4 py-6 sm:px-7">

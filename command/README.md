@@ -27,6 +27,7 @@ createdb -O pollproof pollproof_test
 php artisan migrate --seed       # demo state: 2 LGAs, 4 wards, 12 units, 4 parties
 php artisan db:seed --class=ElectionDaySeeder   # optional: plays a short election day through the API
 php artisan serve                # open http://localhost:8000 and sign in
+php artisan queue:work           # sends invites and reminders (bulk SMS go through the queue)
 php artisan test
 ```
 
@@ -53,8 +54,38 @@ The Vue app lives in `resources/js` and is served by a catch-all route to `resou
 | Agents, check-ins to confirm, reserves | `/agents` | supervisors, situation room, DG |
 | Stipends and payment export | `/stipends` | finance, DG |
 | Audit log and chain check | `/audit` | legal, DG |
+| **Setup:** readiness funnel, per-LGA readiness, reminders | `/setup/readiness` | DG, situation room |
+| **Setup:** LGAs, wards, units, GPS gaps, check-in rules | `/setup/structure` | DG, situation room (rules: DG) |
+| **Setup:** agent roster, CSV upload, invites, auto-assign | `/setup/roster` | DG, situation room |
+| **Setup:** LGA and ward supervisors, open wards | `/setup/supervisors` | DG, situation room |
+| **Admin:** users and roles, temporary passwords, deactivation | `/admin/users` | DG |
+| **Admin:** election date, freeze date, parties | `/admin/campaign` | DG |
+| Change password (forced after a temporary one) | `/account/password` | everyone |
 
 The router enforces roles for navigation; the API enforces them for data.
+
+## Before election day
+
+1. **Campaign** (DG): election date, setup freeze date and the parties on the ballot.
+2. **Structure**: import the official polling-unit list (`lga_code, lga_name, ward_code, ward_name, pu_code, pu_name, latitude, longitude, registered_voters`). Units without GPS are listed; supervisors drop a pin from the app at the unit (`PATCH polling-units/{id}` with a GPS fix within the accuracy limit).
+3. **Supervisors**: upload `name, phone, level (lga|ward), lga_code, ward_code, backup`, or fill one post at a time. A new holder replaces the old one.
+4. **Agent roster**: upload `name, phone, pu_code` (or `lga_code, ward_code, reserve=yes` for reserves). Rows are matched on phone, so a corrected file updates people. Bad rows are skipped and can be downloaded. Auto-assign fills free units with agents registered in the same ward.
+5. **Invites**: agents get the app link and their agent ID by SMS. In the app they register a signing key, send a practice result, pass the 10-question quiz (8 to pass) and confirm they will be there.
+6. **Readiness**: the funnel from assigned to confirmed, by LGA, with one-tap SMS reminders. Agents can reply `YES` or `NO` to the confirmation SMS; a NO raises an alert so a reserve is sent.
+7. **Freeze**: from the freeze date, structure, roster and supervisors are locked (HTTP 423). Sending reserves still works.
+
+## SMS
+
+`POLLPROOF_SMS_DRIVER=log` writes messages to the log. For real sending use [Termii](https://termii.com):
+
+```
+POLLPROOF_SMS_DRIVER=termii
+TERMII_API_KEY=...
+TERMII_SENDER_ID=PollProof      # must be approved by Termii
+TERMII_CHANNEL=dnd              # reaches numbers on the Do-Not-Disturb list
+```
+
+One-time codes are sent straight away. Invites and reminders are queued, so run `php artisan queue:work` (or a supervisor process) in production. Numbers are stored as `0803…` and sent as `234803…`.
 
 ## How it fits together
 
@@ -118,6 +149,12 @@ All routes are under `/api/v1`. The phone authenticates with `Authorization: Bea
 | POST | `results/{id}/photo` | agent | Attach the EC8A photo later |
 | POST | `incidents` | field staff | Report an incident with media |
 | POST | `agents/{id}/assign` | supervisors | Send a reserve to a unit |
+| PATCH | `polling-units/{id}` | supervisors, DG, situation room | Set a unit's GPS pin or details |
+| GET | `onboarding` | field staff | Onboarding step and the quiz questions (no answers) |
+| POST | `onboarding/practice` | field staff | Practice result, signed exactly like a real one but for unit code `PRACTICE` |
+| POST | `onboarding/quiz` | field staff | `{answers: {q1: "b", …}}`; marked on the server |
+| POST | `onboarding/confirm` | field staff | `{available, note}` with `available` true or false for election day |
+| POST | `me/password` | command room | Change password |
 | GET | `tally` | command room | Totals, per-LGA shares, 25%-in-⅔ test |
 | GET | `units` | command room | Units with reporting status; filters `status`, `lga_id`, `ward_id`, `search` |
 | GET | `results-queue` · POST `results/{id}/approve` · `send-back` | verifier | Second check |
@@ -129,6 +166,12 @@ All routes are under `/api/v1`. The phone authenticates with `Authorization: Bea
 | GET | `audit-logs`, `audit-logs/verify` | legal, DG | Audit trail and chain check |
 | GET | `stipends`, `stipends/export` | finance, DG | Eligibility and payout CSV |
 | POST | `structure/import` | DG, situation room | Polling-unit CSV import |
+| GET | `setup/structure`, `setup/roster`, `setup/supervisors`, `readiness` | DG, situation room | Setup screens |
+| POST | `roster/import`, `roster/invite`, `roster/auto-assign` | DG, situation room | Agents CSV, SMS invites, ward matching |
+| POST | `supervisors/import`, `supervisors` | DG, situation room | Supervisor CSV or one post |
+| POST | `readiness/remind` | DG, situation room | SMS to `not_installed`, `not_trained` or `not_confirmed` |
+| GET/PATCH | `campaign` · POST/PATCH/DELETE `parties` | DG | Campaign settings and the ballot |
+| GET/POST/PATCH | `users` · POST `users/{id}/reset-password` | DG | Command-room accounts |
 
 ## Commands
 
@@ -139,9 +182,10 @@ php artisan pollproof:verify-audit {campaign}
 
 ## Not built yet
 
-- A real SMS aggregator driver (bind it to `App\Services\Sms\SmsSender`).
 - Two-step verification for command-room sign-in.
+- Automatic escalation of unanswered incidents up the supervisor chain.
 - A server-generated PDF of evidence bundles; today the web app's evidence page prints to PDF from the browser.
 - Encryption at rest per campaign and object storage for photos; photos use the `local` disk.
-- Command-room setup screens (structure import, staff and agent onboarding, party list); today these go through the API and the import command.
+- After-election screens (close-out, tribunal workspace) and the notifications screen.
+- A map view of units; GPS pins are typed or set from the app.
 - The Flutter agent app.
