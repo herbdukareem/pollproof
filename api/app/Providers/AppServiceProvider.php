@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Providers;
+
+use App\Services\Sms\LogSmsSender;
+use App\Services\Sms\SmsSender;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        // Swap in a real aggregator (e.g. Africa's Talking) by binding another SmsSender here.
+        $this->app->singleton(SmsSender::class, fn () => match (config('pollproof.sms_driver')) {
+            default => new LogSmsSender,
+        });
+    }
+
+    public function boot(): void
+    {
+        RateLimiter::for('otp', fn (Request $request) => [
+            Limit::perMinute(3)->by('otp:'.$request->input('phone')),
+            Limit::perMinute(20)->by('otp-ip:'.$request->ip()),
+        ]);
+    }
+}
