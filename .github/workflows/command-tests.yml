@@ -68,4 +68,16 @@ jobs:
           DB_DATABASE: pollproof_test
           DB_USERNAME: pollproof
           DB_PASSWORD: secret
-        run: php artisan test
+        run: php artisan test --log-junit storage/junit.xml
+
+      - name: Report failing tests
+        if: failure()
+        run: |
+          # Turn each failure into an annotation, readable from the checks API without the raw log.
+          php -r '
+            if (!is_file("storage/junit.xml")) { echo "::error::No test report; the run failed before tests started.\n"; exit; }
+            $x = simplexml_load_file("storage/junit.xml");
+            foreach ($x->xpath("//testcase[failure or error]") as $t) {
+              $m = (string) ($t->failure ?: $t->error);
+              echo "::error title=".$t["class"]."::".$t["name"]." ".str_replace(["\r", "\n"], ["", "%0A"], substr($m, 0, 900))."\n";
+            }'
