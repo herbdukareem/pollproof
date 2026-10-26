@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+@source '../js/**/*.vue';
+@source '../views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --color-navy: #13213c;
+    --color-navy-2: #1d2d4c;
+    --color-navy-3: #2a3d63;
+    --color-ink: #13213c;
+    --color-ink-2: #4a5464;
+    --color-ink-3: #8a93a3;
+    --color-mist: #f3f5f8;
+    --color-line: #e1e4ea;
+    --color-orange: #e8590c;
+    --color-action: #c2410c;
+    --color-action-dark: #9a3412;
+    --color-peach: #ffb48a;
+    --color-good: #17694b;
+    --color-good-bg: #e3f4ec;
+    --color-warn: #7a4f00;
+    --color-warn-bg: #fff1cc;
+    --color-bad: #8f350a;
+    --color-bad-bg: #fde7da;
+}
+
+@utility card {
+    @apply rounded-2xl border border-line bg-white;
+}
+@utility btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+    @apply btn bg-action text-white hover:bg-action-dark;
+}
+@utility btn-navy {
+    @apply btn bg-navy text-white hover:bg-navy-2;
+}
+@utility btn-outline {
+    @apply btn border-[1.5px] border-navy bg-white text-navy hover:bg-mist;
+}
+@utility btn-good {
+    @apply btn bg-good text-white hover:opacity-90;
+}
+@utility field {
+    @apply h-11 w-full rounded-xl border border-[#d6dae1] bg-white px-3 text-sm text-ink outline-none focus:border-navy focus:ring-2 focus:ring-navy/15;
+}
+@utility label {
+    @apply mb-1.5 block text-[13px] font-bold text-ink;
+}
+@utility th {
+    @apply px-4 py-3 text-left text-xs font-bold tracking-wide text-ink-2 uppercase;
+}
+@utility td {
+    @apply border-t border-[#eef0f3] px-4 py-3 align-middle;
+}

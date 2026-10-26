@@ -6,8 +6,7 @@ PollProof verifies polling-unit agents, captures a signed copy of every EC8A res
 
 | Folder | What | Status |
 |---|---|---|
-| [`api/`](api/README.md) | Laravel + PostgreSQL backend | Core built and tested |
-| `dashboard/` | Command-room web app | Not started |
+| [`command/`](command/README.md) | Laravel + Vue monolith: the API for the agent app and the command-room web app | Election-day screens built and tested |
 | `mobile/` | Flutter agent app | Not started |
 
-See [`api/README.md`](api/README.md) to run the backend.
+See [`command/README.md`](command/README.md) to run it.
