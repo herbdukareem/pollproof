@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
+use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -20,9 +21,10 @@ class AuthController extends Controller
     public function requestOtp(Request $request): JsonResponse
     {
         $data = $request->validate(['phone' => ['required', 'string', 'max:20']]);
-        $user = User::where('phone', $data['phone'])->first();
-        if ($user && $user->role->isField()) {
-            $this->otp->send($data['phone']);
+        $phone = Phone::normalize($data['phone']) ?? $data['phone'];
+        $user = User::where('phone', $phone)->first();
+        if ($user && $user->isActive() && $user->role->isField()) {
+            $this->otp->send($phone);
         }
 
         return response()->json(['message' => 'If this number is registered, a code has been sent.']);
@@ -35,8 +37,9 @@ class AuthController extends Controller
             'code' => ['required', 'digits:6'],
             'device_name' => ['nullable', 'string', 'max:100'],
         ]);
-        $user = User::where('phone', $data['phone'])->first();
-        if (! $user || ! $user->role->isField() || ! $this->otp->verify($data['phone'], $data['code'])) {
+        $phone = Phone::normalize($data['phone']) ?? $data['phone'];
+        $user = User::where('phone', $phone)->first();
+        if (! $user || ! $user->isActive() || ! $user->role->isField() || ! $this->otp->verify($phone, $data['code'])) {
             throw ValidationException::withMessages(['code' => 'The code is wrong or has expired.']);
         }
         $this->audit->log($user, 'auth.otp_login', null, [], $request->ip());
@@ -49,7 +52,7 @@ class AuthController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string']]);
         $user = User::where('email', $data['email'])->first();
-        if (! $user || ! $user->password || ! Hash::check($data['password'], $user->password) || $user->role->isField()) {
+        if (! $user || ! $user->isActive() || ! $user->password || ! Hash::check($data['password'], $user->password) || $user->role->isField()) {
             $this->audit->log($user, 'auth.failed_login', null, ['email' => $data['email']], $request->ip(), $user?->campaign_id);
             throw ValidationException::withMessages(['email' => 'These details do not match our records.']);
         }
@@ -79,6 +82,7 @@ class AuthController extends Controller
             'role' => $user->role,
             'role_label' => $user->role->label(),
             'is_reserve' => $user->is_reserve,
+            'must_change_password' => $user->must_change_password,
             'campaign' => $user->campaign,
             'polling_unit' => $user->pollingUnit ? [
                 'id' => $user->pollingUnit->id,

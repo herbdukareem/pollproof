@@ -27,6 +27,15 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => Role::class,
             'is_reserve' => 'boolean',
+            'is_backup' => 'boolean',
+            'must_change_password' => 'boolean',
+            'deactivated_at' => 'datetime',
+            'last_active_at' => 'datetime',
+            'invited_at' => 'datetime',
+            'practice_passed_at' => 'datetime',
+            'trained_at' => 'datetime',
+            'confirmed_at' => 'datetime',
+            'unavailable_at' => 'datetime',
         ];
     }
 
@@ -59,6 +68,36 @@ class User extends Authenticatable
     {
         return $this->hasMany(CheckIn::class);
     }
+
+    public function isActive(): bool
+    {
+        return $this->deactivated_at === null;
+    }
+
+    /**
+     * Furthest onboarding step reached by a field user, from 0 (nothing) to 5 (confirmed for election day).
+     * Steps: invited, app installed (a signing key is registered), practice result sent, trained, confirmed.
+     */
+    public function onboardingStep(): int
+    {
+        // Load with withCount('devices') when listing many users.
+        $hasDevice = $this->devices_count !== null ? $this->devices_count > 0 : $this->devices()->exists();
+        $steps = [
+            $this->invited_at !== null || $hasDevice,
+            $hasDevice,
+            $this->practice_passed_at !== null,
+            $this->trained_at !== null,
+            $this->confirmed_at !== null && $this->unavailable_at === null,
+        ];
+        $n = 0;
+        while ($n < count($steps) && $steps[$n]) {
+            $n++;
+        }
+
+        return $n;
+    }
+
+    public const ONBOARDING_STEPS = ['Not invited', 'Invited', 'App installed', 'Practice sent', 'Trained', 'Confirmed'];
 
     public function hasRole(Role ...$roles): bool
     {

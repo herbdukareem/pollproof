@@ -21,7 +21,7 @@ class SessionController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string']]);
         $user = User::where('email', $data['email'])->first();
-        if (! $user || ! $user->password || $user->role->isField() || ! Hash::check($data['password'], $user->password)) {
+        if (! $user || ! $user->isActive() || ! $user->password || $user->role->isField() || ! Hash::check($data['password'], $user->password)) {
             $audit->log($user, 'auth.failed_login', null, ['email' => $data['email'], 'via' => 'web'], $request->ip(), $user?->campaign_id);
             throw ValidationException::withMessages(['email' => 'These details do not match our records.']);
         }
@@ -30,7 +30,9 @@ class SessionController extends Controller
         $request->session()->regenerate();
         $audit->log($user, 'auth.login', null, ['via' => 'web'], $request->ip());
 
-        return response()->json(['user' => ['id' => $user->id, 'name' => $user->name, 'role' => $user->role]]);
+        $user->forceFill(['last_active_at' => now()])->saveQuietly();
+
+        return response()->json(['user' => ['id' => $user->id, 'name' => $user->name, 'role' => $user->role, 'must_change_password' => $user->must_change_password]]);
     }
 
     public function destroy(Request $request): JsonResponse

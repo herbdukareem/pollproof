@@ -25,7 +25,7 @@ class CheckInController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy_m' => ['required', 'integer', 'min:0', 'max:5000'],
             'captured_at' => ['required', 'date'],
-            'selfie' => ['nullable', 'image', 'max:5120'],
+            'selfie' => [$user->campaign->require_selfie ? 'required' : 'nullable', 'image', 'max:5120'],
             'request_review' => ['nullable', 'boolean'],
         ]);
 

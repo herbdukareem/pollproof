@@ -1,21 +1,29 @@
 <?php
 
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AgentController;
 use App\Http\Controllers\Api\AgentListController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\CheckInController;
 use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
+use App\Http\Controllers\Api\OnboardingController;
+use App\Http\Controllers\Api\PollingUnitController;
+use App\Http\Controllers\Api\ReadinessController;
 use App\Http\Controllers\Api\ResultController;
+use App\Http\Controllers\Api\RosterController;
+use App\Http\Controllers\Api\SetupController;
 use App\Http\Controllers\Api\SmsWebhookController;
 use App\Http\Controllers\Api\StipendController;
 use App\Http\Controllers\Api\StructureController;
 use App\Http\Controllers\Api\TallyController;
 use App\Http\Controllers\Api\UnitController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -27,9 +35,10 @@ Route::prefix('v1')->group(function () {
     // Aggregator webhook for results sent by SMS
     Route::post('sms/inbound', SmsWebhookController::class)->middleware('throttle:600,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::post('me/password', [AccountController::class, 'password'])->middleware('throttle:10,1');
 
         // Agent app
         Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->post('devices', [DeviceController::class, 'store']);
@@ -40,12 +49,21 @@ Route::prefix('v1')->group(function () {
         });
         Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->post('incidents', [IncidentController::class, 'store']);
 
+        // Agent onboarding: practice run, quiz, eve-of-election confirmation
+        Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->group(function () {
+            Route::get('onboarding', [OnboardingController::class, 'show']);
+            Route::post('onboarding/practice', [OnboardingController::class, 'practice']);
+            Route::post('onboarding/quiz', [OnboardingController::class, 'quiz'])->middleware('throttle:20,1');
+            Route::post('onboarding/confirm', [OnboardingController::class, 'confirm']);
+        });
+
         // Supervisors
         Route::middleware('role:ward_supervisor,lga_supervisor,situation_room,dg')->group(function () {
             Route::get('check-ins', [CheckInController::class, 'index']);
             Route::post('check-ins/{checkIn}/review', [CheckInController::class, 'review']);
             Route::get('agents', AgentListController::class);
             Route::post('agents/{agent}/assign', [AgentController::class, 'assign']);
+            Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);
         });
 
         // Command room: read
@@ -90,7 +108,32 @@ Route::prefix('v1')->group(function () {
             Route::get('stipends/export', [StipendController::class, 'export']);
         });
 
-        // Setup
-        Route::middleware('role:dg,situation_room')->post('structure/import', [StructureController::class, 'import']);
+        // Setup (before election day)
+        Route::middleware('role:dg,situation_room')->group(function () {
+            Route::get('setup/structure', [SetupController::class, 'structure']);
+            Route::post('structure/import', [StructureController::class, 'import']);
+            Route::get('setup/roster', [SetupController::class, 'roster']);
+            Route::post('roster/import', [RosterController::class, 'importAgents']);
+            Route::post('roster/invite', [RosterController::class, 'invite'])->middleware('throttle:10,1');
+            Route::post('roster/auto-assign', [RosterController::class, 'autoAssign']);
+            Route::get('setup/supervisors', [SetupController::class, 'supervisors']);
+            Route::post('supervisors/import', [RosterController::class, 'importSupervisors']);
+            Route::post('supervisors', [RosterController::class, 'storeSupervisor']);
+            Route::get('readiness', [ReadinessController::class, 'index']);
+            Route::post('readiness/remind', [ReadinessController::class, 'remind'])->middleware('throttle:10,1');
+        });
+
+        // Admin (DG)
+        Route::middleware('role:dg')->group(function () {
+            Route::get('campaign', [CampaignController::class, 'show']);
+            Route::patch('campaign', [CampaignController::class, 'update']);
+            Route::post('parties', [CampaignController::class, 'storeParty']);
+            Route::patch('parties/{party}', [CampaignController::class, 'updateParty']);
+            Route::delete('parties/{party}', [CampaignController::class, 'destroyParty']);
+            Route::get('users', [UserController::class, 'index']);
+            Route::post('users', [UserController::class, 'store']);
+            Route::patch('users/{user}', [UserController::class, 'update']);
+            Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
+        });
     });
 });

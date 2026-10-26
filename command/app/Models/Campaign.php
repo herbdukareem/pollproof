@@ -15,7 +15,22 @@ class Campaign extends Model
             'election_date' => 'date',
             'lga_share_threshold' => 'float',
             'lga_count_fraction' => 'float',
+            'freeze_at' => 'date',
+            'require_selfie' => 'boolean',
         ];
+    }
+
+    /** After the freeze date the polling-unit list, roster and supervisors can no longer be changed. */
+    public function isFrozen(): bool
+    {
+        return $this->freeze_at !== null && now()->startOfDay()->gte($this->freeze_at);
+    }
+
+    public function abortIfFrozen(): void
+    {
+        if ($this->isFrozen()) {
+            abort(423, 'Setup was locked on '.$this->freeze_at->format('j M Y').'. Ask the DG to move the freeze date to make changes.');
+        }
     }
 
     public function lgas(): HasMany
