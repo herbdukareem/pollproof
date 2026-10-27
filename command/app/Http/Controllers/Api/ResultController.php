@@ -109,7 +109,7 @@ class ResultController extends Controller
             ->where('is_current', true)
             ->where('status', ResultSubmission::PENDING_REVIEW)
             ->with(['pollingUnit.ward.lga', 'votes.party', 'user:id,name,code'])
-            ->orderByRaw("CASE WHEN flags::text LIKE '%overvote%' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN JSON_CONTAINS(flags, '\"overvote\"') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
             ->limit(100)
             ->get();

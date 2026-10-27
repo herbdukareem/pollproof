@@ -111,7 +111,7 @@ return new class extends Migration
             $table->boolean('signature_valid')->default(false);
             $table->boolean('is_current')->default(true)->index();
             $table->string('status')->default('pending_review')->index()->comment('pending_review, approved, sent_back');
-            $table->jsonb('flags')->nullable();
+            $table->json('flags')->nullable();
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
             $table->string('review_note')->nullable();
@@ -132,7 +132,7 @@ return new class extends Migration
             $table->string('level')->comment('ward (EC8B), lga (EC8C), state (EC8D)');
             $table->unsignedBigInteger('scope_id')->nullable()->comment('ward_id or lga_id; null for state');
             $table->foreignId('entered_by')->constrained('users')->cascadeOnDelete();
-            $table->jsonb('votes')->comment('{"PARTY_CODE": votes}');
+            $table->json('votes')->comment('{"PARTY_CODE": votes}');
             $table->unsignedInteger('accredited')->nullable();
             $table->unsignedInteger('rejected')->default(0);
             $table->unsignedInteger('total_cast');
@@ -148,7 +148,7 @@ return new class extends Migration
             $table->foreignId('polling_unit_id')->constrained()->cascadeOnDelete();
             $table->foreignId('entered_by')->constrained('users')->cascadeOnDelete();
             $table->boolean('not_on_irev')->default(false);
-            $table->jsonb('votes')->nullable();
+            $table->json('votes')->nullable();
             $table->unsignedInteger('accredited')->nullable();
             $table->unsignedInteger('rejected')->nullable();
             $table->string('screenshot_path')->nullable();
@@ -166,10 +166,10 @@ return new class extends Migration
             $table->text('description');
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
-            $table->jsonb('media_paths')->nullable();
+            $table->json('media_paths')->nullable();
             $table->string('status')->default('open')->comment('open, handling, resolved');
             $table->string('assigned_to')->nullable();
-            $table->jsonb('updates')->nullable();
+            $table->json('updates')->nullable();
             $table->timestamp('occurred_at');
             $table->timestamps();
         });
@@ -182,7 +182,7 @@ return new class extends Migration
             $table->string('title');
             $table->text('detail');
             $table->nullableMorphs('subject');
-            $table->jsonb('data')->nullable();
+            $table->json('data')->nullable();
             $table->string('status')->default('open')->index()->comment('open, acknowledged, resolved');
             $table->string('dedupe_key');
             $table->foreignId('resolved_by')->nullable()->constrained('users')->nullOnDelete();
@@ -197,7 +197,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('action');
             $table->nullableMorphs('subject');
-            $table->jsonb('meta')->nullable();
+            $table->json('meta')->nullable();
             $table->string('ip', 45)->nullable();
             $table->string('prev_hash', 64)->nullable();
             $table->string('hash', 64);

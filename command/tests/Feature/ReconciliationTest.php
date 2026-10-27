@@ -104,12 +104,14 @@ class ReconciliationTest extends TestCase
         $this->postJson('/api/v1/collation-entries', [
             'level' => 'ward', 'scope_id' => $this->wards['L1']->id, 'votes' => ['A' => 300, 'B' => 430, 'C' => 30], 'rejected' => 8, 'announced_at' => '2027-02-06T20:07:00Z',
         ]);
+        $this->postJson('/api/v1/irev-entries', ['polling_unit_id' => $this->units['PU1']->id, 'not_on_irev' => true, 'seen_at' => '2027-02-06T18:00:00Z'])->assertCreated();
 
         $this->actingAsUser($this->staff(Role::Legal));
         $this->getJson('/api/v1/units/'.$this->units['PU1']->id.'/evidence')
             ->assertOk()
             ->assertJsonPath('polling_unit.code', 'PU1')
             ->assertJsonPath('results.0.signature_valid', true)
-            ->assertJsonPath('collation.0.comparison.differences', ['B' => 160]);
+            ->assertJsonPath('collation.0.comparison.differences', ['B' => 160])
+            ->assertJsonPath('irev.comparison.status', 'not_on_irev');
     }
 }

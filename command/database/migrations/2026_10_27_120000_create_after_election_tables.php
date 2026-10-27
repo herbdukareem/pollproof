@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('campaigns', function (Blueprint $table) {
             $table->timestamp('declared_at')->nullable()->comment('Official declaration; election-day records are read-only from here');
-            $table->jsonb('declared_votes')->nullable();
+            $table->json('declared_votes')->nullable();
             $table->string('retention_choice')->nullable()->comment('keep_until_cases_end, handover_then_delete, delete_now');
             $table->foreignId('retention_set_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('retention_set_at')->nullable();
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('petitioner');
             $table->string('our_role')->default('respondent');
             $table->string('status')->default('open')->comment('open, closed');
-            $table->jsonb('milestones')->nullable()->comment('[{date, label}]');
+            $table->json('milestones')->nullable()->comment('[{date, label}]');
             $table->timestamps();
         });
 
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->text('claim');
             $table->text('answer')->nullable();
             $table->string('evidence_note')->nullable();
-            $table->jsonb('unit_ids')->nullable()->comment('Polling units whose evidence supports the answer');
+            $table->json('unit_ids')->nullable()->comment('Polling units whose evidence supports the answer');
             $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('status')->default('in_progress')->comment('in_progress, ready');
             $table->timestamps();

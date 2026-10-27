@@ -12,10 +12,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('campaign_id')->constrained()->cascadeOnDelete();
             $table->string('event')->comment('Alert type this rule routes');
-            $table->jsonb('recipients')->comment('Role values told first');
-            $table->jsonb('channels')->comment('app, sms, email');
+            $table->json('recipients')->comment('Role values told first');
+            $table->json('channels')->comment('app, sms, email');
             $table->unsignedSmallInteger('escalate_after_minutes')->nullable();
-            $table->jsonb('escalate_to')->nullable()->comment('Role values told if nobody acts');
+            $table->json('escalate_to')->nullable()->comment('Role values told if nobody acts');
             $table->boolean('enabled')->default(true);
             $table->timestamps();
             $table->unique(['campaign_id', 'event']);

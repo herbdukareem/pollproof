@@ -27,11 +27,11 @@ class UnitController extends Controller
             ->with(['ward.lga', 'currentResult', 'agent:id,name,code,polling_unit_id'])
             ->when($data['ward_id'] ?? null, fn ($q, $w) => $q->where('ward_id', $w))
             ->when($data['lga_id'] ?? null, fn ($q, $l) => $q->whereHas('ward', fn ($w) => $w->where('lga_id', $l)))
-            ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->where('code', 'ilike', "%{$s}%")->orWhere('name', 'ilike', "%{$s}%")))
+            ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%")))
             ->when(($data['status'] ?? null) === 'reported', fn ($q) => $q->whereHas('currentResult'))
             ->when(($data['status'] ?? null) === 'awaiting', fn ($q) => $q->whereDoesntHave('currentResult'))
             ->when(($data['status'] ?? null) === 'no_agent', fn ($q) => $q->whereDoesntHave('agent'))
-            ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereRaw("flags::text LIKE '%overvote%'")))
+            ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote')))
             ->orderBy('code')
             ->paginate(100);
 

@@ -5,13 +5,13 @@ One Laravel app that serves both halves of PollProof:
 - **The API** (`/api/v1`) for the agent app and SMS fallback: agent sign-in, geofenced check-in, signed polling-unit results, collation and IReV checks, live tallies with the 25% rule, stipend eligibility and a tamper-evident audit log.
 - **The command-room web app**, a Vue 3 single-page app served from the same app, that calls the same `/api/v1` endpoints.
 
-Built with Laravel 13, PostgreSQL 16, Sanctum, Vue 3, Vue Router and Tailwind CSS 4 (via Vite).
+Built with Laravel 13, MySQL 8.4, Sanctum, Vue 3, Vue Router and Tailwind CSS 4 (via Vite).
 
 Phones sign in with Sanctum tokens. The browser signs in at `/session` and uses the Laravel session cookie; Sanctum treats the host that serves the app as its own frontend, so no extra configuration is needed when the app and API share a domain.
 
 ## Run it locally
 
-Requirements: PHP 8.3+ with `pdo_pgsql` and `sodium`, Composer, Node 20+, PostgreSQL 16.
+Requirements: PHP 8.3+ with `pdo_mysql`, `sodium` and `zip`, Composer, Node 20+, MySQL 8.0 or newer (8.4 LTS recommended).
 
 ```bash
 cd command
@@ -20,10 +20,11 @@ npm install
 npm run build                    # or `npm run dev` while working on the web app
 cp .env.example .env
 php artisan key:generate
-# create the databases (adjust to your setup)
-createuser -P pollproof          # password: secret, or update .env
-createdb -O pollproof pollproof
-createdb -O pollproof pollproof_test
+# create the databases and user (adjust to your setup; the tests use pollproof_test)
+mysql -uroot -p -e "CREATE DATABASE pollproof CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CREATE DATABASE pollproof_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CREATE USER 'pollproof'@'localhost' IDENTIFIED BY 'secret';
+  GRANT ALL ON pollproof.* TO 'pollproof'@'localhost'; GRANT ALL ON pollproof_test.* TO 'pollproof'@'localhost';"
 php artisan migrate --seed       # demo state: 2 LGAs, 4 wards, 12 units, 4 parties
 php artisan db:seed --class=ElectionDaySeeder   # optional: plays a short election day through the API
 php artisan serve                # open http://localhost:8000 and sign in

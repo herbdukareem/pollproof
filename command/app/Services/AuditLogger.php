@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Campaign;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +19,13 @@ final class AuditLogger
         $campaignId ??= $user?->campaign_id;
 
         return DB::transaction(function () use ($user, $action, $subject, $meta, $ip, $campaignId) {
-            // Serialise writers per campaign so the chain never forks.
-            DB::select('SELECT pg_advisory_xact_lock(?)', [crc32('audit:'.($campaignId ?? 0))]);
+            // Serialise writers per campaign so the chain never forks: lock the campaign's row until commit.
+            // Entries without a campaign (unknown-email sign-in attempts) lock the newest entry of that chain instead.
+            if ($campaignId !== null) {
+                Campaign::whereKey($campaignId)->lockForUpdate()->value('id');
+            } else {
+                AuditLog::whereNull('campaign_id')->orderByDesc('id')->lockForUpdate()->value('id');
+            }
 
             $prev = AuditLog::where('campaign_id', $campaignId)->orderByDesc('id')->value('hash');
             $entry = new AuditLog([
@@ -56,7 +62,7 @@ final class AuditLogger
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
-    /** jsonb does not keep key order, so hash a key-sorted copy. */
+    /** MySQL's JSON type does not keep key order, so hash a key-sorted copy. */
     private static function sortKeys(array $value): array
     {
         if (! array_is_list($value)) {
