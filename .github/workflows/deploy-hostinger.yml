@@ -38,10 +38,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.HOSTINGER_AUTO_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: production
-    env:
-      APP_DIR: /home/${{ secrets.HOSTINGER_USER }}/domains/${{ vars.HOSTINGER_DOMAIN }}/pollproof
-      WEB_DIR: /home/${{ secrets.HOSTINGER_USER }}/domains/${{ vars.HOSTINGER_DOMAIN }}/public_html
-      SSH: ssh -i ~/.ssh/deploy -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=yes ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}
     steps:
       - uses: actions/checkout@v4
 
@@ -133,21 +129,105 @@ jobs:
           echo "REL=$REL" >> "$GITHUB_ENV"
           tar czf "/tmp/$REL.tgz" -C command .
 
-      - name: SSH key
+      - name: Connect to the server
+        env:
+          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          KNOWN: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+          H_HOST: ${{ secrets.HOSTINGER_HOST }}
+          H_PORT: ${{ secrets.HOSTINGER_PORT }}
+          H_USER: ${{ secrets.HOSTINGER_USER }}
+          DOMAIN: ${{ vars.HOSTINGER_DOMAIN }}
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/deploy
-          chmod 600 ~/.ssh/deploy
-          printf '%s\n' "${{ secrets.HOSTINGER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          if [ ! -s ~/.ssh/known_hosts ] || ! grep -q . ~/.ssh/known_hosts; then
-            echo "::warning::HOSTINGER_KNOWN_HOSTS is not set; trusting the server key seen now. Save the line below as that secret."
-            ssh-keyscan -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_HOST }} 2>/dev/null | tee ~/.ssh/known_hosts
+          trim() { printf '%s' "$1" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+          H_HOST=$(trim "$H_HOST"); H_PORT=$(trim "${H_PORT:-65002}"); H_USER=$(trim "$H_USER"); DOMAIN=$(trim "$DOMAIN")
+          missing=""
+          [ -n "$H_HOST" ] || missing="$missing secret:HOSTINGER_HOST"
+          [ -n "$H_USER" ] || missing="$missing secret:HOSTINGER_USER"
+          [ -n "$KEY" ] || missing="$missing secret:HOSTINGER_SSH_KEY"
+          [ -n "$DOMAIN" ] || missing="$missing variable:HOSTINGER_DOMAIN"
+          if [ -n "$missing" ]; then
+            echo "::error::Not set (Settings → Secrets and variables → Actions):$missing"
+            exit 1
           fi
+
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          if ! ssh-keygen -y -P '' -f ~/.ssh/deploy > ~/.ssh/deploy.pub 2> /tmp/keyerr; then
+            if grep -qi passphrase /tmp/keyerr; then
+              echo "::error::HOSTINGER_SSH_KEY is protected by a passphrase, so GitHub can't use it. Make a new key with an empty passphrase (see deploy/hostinger/README.md), add its .pub in hPanel and replace the secret."
+            else
+              echo "::error::HOSTINGER_SSH_KEY isn't a usable private key ($(head -1 /tmp/keyerr)). Paste the whole pollproof_deploy file (not the .pub), from the -----BEGIN line to the -----END line."
+            fi
+            exit 1
+          fi
+          echo "::notice::Deploy key: $(cut -d' ' -f1,2 ~/.ssh/deploy.pub | cut -c1-40)… fingerprint $(ssh-keygen -lf ~/.ssh/deploy.pub | cut -d' ' -f2). The same key must be listed in hPanel → Advanced → SSH Access → SSH keys."
+
+          if [ -n "$(trim "$KNOWN")" ]; then
+            printf '%s\n' "$KNOWN" | tr -d '\r' > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -T 20 -p "$H_PORT" "$H_HOST" 2>/dev/null > ~/.ssh/known_hosts || true
+            if [ -s ~/.ssh/known_hosts ]; then
+              echo "::warning::HOSTINGER_KNOWN_HOSTS is not set; trusting the server key seen now. To pin it, save this as that secret: $(grep ed25519 ~/.ssh/known_hosts | head -1)"
+            fi
+          fi
+
+          {
+            echo "Host hostinger"
+            echo "  HostName $H_HOST"
+            echo "  Port $H_PORT"
+            echo "  User $H_USER"
+            echo "  IdentityFile $HOME/.ssh/deploy"
+            echo "  UserKnownHostsFile $HOME/.ssh/known_hosts"
+            echo "  IdentitiesOnly yes"
+            echo "  BatchMode yes"
+            echo "  ConnectTimeout 25"
+            echo "  StrictHostKeyChecking yes"
+            echo "  ServerAliveInterval 30"
+            echo "  LogLevel ERROR"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+          # Retry a little: some servers briefly refuse connections right after ssh-keyscan.
+          ok=""
+          for attempt in 1 2 3; do
+            if out=$(ssh -F ~/.ssh/config hostinger 'echo connected; echo "home=$HOME"; php -r "echo PHP_VERSION;" 2>&1 || true' 2> /tmp/ssherr); then ok=1; break; fi
+            grep -qiE 'Permission denied|Host key verification|IDENTIFICATION|Could not resolve' /tmp/ssherr && break
+            sleep $((attempt * 5))
+          done
+          if [ -z "$ok" ]; then
+            err=$(tr '\n' ' ' < /tmp/ssherr)
+            case "$err" in
+              *"Permission denied"*) why="the server refused the key. Add the public key (pollproof_deploy.pub) in hPanel → Advanced → SSH Access → SSH keys, check HOSTINGER_USER is the SSH username shown there ($H_USER now), and that SSH access is enabled." ;;
+              *"Host key verification failed"*|*"REMOTE HOST IDENTIFICATION"*) why="the server's key doesn't match HOSTINGER_KNOWN_HOSTS. Run ssh-keyscan -p $H_PORT $H_HOST again and replace that secret." ;;
+              *"timed out"*|*"Connection refused"*|*"No route"*|*"Connection reset"*|*"Connection closed"*) why="nothing answered at $H_HOST port $H_PORT. Check the IP and port in hPanel → SSH Access, and that SSH access is enabled." ;;
+              *"Could not resolve"*) why="$H_HOST isn't a valid address. Use the SSH IP from hPanel → SSH Access." ;;
+              *) why="$err" ;;
+            esac
+            echo "::error::Couldn't sign in to $H_USER@$H_HOST:$H_PORT over SSH: $why"
+            echo "ssh said: $err"
+            exit 1
+          fi
+          echo "$out"
+          home=$(printf '%s\n' "$out" | sed -n 's/^home=//p')
+          echo "::notice::Connected to $H_USER@$H_HOST:$H_PORT (PHP $(printf '%s\n' "$out" | tail -1))."
+
+          base="${home:-/home/$H_USER}/domains/$DOMAIN"
+          if ! ssh -F ~/.ssh/config hostinger "test -d '$base'"; then
+            echo "::error::$base doesn't exist on the server. Set HOSTINGER_DOMAIN to the website's name exactly as hPanel lists it under Websites (e.g. lightseagreen-trout-569131.hostingersite.com)."
+            exit 1
+          fi
+          {
+            echo "APP_DIR=$base/pollproof"
+            echo "WEB_DIR=$base/public_html"
+            echo "SSH=ssh -F $HOME/.ssh/config hostinger"
+            echo "SCP=scp -F $HOME/.ssh/config"
+          } >> "$GITHUB_ENV"
 
       - name: Upload
         run: |
           $SSH "mkdir -p '$APP_DIR/releases/$REL'"
-          scp -i ~/.ssh/deploy -P ${{ secrets.HOSTINGER_PORT }} "/tmp/$REL.tgz" "${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:$APP_DIR/releases/$REL.tgz"
+          $SCP "/tmp/$REL.tgz" "hostinger:$APP_DIR/releases/$REL.tgz"
           $SSH "cd '$APP_DIR/releases' && tar xzf '$REL.tgz' -C '$REL' && rm '$REL.tgz'"
 
       - name: Go live

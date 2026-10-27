@@ -37,9 +37,11 @@ GitHub only shows the **Run workflow** button for workflows on `main`, so merge 
 On your computer (Windows PowerShell, macOS or Linux):
 
 ```powershell
-ssh-keygen -t ed25519 -C "pollproof-deploy" -f "$HOME/.ssh/pollproof_deploy" -N '""'
+ssh-keygen -t ed25519 -C "pollproof-deploy" -f "$HOME/.ssh/pollproof_deploy"
 ssh-keyscan -p 65002 YOUR_SERVER_IP
 ```
+
+When `ssh-keygen` asks for a passphrase, press **Enter** twice to leave it empty. GitHub can't type a passphrase, so a key that has one won't work.
 
 - Add the **public** key (the contents of `pollproof_deploy.pub`) in **hPanel → SSH Access → SSH keys**.
 - Keep the **private** key (`pollproof_deploy`) for the next step. Never commit it.
@@ -120,7 +122,8 @@ This switches back to the previous release. Database changes are not undone, so 
 | What you see | What to do |
 |---|---|
 | The workflow stops at **Checking PHP** | Set PHP 8.3 for the domain and turn on the extension it names. If SSH's `php` is still older, find the PHP 8.3 binary over SSH (`ls /opt/alt/php83/usr/bin/php` or `which php83`), set it as the variable `HOSTINGER_PHP_BIN`, and use the same path in the cron job instead of `php`. |
-| **Permission denied (publickey)** | The public key isn't added in hPanel, or `HOSTINGER_SSH_KEY` is missing its first or last line. |
+| The workflow stops at **Connect to the server** | Its error says what's wrong: a missing setting, a key with a passphrase, a key hPanel doesn't list (compare the fingerprint in the run's notice with the key in hPanel → SSH Access), the wrong IP or port, or a `HOSTINGER_DOMAIN` that doesn't match the folder name under `domains/`. |
+| **Permission denied (publickey)** | The public key isn't added in hPanel, `HOSTINGER_USER` isn't the SSH username hPanel shows, or `HOSTINGER_SSH_KEY` is missing its first or last line. |
 | Hostinger's default page or a 403 after a successful deploy | The host isn't following the `public_html` symlink. Set the variable `HOSTINGER_PUBLIC_MODE=copy` and deploy again; the web folder becomes a copy of `public/` that points at the live release. |
 | **500 error** | Read `~/domains/YOUR_DOMAIN/pollproof/shared/storage/logs/laravel-*.log` over SSH. |
 | SMS or notifications never arrive | Check the cron job is saved and runs every minute; `php artisan schedule:run` by hand should print what it ran. |
