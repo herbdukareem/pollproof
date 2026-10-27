@@ -66,22 +66,23 @@ jobs:
       - name: Settings for the server
         working-directory: command
         env:
-          DOMAIN: ${{ vars.HOSTINGER_DOMAIN }}
+          DOMAIN: ${{ vars.HOSTINGER_DOMAIN || secrets.HOSTINGER_DOMAIN }}
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          SMS_DRIVER: ${{ vars.POLLPROOF_SMS_DRIVER }}
-          SMS_NUMBER: ${{ vars.POLLPROOF_SMS_NUMBER }}
+          SMS_DRIVER: ${{ vars.POLLPROOF_SMS_DRIVER || secrets.POLLPROOF_SMS_DRIVER }}
+          SMS_NUMBER: ${{ vars.POLLPROOF_SMS_NUMBER || secrets.POLLPROOF_SMS_NUMBER }}
           SMS_WEBHOOK_TOKEN: ${{ secrets.POLLPROOF_SMS_WEBHOOK_TOKEN }}
           TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
-          TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID }}
-          MAIL_HOST: ${{ vars.MAIL_HOST }}
+          TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID || secrets.TERMII_SENDER_ID }}
+          MAIL_HOST: ${{ vars.MAIL_HOST || secrets.MAIL_HOST }}
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         run: |
           # Quote values so phpdotenv reads them back exactly: single quotes are literal; values
           # containing a single quote use double quotes with \, " and $ escaped.
+          DOMAIN=$(printf '%s' "$DOMAIN" | tr -d '\r' | sed 's#^[[:space:]]*##; s#[[:space:]]*$##; s#^https\{0,1\}://##; s#/.*$##')
           q() { case "$1" in *\'*) printf '"%s"' "$(printf '%s' "$1" | sed 's/["\\$]/\\&/g')" ;; *) printf "'%s'" "$1" ;; esac; }
           {
             echo "APP_NAME=PollProof"
@@ -136,17 +137,17 @@ jobs:
           H_HOST: ${{ secrets.HOSTINGER_HOST }}
           H_PORT: ${{ secrets.HOSTINGER_PORT }}
           H_USER: ${{ secrets.HOSTINGER_USER }}
-          DOMAIN: ${{ vars.HOSTINGER_DOMAIN }}
+          DOMAIN: ${{ vars.HOSTINGER_DOMAIN || secrets.HOSTINGER_DOMAIN }}
         run: |
           trim() { printf '%s' "$1" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
-          H_HOST=$(trim "$H_HOST"); H_PORT=$(trim "${H_PORT:-65002}"); H_USER=$(trim "$H_USER"); DOMAIN=$(trim "$DOMAIN")
+          H_HOST=$(trim "$H_HOST"); H_PORT=$(trim "${H_PORT:-65002}"); H_USER=$(trim "$H_USER"); DOMAIN=$(printf '%s' "$DOMAIN" | tr -d '\r' | sed 's#^[[:space:]]*##; s#[[:space:]]*$##; s#^https\{0,1\}://##; s#/.*$##')
           missing=""
           [ -n "$H_HOST" ] || missing="$missing secret:HOSTINGER_HOST"
           [ -n "$H_USER" ] || missing="$missing secret:HOSTINGER_USER"
           [ -n "$KEY" ] || missing="$missing secret:HOSTINGER_SSH_KEY"
           [ -n "$DOMAIN" ] || missing="$missing variable:HOSTINGER_DOMAIN"
           if [ -n "$missing" ]; then
-            echo "::error::Not set (Settings → Secrets and variables → Actions):$missing"
+            echo "::error::Not set (Settings → Secrets and variables → Actions; either tab works):$missing"
             exit 1
           fi
 
@@ -222,6 +223,7 @@ jobs:
             echo "WEB_DIR=$base/public_html"
             echo "SSH=ssh -F $HOME/.ssh/config hostinger"
             echo "SCP=scp -F $HOME/.ssh/config"
+            echo "SITE=$DOMAIN"
           } >> "$GITHUB_ENV"
 
       - name: Upload
@@ -231,7 +233,7 @@ jobs:
           $SSH "cd '$APP_DIR/releases' && tar xzf '$REL.tgz' -C '$REL' && rm '$REL.tgz'"
 
       - name: Go live
-        run: $SSH "PHP_BIN=${{ vars.HOSTINGER_PHP_BIN || 'php' }} PUBLIC_MODE=${{ vars.HOSTINGER_PUBLIC_MODE || 'symlink' }} bash '$APP_DIR/releases/$REL/.deploy/activate.sh' '$APP_DIR' '$REL' '$WEB_DIR'"
+        run: $SSH "PHP_BIN=${{ vars.HOSTINGER_PHP_BIN || secrets.HOSTINGER_PHP_BIN || 'php' }} PUBLIC_MODE=${{ vars.HOSTINGER_PUBLIC_MODE || secrets.HOSTINGER_PUBLIC_MODE || 'symlink' }} bash '$APP_DIR/releases/$REL/.deploy/activate.sh' '$APP_DIR' '$REL' '$WEB_DIR'"
 
       - name: Create the campaign and DG
         if: github.event_name == 'workflow_dispatch' && inputs.create_campaign
@@ -243,14 +245,14 @@ jobs:
           C_DG_EMAIL: ${{ inputs.dg_email }}
         run: |
           args=$(printf ' %q' --no-interaction "--name=$C_NAME" "--state=$C_STATE" "--election-date=$C_DATE" "--dg-name=$C_DG_NAME" "--dg-email=$C_DG_EMAIL")
-          $SSH "cd '$APP_DIR/current' && ${{ vars.HOSTINGER_PHP_BIN || 'php' }} artisan pollproof:create-campaign$args"
+          $SSH "cd '$APP_DIR/current' && ${{ vars.HOSTINGER_PHP_BIN || secrets.HOSTINGER_PHP_BIN || 'php' }} artisan pollproof:create-campaign$args"
 
       - name: Check the site answers
         run: |
           for i in 1 2 3 4 5; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${{ vars.HOSTINGER_DOMAIN }}/up" || true)
-            [ "$code" = "200" ] && { echo "https://${{ vars.HOSTINGER_DOMAIN }} is up"; exit 0; }
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://$SITE/up" || true)
+            [ "$code" = "200" ] && { echo "https://$SITE is up"; exit 0; }
             sleep 5
           done
-          echo "::error::https://${{ vars.HOSTINGER_DOMAIN }}/up answered $code. Check storage/logs on the server, or roll back with .deploy/rollback.sh."
+          echo "::error::https://$SITE/up answered $code. Check storage/logs on the server, or roll back with .deploy/rollback.sh."
           exit 1
