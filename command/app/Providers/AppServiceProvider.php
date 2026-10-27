@@ -8,6 +8,7 @@ use App\Services\Sms\TermiiSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +28,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Behind the host's proxy the app may not see HTTPS; links and cookies must still use it.
+        if ($this->app->isProduction() && str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
+
         RateLimiter::for('otp', fn (Request $request) => [
             Limit::perMinute(3)->by('otp:'.$request->input('phone')),
             Limit::perMinute(20)->by('otp-ip:'.$request->ip()),

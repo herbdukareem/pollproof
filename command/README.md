@@ -39,6 +39,10 @@ Command-room users sign in on the web at `/login` (password `password`): `dg@dem
 `ElectionDaySeeder` gives the screens something to show: check-ins (one outside the area, two absent), eight signed results with one correction, three approvals, incidents, a ward collation sheet with B inflated by 40, and IReV checks (one match, one difference, one missing). Run it once on a fresh `migrate --seed`.
 Field users sign in by phone: agents `08000001001`–`08000001012`, ward supervisor `08000000100`, collation agent `08000000200`. With `POLLPROOF_SMS_DRIVER=log` the one-time code is written to `storage/logs/laravel.log`.
 
+## Deploying
+
+[`deploy/hostinger/README.md`](../deploy/hostinger/README.md) covers Hostinger web hosting: GitHub Actions builds each release and uploads it over SSH, and a cron job runs the scheduler and the queue every minute (`POLLPROOF_QUEUE_VIA_SCHEDULER=true`). On a fresh install, `php artisan pollproof:create-campaign` creates the campaign and the DG's account.
+
 ## Web app
 
 The Vue app lives in `resources/js` and is served by a catch-all route to `resources/views/command.blade.php`.

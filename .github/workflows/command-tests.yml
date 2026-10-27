@@ -12,6 +12,16 @@ permissions:
 
 jobs:
   tests:
+    # MySQL 8.4 for a VPS; MariaDB, which Hostinger's web hosting runs, is checked as well.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - db: mysql:8.4
+            health: mysqladmin ping -h 127.0.0.1 -uroot -proot
+          - db: mariadb:11.4
+            health: healthcheck.sh --connect --innodb_initialized
+    name: tests (${{ matrix.db }})
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,15 +29,19 @@ jobs:
 
     services:
       mysql:
-        image: mysql:8.4
+        image: ${{ matrix.db }}
         env:
           MYSQL_DATABASE: pollproof_test
           MYSQL_USER: pollproof
           MYSQL_PASSWORD: secret
           MYSQL_ROOT_PASSWORD: root
+          MARIADB_DATABASE: pollproof_test
+          MARIADB_USER: pollproof
+          MARIADB_PASSWORD: secret
+          MARIADB_ROOT_PASSWORD: root
         ports: ['3306:3306']
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd "${{ matrix.health }}"
           --health-interval 5s --health-timeout 5s --health-retries 20
 
     steps:

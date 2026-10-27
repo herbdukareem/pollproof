@@ -6,6 +6,10 @@ return [
     'otp_ttl_minutes' => (int) env('POLLPROOF_OTP_TTL_MINUTES', 10),
     'evidence_disk' => env('POLLPROOF_EVIDENCE_DISK', 'local'),
 
+    // On hosting without a process supervisor (Hostinger web hosting), let the every-minute
+    // scheduler start a short-lived queue worker instead of running `queue:work` all the time.
+    'queue_via_scheduler' => (bool) env('POLLPROOF_QUEUE_VIA_SCHEDULER', false),
+
     // Election-day times (check-in deadline) are in this zone.
     'timezone' => env('POLLPROOF_TIMEZONE', 'Africa/Lagos'),
 

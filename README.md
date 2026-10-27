@@ -10,4 +10,4 @@ PollProof verifies polling-unit agents, captures a signed copy of every EC8A res
 | [`mobile/`](mobile/README.md) | Flutter app for agents, supervisors and collation agents | Built and tested against the API |
 | `shared/` | Signing fixture both apps test against | |
 
-See [`command/README.md`](command/README.md) to run it.
+See [`command/README.md`](command/README.md) to run it locally, and [`deploy/hostinger/README.md`](deploy/hostinger/README.md) to put it on Hostinger web hosting.
