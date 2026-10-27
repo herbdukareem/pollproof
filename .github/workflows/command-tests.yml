@@ -1,0 +1,98 @@
+name: Command tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['command/**', 'shared/**', '.github/workflows/command-tests.yml']
+  pull_request:
+    paths: ['command/**', 'shared/**', '.github/workflows/command-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    # MySQL 8.4 for a VPS; MariaDB, which Hostinger's web hosting runs, is checked as well.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - db: mysql:8.4
+            health: mysqladmin ping -h 127.0.0.1 -uroot -proot
+          - db: mariadb:11.4
+            health: healthcheck.sh --connect --innodb_initialized
+    name: tests (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: command
+
+    services:
+      mysql:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_DATABASE: pollproof_test
+          MYSQL_USER: pollproof
+          MYSQL_PASSWORD: secret
+          MYSQL_ROOT_PASSWORD: root
+          MARIADB_DATABASE: pollproof_test
+          MARIADB_USER: pollproof
+          MARIADB_PASSWORD: secret
+          MARIADB_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "${{ matrix.health }}"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, sodium, gd, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: command/package-lock.json
+
+      - name: Build the command-room web app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      - name: Run tests
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: pollproof_test
+          DB_USERNAME: pollproof
+          DB_PASSWORD: secret
+        run: php artisan test --log-junit storage/junit.xml
+
+      - name: Report failing tests
+        if: failure()
+        run: |
+          # Turn each failure into an annotation, readable from the checks API without the raw log.
+          php -r '
+            if (!is_file("storage/junit.xml")) { echo "::error::No test report; the run failed before tests started.\n"; exit; }
+            $x = simplexml_load_file("storage/junit.xml");
+            foreach ($x->xpath("//testcase[failure or error]") as $t) {
+              $m = (string) ($t->failure ?: $t->error);
+              echo "::error title=".$t["class"]."::".$t["name"]." ".str_replace(["\r", "\n"], ["", "%0A"], substr($m, 0, 900))."\n";
+            }'

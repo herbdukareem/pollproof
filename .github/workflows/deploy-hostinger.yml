@@ -1,0 +1,176 @@
+name: Deploy to Hostinger
+
+# Builds the command room (composer + Vite) on GitHub, uploads it over SSH and switches the
+# live site with deploy/hostinger/activate.sh. See deploy/hostinger/README.md for set-up.
+on:
+  workflow_dispatch:
+    inputs:
+      create_campaign:
+        description: 'First install only: create the campaign and DG account (fill the fields below)'
+        type: boolean
+        default: false
+      campaign_name:
+        description: 'Campaign name'
+        required: false
+      campaign_state:
+        description: 'State'
+        required: false
+      election_date:
+        description: 'Election date (YYYY-MM-DD)'
+        required: false
+      dg_name:
+        description: "DG's full name"
+        required: false
+      dg_email:
+        description: "DG's email (signs in with a temporary password printed in this run's log)"
+        required: false
+  push:
+    branches: [main]
+    paths: ['command/**', 'deploy/hostinger/**', '.github/workflows/deploy-hostinger.yml']
+
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Pushes to main deploy only once the HOSTINGER_AUTO_DEPLOY variable is set to true.
+    if: github.event_name == 'workflow_dispatch' || vars.HOSTINGER_AUTO_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_DIR: /home/${{ secrets.HOSTINGER_USER }}/domains/${{ vars.HOSTINGER_DOMAIN }}/pollproof
+      WEB_DIR: /home/${{ secrets.HOSTINGER_USER }}/domains/${{ vars.HOSTINGER_DOMAIN }}/public_html
+      SSH: ssh -i ~/.ssh/deploy -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=yes ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, sodium, gd, zip
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: command/package-lock.json
+
+      - name: Build the release
+        working-directory: command
+        run: |
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
+          npm ci
+          npm run build
+          rm -rf node_modules tests storage/logs/*.log .env
+          mkdir -p .deploy
+          cp ../deploy/hostinger/activate.sh ../deploy/hostinger/rollback.sh .deploy/
+
+      - name: Settings for the server
+        working-directory: command
+        env:
+          DOMAIN: ${{ vars.HOSTINGER_DOMAIN }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SMS_DRIVER: ${{ vars.POLLPROOF_SMS_DRIVER }}
+          SMS_NUMBER: ${{ vars.POLLPROOF_SMS_NUMBER }}
+          SMS_WEBHOOK_TOKEN: ${{ secrets.POLLPROOF_SMS_WEBHOOK_TOKEN }}
+          TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
+          TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID }}
+          MAIL_HOST: ${{ vars.MAIL_HOST }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        run: |
+          # Quote values so phpdotenv reads them back exactly: single quotes are literal; values
+          # containing a single quote use double quotes with \, " and $ escaped.
+          q() { case "$1" in *\'*) printf '"%s"' "$(printf '%s' "$1" | sed 's/["\\$]/\\&/g')" ;; *) printf "'%s'" "$1" ;; esac; }
+          {
+            echo "APP_NAME=PollProof"
+            echo "APP_ENV=production"
+            echo "APP_DEBUG=false"
+            echo "APP_URL=https://$DOMAIN"
+            echo "APP_TIMEZONE=UTC"
+            echo "LOG_CHANNEL=daily"
+            echo "LOG_LEVEL=warning"
+            echo "DB_CONNECTION=mysql"
+            echo "DB_HOST=${DB_HOST:-localhost}"
+            echo "DB_PORT=3306"
+            echo "DB_DATABASE=$(q "$DB_DATABASE")"
+            echo "DB_USERNAME=$(q "$DB_USERNAME")"
+            echo "DB_PASSWORD=$(q "$DB_PASSWORD")"
+            echo "SESSION_DRIVER=database"
+            echo "SESSION_SECURE_COOKIE=true"
+            echo "SESSION_DOMAIN=$DOMAIN"
+            echo "SANCTUM_STATEFUL_DOMAINS=$DOMAIN"
+            echo "CACHE_STORE=database"
+            echo "QUEUE_CONNECTION=database"
+            echo "POLLPROOF_QUEUE_VIA_SCHEDULER=true"
+            echo "POLLPROOF_SMS_DRIVER=${SMS_DRIVER:-log}"
+            echo "POLLPROOF_SMS_NUMBER=$(q "$SMS_NUMBER")"
+            echo "POLLPROOF_SMS_WEBHOOK_TOKEN=$(q "$SMS_WEBHOOK_TOKEN")"
+            echo "TERMII_API_KEY=$(q "$TERMII_API_KEY")"
+            echo "TERMII_SENDER_ID=$(q "${TERMII_SENDER_ID:-PollProof}")"
+            echo "TERMII_CHANNEL=dnd"
+            if [ -n "$MAIL_HOST" ]; then
+              echo "MAIL_MAILER=smtp"
+              echo "MAIL_HOST=$MAIL_HOST"
+              echo "MAIL_PORT=465"
+              echo "MAIL_SCHEME=smtps"
+              echo "MAIL_USERNAME=$(q "$MAIL_USERNAME")"
+              echo "MAIL_PASSWORD=$(q "$MAIL_PASSWORD")"
+              echo "MAIL_FROM_ADDRESS=$(q "$MAIL_USERNAME")"
+            else
+              echo "MAIL_MAILER=log"
+            fi
+          } > .env.deploy
+
+      - name: Package
+        run: |
+          REL="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          echo "REL=$REL" >> "$GITHUB_ENV"
+          tar czf "/tmp/$REL.tgz" -C command .
+
+      - name: SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "${{ secrets.HOSTINGER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          if [ ! -s ~/.ssh/known_hosts ] || ! grep -q . ~/.ssh/known_hosts; then
+            echo "::warning::HOSTINGER_KNOWN_HOSTS is not set; trusting the server key seen now. Save the line below as that secret."
+            ssh-keyscan -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_HOST }} 2>/dev/null | tee ~/.ssh/known_hosts
+          fi
+
+      - name: Upload
+        run: |
+          $SSH "mkdir -p '$APP_DIR/releases/$REL'"
+          scp -i ~/.ssh/deploy -P ${{ secrets.HOSTINGER_PORT }} "/tmp/$REL.tgz" "${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:$APP_DIR/releases/$REL.tgz"
+          $SSH "cd '$APP_DIR/releases' && tar xzf '$REL.tgz' -C '$REL' && rm '$REL.tgz'"
+
+      - name: Go live
+        run: $SSH "PHP_BIN=${{ vars.HOSTINGER_PHP_BIN || 'php' }} PUBLIC_MODE=${{ vars.HOSTINGER_PUBLIC_MODE || 'symlink' }} bash '$APP_DIR/releases/$REL/.deploy/activate.sh' '$APP_DIR' '$REL' '$WEB_DIR'"
+
+      - name: Create the campaign and DG
+        if: github.event_name == 'workflow_dispatch' && inputs.create_campaign
+        env:
+          C_NAME: ${{ inputs.campaign_name }}
+          C_STATE: ${{ inputs.campaign_state }}
+          C_DATE: ${{ inputs.election_date }}
+          C_DG_NAME: ${{ inputs.dg_name }}
+          C_DG_EMAIL: ${{ inputs.dg_email }}
+        run: |
+          args=$(printf ' %q' --no-interaction "--name=$C_NAME" "--state=$C_STATE" "--election-date=$C_DATE" "--dg-name=$C_DG_NAME" "--dg-email=$C_DG_EMAIL")
+          $SSH "cd '$APP_DIR/current' && ${{ vars.HOSTINGER_PHP_BIN || 'php' }} artisan pollproof:create-campaign$args"
+
+      - name: Check the site answers
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${{ vars.HOSTINGER_DOMAIN }}/up" || true)
+            [ "$code" = "200" ] && { echo "https://${{ vars.HOSTINGER_DOMAIN }} is up"; exit 0; }
+            sleep 5
+          done
+          echo "::error::https://${{ vars.HOSTINGER_DOMAIN }}/up answered $code. Check storage/logs on the server, or roll back with .deploy/rollback.sh."
+          exit 1

@@ -1,0 +1,52 @@
+name: Agent app
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-tests.yml']
+  pull_request:
+    paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - name: Tests (including the signing contract shared with the server)
+        run: flutter test
+
+  apk:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter build apk --release --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://command.pollproof.ng' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pollproof-agent-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
