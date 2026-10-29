@@ -19,33 +19,72 @@ use Illuminate\Support\Carbon;
 use RuntimeException;
 
 /**
- * A larger, made-up state for demos and pitch screenshots: 8 LGAs, 24 wards, 144 polling units,
- * then election day played through the real API (check-ins, signed results, incidents,
- * collation and IReV). All names and figures are invented.
+ * A demo election in Niger State at full size: the real 25 LGAs and 274 wards, with
+ * PITCH_DEMO_UNITS polling units per ward (default 6: 1,644 units, about 550,000 votes), then
+ * election day played through the real API: check-ins, signed results with sample sheet
+ * photos, approvals, incidents, ward and LGA collation with mismatches, and IReV checks.
+ * Polling unit names, people, parties ("Party A" to "Party D") and every figure are invented.
  *
- *   php artisan migrate:fresh --seed --seeder=PitchDemoSeeder
+ *   php artisan migrate:fresh --seed --seeder=PitchDemoSeeder --force
  *
- * Command-room users sign in as <role>@demo.test with password "password".
+ * The default takes about ten minutes; PITCH_DEMO_UNITS=3 is quicker. Command-room users
+ * sign in as <role>@demo.test with password "password".
  */
 class PitchDemoSeeder extends Seeder
 {
+    /**
+     * Niger State's 25 LGAs and 274 wards (INEC registration areas), with approximate headquarters
+     * coordinates. The vote shares are invented for the demo.
+     * code, name, lat, lng, our share, main rival share, wards
+     */
     private const LGAS = [
-        // code, name, centre lat, lng, our share, main rival share
-        ['01', 'Northgate', 9.70, 6.40, 0.52, 0.33],
-        ['02', 'Riverbend', 9.62, 6.62, 0.47, 0.38],
-        ['03', 'Hilltop', 9.52, 6.48, 0.58, 0.28],
-        ['04', 'Lakeside', 9.44, 6.70, 0.36, 0.49],
-        ['05', 'Eastfield', 9.36, 6.52, 0.49, 0.35],
-        ['06', 'Westbrook', 9.80, 6.58, 0.21, 0.62],
-        ['07', 'Southpoint', 9.28, 6.36, 0.44, 0.40],
-        ['08', 'Central', 9.58, 6.30, 0.55, 0.31],
+        ['01', 'Agaie', 9.01, 6.32, 0.51, 0.36, ['Baro', 'Boku', 'Ekobadeggi', 'Ekossa', 'Ekowugi', 'Ekowuna', 'Etsugaie', 'Dauaci', 'Kutiriko', 'Magaji', 'Tagagi']],
+        ['02', 'Agwara', 10.71, 4.58, 0.43, 0.41, ['Adehe', 'Agwata', 'Busuru', 'Gallah', 'Kashini', 'Kokoli', 'Mago', 'Papiri', 'Rofia', 'Suteku']],
+        ['03', 'Bida', 9.08, 6.01, 0.56, 0.30, ['Bariki', 'Ceniyan', 'Dokodza', 'Kyari', 'Landzun', 'Masaba I', 'Masaba II', 'Masaga I', 'Masaga II', 'Mayaki Ndajiya', 'Nassarafu', 'Umaru/Majigi I', 'Umaru/Majigi II', 'Wadata']],
+        ['04', 'Borgu', 9.88, 4.52, 0.38, 0.47, ['Babanna', 'Dugga', 'Karabonde', 'Konkoso', 'Malale', 'New Bussa', 'Kabe/Pissa', 'Shagunu', 'Wawa', 'Riverine']],
+        ['05', 'Bosso', 9.70, 6.48, 0.53, 0.33, ['Beji', 'Bosso Central I', 'Bosso Central II', 'Chanchaga', 'Garatu', 'Kampala', 'Kodo', 'Maikunkele', 'Maitumbi', 'Shata']],
+        ['06', 'Chanchaga', 9.61, 6.55, 0.57, 0.29, ['Limawa \'A\'', 'Limawa \'B\'', 'Makera', 'Minna Central', 'Minna South', 'Nassarawa \'A\'', 'Nassarawa \'B\'', 'Nassarawa \'C\'', 'Sabon Gari', 'Tudun Wada North', 'Tudun Wada South']],
+        ['07', 'Edati', 9.05, 5.80, 0.46, 0.38, ['Enagi', 'Etsu Tasha', 'Fazhi', 'Gazhe I', 'Gazhe II', 'Gbangban', 'Gonagi', 'Guzan', 'Rokota', 'Sakpe']],
+        ['08', 'Gbako', 9.36, 6.03, 0.49, 0.36, ['Batagi', 'Batako', 'Edokota', 'Edozhigi', 'Etsu Audu', 'Gbadafu', 'Gogata', 'Lemu', 'Nuwankota', 'Sammajiko']],
+        ['09', 'Gurara', 9.12, 7.05, 0.33, 0.50, ['Bonu', 'Diko', 'Gawu', 'Izom', 'Kabo', 'Kwaka', 'Lambata', 'Lefu', 'Shako', 'Tufa']],
+        ['10', 'Katcha', 8.77, 6.31, 0.48, 0.37, ['Bakeko', 'Badeggi', 'Bisanti', 'Dzwafu', 'Edotsu', 'Essa', 'Gbakogi', 'Katcha', 'Kataregi', 'Sidi Saba']],
+        ['11', 'Kontagora', 10.40, 5.47, 0.45, 0.40, ['Arewa', 'Central', 'Gabas', 'Kudu', 'Magajiya', 'Masuga', 'Madara', 'Nagwamatse', 'Rafin Gora', 'Tunganwawa', 'Tungan Kawo', 'Usalle', 'Yamma']],
+        ['12', 'Lapai', 9.05, 6.57, 0.52, 0.34, ['Arewa/Yamma', 'Birnin Maza/Tashibo', 'Ebbo/Gbacinku', 'Evuti/Kpada', 'Gulu/Anguwa Vatsa', 'Gupa/Abugi', 'Gurdi/Zago', 'Kudu/Gabas', 'Muye/Egba', 'Takuti/Shaku']],
+        ['13', 'Lavun', 9.20, 5.60, 0.50, 0.35, ['Busu/Kuchi', 'Batati', 'Dassun', 'Doko', 'Dabban', 'Egbako', 'Gaba', 'Jima', 'Kutigi', 'Kusotachi', 'Lagun', 'Mambe']],
+        ['14', 'Magama', 10.33, 5.10, 0.40, 0.44, ['Auna Central', 'Auna East Central', 'Auna East', 'Auna South East', 'Auna South', 'Ibelu Central', 'Ibelu East', 'Ibelu North', 'Ibelu West', 'Nasko', 'Nassarawa']],
+        ['15', 'Mariga', 10.75, 5.75, 0.42, 0.43, ['Bangi', 'Beri', 'Bobi', 'Gulbi Koka', 'Galma', 'Inkwai', 'Igwama', 'Kakihum', 'Kontokoro', 'Kumbashi', 'Maburya']],
+        ['16', 'Mashegu', 9.97, 5.78, 0.47, 0.38, ['Babban Rami', 'Dapangi/Makera', 'Ibbi', 'Kaboji', 'Kasanga', 'Kwatachi', 'Kulho', 'Mashegu', 'Mazakuka', 'Saho Rami']],
+        ['17', 'Mokwa', 9.29, 5.05, 0.44, 0.40, ['Bokani', 'Gbajibo/Muwo', 'Gbara', 'Jaagi', 'Jeba North', 'Kpaki', 'Kudu', 'Labozhi', 'Mokwa', 'Muregi', 'Rabban/Dayahko']],
+        ['18', 'Munya', 10.02, 7.10, 0.36, 0.48, ['Beni', 'Dandaudu', 'Dangunu', 'Daza', 'Fuka', 'Gini', 'Guni', 'Kabula', 'Kazai', 'Kuchi', 'Sarki Pawa']],
+        ['19', 'Paikoro', 9.44, 6.63, 0.50, 0.35, ['Aduni', 'Chimbi', 'Gwam', 'Ishau', 'Jere', 'Kafin Koro', 'Kwagana', 'Kwakuti', 'Nikuchi T', 'Paikoro Central', 'Tutungo Jedna']],
+        ['20', 'Rafi', 10.19, 6.25, 0.46, 0.39, ['Kagara Gari', 'Kakuri', 'Kongoma Central', 'Kongoma East', 'Kongoma North', 'Kongoma South', 'Kundun', 'Sabon Gari', 'Tegina Gari', 'Tegina West', 'Yakila']],
+        ['21', 'Rijau', 11.10, 5.25, 0.21, 0.62, ['Danrangi', 'Dugge', 'Dukku', 'Genu', 'Jama\'are', 'Rijau', 'Shambo', 'T/Bunu', 'T/Magajiya', 'Uche', 'Warari']],
+        ['22', 'Shiroro', 9.87, 6.71, 0.41, 0.44, ['Allawa', 'Bangajiya', 'Bassa/Kukoki', 'Egwa/Gwada', 'Erana', 'Galkogo', 'Gurmana', 'Gussoro', 'Kato', 'Kushaka', 'Kwaki', 'Manta', 'Pina', 'She', 'Ubandoma']],
+        ['23', 'Suleja', 9.18, 7.18, 0.31, 0.53, ['Bagmama A', 'Bagmama B', 'Hashimi A', 'Hashimi B', 'Iku South I', 'Iku South II', 'Kurmin Sarki', 'Magajiya', 'Maje North', 'Wambai']],
+        ['24', 'Tafa', 9.30, 7.23, 0.27, 0.56, ['Dogon', 'Garam', 'Ija Gwari', 'Ija Koro', 'Iku', 'New Bwari', 'Wuse West', 'Wuse East', 'Zuma East', 'Zuma West']],
+        ['25', 'Wushishi', 9.73, 6.07, 0.48, 0.37, ['Akare', 'Barwa', 'Gwarjiko', 'Kanwari', 'Kodo', 'Kwata', 'Lokogoma', 'Maito', 'Sabon Gari', 'Tukunji Yamigi', 'Zungeru']],
     ];
 
-    private const PLACES = ['LEA Primary School', 'Village Square', 'Health Centre', 'Market Square', 'Town Hall', 'Junior Secondary School'];
+    private const PLACES = ['LEA Primary School', 'Village Square', 'Health Centre', 'Market Square', 'Town Hall', 'Junior Secondary School', 'Community Hall', 'Motor Park', 'Central Mosque Junction', 'Church Premises'];
 
     private const FIRST = ['Aisha', 'Musa', 'Fatima', 'Ibrahim', 'Zainab', 'Usman', 'Hauwa', 'Yusuf', 'Halima', 'Sani', 'Grace', 'Daniel', 'Amina', 'Emeka', 'Ngozi', 'Tunde', 'Bola', 'Joseph', 'Hadiza', 'Abubakar', 'Rukayya', 'Peter', 'Maryam', 'Kabiru'];
 
     private const LAST = ['Abdullahi', 'Bello', 'Mohammed', 'Danjuma', 'Okafor', 'Adeyemi', 'Yakubu', 'Garba', 'Suleiman', 'Ibrahim', 'Nwosu', 'Ahmed', 'Aliyu', 'Ogunleye', 'Haruna', 'Isah'];
+
+    private const INCIDENTS = [
+        ['agent_turned_away', 'high', 'Presiding officer refused entry without a new letter. Supervisor on the way.', '07:40'],
+        ['materials_late', 'low', 'Materials arrived at 9:15; voting started late.', '09:15'],
+        ['bvas_problem', 'medium', 'BVAS stopped reading fingerprints for about 40 minutes. Voters waited.', '10:20'],
+        ['vote_buying', 'high', 'Men near the queue handing out cash to voters. Photos attached.', '11:05'],
+        ['bvas_problem', 'medium', 'BVAS battery died; replacement arrived after an hour.', '12:10'],
+        ['vote_buying', 'medium', 'Voters asked to show marked ballots in exchange for food items.', '12:45'],
+        ['disruption', 'high', 'Thugs scattered the queue and took a ballot box. Police called.', '13:30'],
+        ['other', 'low', 'Rain; voting moved under the school veranda.', '14:00'],
+        ['disruption', 'medium', 'Argument between party supporters; security restored order after 20 minutes.', '14:25'],
+        ['agent_turned_away', 'medium', 'Agent asked to stand outside the unit during counting.', '16:05'],
+        ['materials_late', 'medium', 'Result sheets ran short; presiding officer sent for more.', '16:40'],
+        ['other', 'low', 'Power out at the unit; counting finished by torchlight.', '18:10'],
+    ];
 
     private Campaign $campaign;
 
@@ -54,13 +93,16 @@ class PitchDemoSeeder extends Seeder
 
     private int $people = 0;
 
+    private int $perWard;
+
     public function run(): void
     {
         mt_srand(2027);
+        $this->perWard = max(3, (int) env('PITCH_DEMO_UNITS', 6));
 
         $this->campaign = Campaign::create([
             'name' => 'Demo Governorship Campaign',
-            'state_name' => 'Demo State',
+            'state_name' => 'Niger',
             'election_date' => '2027-02-06',
             'freeze_at' => '2027-01-30',
         ]);
@@ -74,25 +116,28 @@ class PitchDemoSeeder extends Seeder
         }
 
         $agentNo = 0;
-        foreach (self::LGAS as [$lc, $lname, $lat, $lng]) {
+        foreach (self::LGAS as [$lc, $lname, $lat, $lng, , , $wardNames]) {
             $lga = Lga::create(['campaign_id' => $this->campaign->id, 'code' => "LGA-{$lc}", 'name' => $lname]);
             $this->field(Role::LgaSupervisor, ['lga_id' => $lga->id], 'SV-'.$lc);
-            foreach ([1, 2, 3] as $w) {
-                $ward = Ward::create(['campaign_id' => $this->campaign->id, 'lga_id' => $lga->id, 'code' => sprintf('W%02d', $w), 'name' => "{$lname} Ward {$w}"]);
+            foreach ($wardNames as $wi => $wardName) {
+                $w = $wi + 1;
+                $ward = Ward::create(['campaign_id' => $this->campaign->id, 'lga_id' => $lga->id, 'code' => sprintf('W%02d', $w), 'name' => $wardName]);
                 $this->field(Role::WardSupervisor, ['lga_id' => $lga->id, 'ward_id' => $ward->id], sprintf('WS-%s%02d', $lc, $w));
                 $this->field(Role::CollationAgent, ['lga_id' => $lga->id, 'ward_id' => $ward->id], sprintf('CA-%s%02d', $lc, $w));
-                foreach (range(1, 6) as $p) {
+                $wlat = $lat + (intdiv($w - 1, 4) - 1.5) * 0.03;
+                $wlng = $lng + (($w - 1) % 4 - 1.5) * 0.03;
+                for ($p = 1; $p <= $this->perWard; $p++) {
                     $unit = PollingUnit::create([
                         'campaign_id' => $this->campaign->id,
                         'ward_id' => $ward->id,
                         'code' => sprintf('%s-%02d-%03d', $lc, $w, $p),
-                        'name' => self::PLACES[($p + $w) % 6].' '.['I', 'II', 'III'][$p % 3],
-                        'latitude' => $lat + ($w - 2) * 0.03 + ($p - 3) * 0.006,
-                        'longitude' => $lng + ($w - 2) * 0.025 - ($p - 3) * 0.004,
-                        'registered_voters' => 600 + mt_rand(0, 9) * 60,
+                        'name' => trim(preg_replace("/[\\/'].*$|\\s+I+$/", '', $wardName)).' '.self::PLACES[($p + $w) % count(self::PLACES)].($p > count(self::PLACES) ? ' II' : ''),
+                        'latitude' => round($wlat + (($p - 1) % 4 - 1.5) * 0.003, 6),
+                        'longitude' => round($wlng + (intdiv($p - 1, 4) - 1) * 0.003, 6),
+                        'registered_voters' => 500 + mt_rand(0, 14) * 50,
                     ]);
                     $agentNo++;
-                    $agent = $this->field(Role::Agent, ['polling_unit_id' => $unit->id, 'ward_id' => $ward->id], sprintf('AG-%04d', $agentNo));
+                    $agent = $this->field(Role::Agent, ['polling_unit_id' => $unit->id, 'ward_id' => $ward->id], sprintf('AG-%05d', $agentNo));
                     $ready = $agentNo % 17 !== 0;
                     $agent->update([
                         'invited_at' => now()->subDays(12),
@@ -124,38 +169,45 @@ class PitchDemoSeeder extends Seeder
     private function electionDay(): void
     {
         $units = PollingUnit::where('campaign_id', $this->campaign->id)->with('ward.lga')->orderBy('code')->get()->values();
-        $agentFor = fn (PollingUnit $u) => User::where('polling_unit_id', $u->id)->where('role', Role::Agent->value)->firstOrFail();
+        $n = $units->count();
+        $u = $this->perWard;
+        $agentFor = fn (PollingUnit $unit) => User::where('polling_unit_id', $unit->id)->where('role', Role::Agent->value)->firstOrFail();
         $at = fn (string $hm) => $this->campaign->election_date->format('Y-m-d')."T{$hm}:00Z";
+        $hm = fn (int $minutes) => sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
         $lgaShare = collect(self::LGAS)->keyBy(fn ($l) => "LGA-{$l[0]}");
 
         $verifier = $this->staff(Role::Verifier);
         $officer = $this->staff(Role::DataOfficer);
         $room = $this->staff(Role::SituationRoom);
 
-        // Wards still waiting for some units (by position in the list), and wards missing one unit.
-        $slowWards = [1, 4, 9, 10, 14, 17, 20, 22];
-        $oneMissing = [5, 13, 19];
+        // Wards still waiting for some units, and wards missing one; Chanchaga (LGA-06) is complete.
+        $slow = fn (int $w, PollingUnit $unit) => $w % 5 === 1 && $unit->ward->lga->code !== 'LGA-06';
+        $oneShort = fn (int $w, PollingUnit $unit) => $w % 7 === 3 && ! $slow($w, $unit) && $unit->ward->lga->code !== 'LGA-06';
+        $overvote = $units->search(fn ($unit) => $unit->code === '03-01-005');
+        $overvote = $overvote === false ? min(40, $n - 1) : $overvote;
+
         $figures = [];
         $rejected = [];
         foreach ($units as $i => $unit) {
             $agent = $agentFor($unit);
-            $w = intdiv($i, 6);
-            $p = $i % 6 + 1;
-            // In the slow wards the sixth agent never checked in; one agent in 25 checks in outside the unit.
-            if (in_array($w, $slowWards, true) && $p === 6) {
+            $w = intdiv($i, $u);
+            $p = $i % $u + 1;
+            // In the slow wards the last agent never checked in; one agent in 25 checks in outside the unit.
+            if ($slow($w, $unit) && $p === $u) {
                 continue;
             }
             $outside = $i % 25 === 7;
-            $this->clock($at(sprintf('07:%02d', 5 + $i % 50)), 1);
+            $checkIn = $at($hm(7 * 60 + 5 + ($i * 7) % 110));
+            $this->clock($checkIn, 1);
             $this->send($agent, 'POST', 'check-ins', [
                 'latitude' => $unit->latitude + ($outside ? 0.006 : 0.0002),
                 'longitude' => $unit->longitude,
                 'accuracy_m' => $outside ? 22 : 6 + $i % 8,
-                'captured_at' => $at(sprintf('07:%02d', 5 + $i % 50)),
+                'captured_at' => $checkIn,
                 'request_review' => $outside,
             ]);
 
-            if ((in_array($w, $slowWards, true) && in_array($p, [2, 5], true)) || (in_array($w, $oneMissing, true) && $p === 4)) {
+            if (($slow($w, $unit) && in_array($p, [2, $u - 1], true)) || ($oneShort($w, $unit) && $p === 4)) {
                 continue;
             }
             [, , , , $ours, $rival] = $lgaShare[$unit->ward->lga->code];
@@ -166,82 +218,81 @@ class PitchDemoSeeder extends Seeder
             $b = (int) round($valid * max(0.05, $rival + (mt_rand(-80, 80) / 1000)));
             $c = (int) round(($valid - $a - $b) * 0.7);
             $votes = ['A' => $a, 'B' => $b, 'C' => max(0, $c), 'D' => max(0, $valid - $a - $b - $c)];
-            if ($i === 40) {
+            if ($i === $overvote) {
                 $votes['B'] += 160; // over-voting: more votes than accredited voters
             }
             $figures[$i] = $votes;
             $rejected[$i] = $rej;
-            $captured = $at(sprintf('%02d:%02d', 15 + intdiv($i, 40), ($i * 7) % 60));
+            $captured = $at($hm(15 * 60 + intdiv($i * 330, max(1, $n))));
             $this->clock($captured, 2);
             $id = $this->submitResult($agent, $unit, $votes, $acc, $rej, $captured);
-            if ($i % 3 !== 2 && $i !== 40) {
+            if ($i % 3 !== 2 && $i !== $overvote) {
                 $this->clock($captured, 25);
                 $this->send($verifier, 'POST', "results/{$id}/approve", []);
             }
         }
 
-        // Incidents across the day.
-        $incidents = [
-            [3, 'agent_turned_away', 'high', 'Presiding officer refused entry without a new letter. Supervisor on the way.', '07:40'],
-            [17, 'bvas_problem', 'medium', 'BVAS stopped reading fingerprints for about 40 minutes. Voters waited.', '10:20'],
-            [29, 'vote_buying', 'high', 'Men near the queue handing out cash to voters. Photos attached.', '11:05'],
-            [52, 'materials_late', 'low', 'Materials arrived at 9:15; voting started late.', '09:15'],
-            [66, 'disruption', 'high', 'Thugs scattered the queue and took a ballot box. Police called.', '13:30'],
-            [88, 'bvas_problem', 'medium', 'BVAS battery died; replacement arrived after an hour.', '12:10'],
-            [101, 'vote_buying', 'medium', 'Voters asked to show marked ballots in exchange for food items.', '12:45'],
-            [130, 'other', 'low', 'Rain; voting moved under the school veranda.', '14:00'],
-        ];
-        foreach ($incidents as [$i, $type, $severity, $text, $time]) {
+        // Incidents spread across the state through the day.
+        foreach (self::INCIDENTS as $k => [$type, $severity, $text, $time]) {
+            $i = (int) floor(($k + 0.5) * $n / count(self::INCIDENTS));
             $this->clock($at($time), 3);
             $this->send($agentFor($units[$i]), 'POST', 'incidents', ['type' => $type, 'severity' => $severity, 'description' => $text, 'occurred_at' => $at($time)]);
         }
 
-        // Ward collation: every complete ward plus two still waiting for units; two declared sheets don't add up.
+        // Ward collation: every complete ward plus two still waiting for units; some declared sheets don't add up.
         $complete = 0;
+        $partial = 0;
         foreach ($units->groupBy('ward_id') as $wardId => $wardUnits) {
-            $w = intdiv($units->search($wardUnits->first()), 6);
-            $isComplete = ! in_array($w, $slowWards, true) && ! in_array($w, $oneMissing, true);
-            if (! $isComplete && ! in_array($w, [4, 13], true)) {
+            $first = $wardUnits->first();
+            $w = intdiv($units->search($first), $u);
+            $isComplete = ! $slow($w, $first) && ! $oneShort($w, $first);
+            if (! $isComplete && ++$partial > 2) {
                 continue;
             }
-            [$sum, $rej] = $this->add($units, $figures, $rejected, fn ($u) => $u->ward_id === $wardId);
+            [$sum, $rej] = $this->add($units, $figures, $rejected, fn ($x) => $x->ward_id === $wardId);
             if ($isComplete) {
                 $complete++;
                 if ($complete === 3) {
                     $sum['B'] += 212;
                     $sum['A'] -= 95;
-                }
-                if ($complete === 8) {
+                } elseif ($complete === 8) {
                     $sum['B'] += 74;
+                } elseif ($complete % 40 === 0) {
+                    $sum['B'] += 30 + $complete % 60;
                 }
             }
-            $this->clock($at(sprintf('%02d:%02d', 19 + intdiv($w, 8), ($w * 7) % 60)), 15);
-            $this->send($officer, 'POST', 'collation-entries', ['level' => 'ward', 'scope_id' => $wardId, 'votes' => $sum, 'rejected' => $rej, 'announced_at' => $at(sprintf('%02d:%02d', 19 + intdiv($w, 8), ($w * 7) % 60))]);
+            $announced = $at($hm(19 * 60 + intdiv($w * 240, max(1, intdiv($n, $u)))));
+            $this->clock($announced, 15);
+            $this->send($officer, 'POST', 'collation-entries', ['level' => 'ward', 'scope_id' => $wardId, 'votes' => $sum, 'rejected' => $rej, 'announced_at' => $announced]);
         }
 
-        // Hilltop LGA collated, matching.
-        $lga = Lga::where('campaign_id', $this->campaign->id)->where('code', 'LGA-03')->first();
-        [$sum, $rej] = $this->add($units, $figures, $rejected, fn ($u) => $u->ward->lga_id === $lga->id);
+        // Chanchaga LGA collated, matching.
+        $lga = Lga::where('campaign_id', $this->campaign->id)->where('code', 'LGA-06')->first();
+        [$sum, $rej] = $this->add($units, $figures, $rejected, fn ($x) => $x->ward->lga_id === $lga->id);
         $this->clock($at('23:10'), 12);
         $this->send($room, 'POST', 'collation-entries', ['level' => 'lga', 'scope_id' => $lga->id, 'votes' => $sum, 'rejected' => $rej, 'announced_at' => $at('23:10')]);
 
-        // IReV: a sample checked; two differ, one missing.
-        foreach ([0, 1, 2, 4, 6, 8, 9, 12, 14, 18, 20, 22, 24, 26] as $k => $i) {
+        // IReV: the first units plus a sample across the state; a few differ, a few are missing.
+        $sample = array_values(array_unique(array_merge([0, 1, 2, 4, 6, 8, 9, 12, 14, 18, 20, 22, 24, 26], range(30, $n - 1, 15))));
+        foreach ($sample as $k => $i) {
             if (! isset($figures[$i])) {
                 continue;
             }
             $v = $figures[$i];
-            if ($k === 3) {
+            if ($k === 3 || $k % 25 === 20) {
                 $v['B'] += 120;
-            }
-            if ($k === 8) {
+            } elseif ($k === 8) {
                 $v['A'] -= 60;
             }
-            $this->clock($at(sprintf('18:%02d', $k * 3)), 1);
-            $this->send($officer, 'POST', 'irev-entries', ['polling_unit_id' => $units[$i]->id, 'not_on_irev' => false, 'votes' => $v, 'seen_at' => $at(sprintf('18:%02d', $k * 3))]);
+            $seen = $at($hm(17 * 60 + 30 + intdiv($k * 240, max(1, count($sample)))));
+            $this->clock($seen, 1);
+            $this->send($officer, 'POST', 'irev-entries', ['polling_unit_id' => $units[$i]->id, 'not_on_irev' => false, 'votes' => $v, 'seen_at' => $seen]);
         }
-        $this->clock($at('18:50'), 1);
-        $this->send($officer, 'POST', 'irev-entries', ['polling_unit_id' => $units[30]->id, 'not_on_irev' => true, 'seen_at' => $at('18:50')]);
+        foreach (range(31, $n - 1, 200) as $k => $i) {
+            $seen = $at($hm(18 * 60 + 50 + $k));
+            $this->clock($seen, 1);
+            $this->send($officer, 'POST', 'irev-entries', ['polling_unit_id' => $units[$i]->id, 'not_on_irev' => true, 'seen_at' => $seen]);
+        }
         Carbon::setTestNow();
     }
 
@@ -299,7 +350,12 @@ class PitchDemoSeeder extends Seeder
             'photo_sha256' => $sha,
         ];
 
-        return $this->send($agent, 'POST', 'results', $body, $photo ? ['photo' => new UploadedFile($photo, 'ec8a.jpg', 'image/jpeg', null, true)] : [])['id'];
+        $id = $this->send($agent, 'POST', 'results', $body, $photo ? ['photo' => new UploadedFile($photo, 'ec8a.jpg', 'image/jpeg', null, true)] : [])['id'];
+        if ($photo && is_file($photo)) {
+            @unlink($photo);
+        }
+
+        return $id;
     }
 
     /**
@@ -311,9 +367,10 @@ class PitchDemoSeeder extends Seeder
         if (! function_exists('imagecreatetruecolor')) {
             return null;
         }
-        $font = collect(['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'])->first(fn ($f) => is_file($f));
-        $hand = collect(['/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf'])->first(fn ($f) => is_file($f)) ?? $font;
-        if (! $font) {
+        // DejaVu fonts ship beside this seeder, so shared hosting without system fonts still gets photos.
+        $font = collect([__DIR__.'/fonts/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'])->first(fn ($f) => is_file($f));
+        $hand = collect([__DIR__.'/fonts/DejaVuSansMono-Bold.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf'])->first(fn ($f) => is_file($f)) ?? $font;
+        if (! $font || ! function_exists('imagettftext')) {
             return null;
         }
         $w = 900;
@@ -330,9 +387,9 @@ class PitchDemoSeeder extends Seeder
         imagettftext($paper, 16, 0, 60, 128, $red, $font, 'DEMO SHEET for PollProof demonstrations. Not an INEC form.');
         imageline($paper, 60, 150, $w - 60, 150, $ink);
         $y = 200;
-        foreach (['State' => 'Demo State', 'LGA' => $unit->ward->lga->name, 'Ward' => $unit->ward->name, 'Polling unit' => $unit->code.'  '.$unit->name] as $label => $value) {
+        foreach (['State' => 'Niger (demo)', 'LGA' => $unit->ward->lga->name, 'Ward' => $unit->ward->name, 'Polling unit' => $unit->code.'  '.$unit->name] as $label => $value) {
             imagettftext($paper, 18, 0, 60, $y, $faint, $font, $label);
-            imagettftext($paper, 22, 0, 290, $y, $pen, $hand, $value);
+            imagettftext($paper, 22, 0, 290, $y, $pen, $hand, mb_strimwidth($value, 0, 34, ''));
             imageline($paper, 280, $y + 10, $w - 60, $y + 10, $faint);
             $y += 56;
         }
@@ -366,8 +423,9 @@ class PitchDemoSeeder extends Seeder
         $photo = imagecreatetruecolor(960, 1280);
         imagefill($photo, 0, 0, imagecolorallocate($photo, 92, 70, 52));
         imagecopy($photo, $turned, (int) ((960 - imagesx($turned)) / 2), (int) ((1280 - imagesy($turned)) / 2), 0, 0, imagesx($turned), imagesy($turned));
-        $path = tempnam(sys_get_temp_dir(), 'ec8a').'.jpg';
-        imagejpeg($photo, $path, 78);
+        $small = imagescale($photo, 720, 960);
+        $path = sys_get_temp_dir().'/pollproof-ec8a-'.bin2hex(random_bytes(6)).'.jpg';
+        imagejpeg($small, $path, 72);
 
         return $path;
     }
