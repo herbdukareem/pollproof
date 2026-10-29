@@ -1,10 +1,13 @@
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import Modal from '../components/Modal.vue';
+import ResultFlags from '../components/ResultFlags.vue';
+import Icon from '../components/Icon.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
@@ -32,7 +35,8 @@ const tabs = [
     { value: 'reported', key: 'reported', label: 'Reported', dot: 'bg-navy' },
     { value: 'awaiting', key: 'awaiting', label: 'Awaiting result', dot: 'bg-[#d99a00]' },
     { value: 'no_agent', key: 'no_agent', label: 'No agent', dot: 'bg-action' },
-    { value: 'flagged', key: 'flagged', label: 'Flagged', dot: 'bg-action' },
+    { value: 'flagged', key: 'flagged', label: 'Overvote', dot: 'bg-action' },
+    { value: 'review_flagged', key: 'review_flagged', label: 'Reviewer flags', dot: 'bg-[#b4470a]' },
 ];
 const counts = computed(() => meta.value?.counts ?? {});
 const lgaTiles = computed(() => (tally.data.value?.lgas ?? []).map((l) => ({ ...l, pct: l.units ? Math.round((l.units_reported / l.units) * 100) : 0 })));
@@ -44,6 +48,8 @@ const irev = {
     no_agent_result: ['text-ink-2', 'On IReV'],
 };
 const canSeeEvidence = hasRole('legal', 'dg');
+const canFlag = hasRole('verifier', 'situation_room', 'dg', 'legal');
+const flagsFor = ref(null);
 
 function flag(u) {
     if (u.result?.flags?.includes('overvote')) return ['bad', 'Overvote'];
@@ -129,7 +135,14 @@ function go(page) {
                                     <span v-else class="text-ink-3">Awaiting</span>
                                 </td>
                                 <td class="td font-semibold" :class="u.irev ? irev[u.irev][0] : 'text-ink-3'">{{ u.irev ? irev[u.irev][1] : 'Not checked' }}</td>
-                                <td class="td"><Badge :tone="flag(u)[0]">{{ flag(u)[1] }}</Badge></td>
+                                <td class="td">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <Badge :tone="flag(u)[0]">{{ flag(u)[1] }}</Badge>
+                                        <button v-if="u.result && (u.open_flags || canFlag)" class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold transition" :class="u.open_flags ? 'bg-bad-bg text-bad hover:brightness-95' : 'text-ink-3 hover:bg-mist hover:text-ink'" :disabled="!canFlag" :title="u.open_flags ? 'See the reviewer flags' : 'Flag this result with a comment'" @click="flagsFor = u">
+                                            <Icon name="flag" :size="13" />{{ u.open_flags || '' }}
+                                        </button>
+                                    </div>
+                                </td>
                                 <td class="td text-right"><RouterLink v-if="canSeeEvidence" :to="`/units/${u.id}/evidence`" class="inline-flex items-center gap-1 text-[13px] font-bold whitespace-nowrap hover:underline">Evidence <span aria-hidden="true">→</span></RouterLink></td>
                             </tr>
                         </tbody>
@@ -139,4 +152,8 @@ function go(page) {
             </LoadState>
         </section>
     </div>
+
+    <Modal :open="!!flagsFor" :title="flagsFor ? `${flagsFor.code} · ${flagsFor.name}` : ''" :subtitle="flagsFor ? `${flagsFor.ward} · ${flagsFor.lga} · ${num(flagsFor.result?.total_cast)} votes cast` : ''" width="max-w-2xl" @close="flagsFor = null">
+        <ResultFlags v-if="flagsFor?.result" :result-id="flagsFor.result.id" @changed="(n) => { flagsFor.open_flags = n; units.load(); }" />
+    </Modal>
 </template>

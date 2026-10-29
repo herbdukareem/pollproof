@@ -17,6 +17,7 @@ class NotificationRule extends Model
         'agent_unavailable' => ["Agent says they can't make election day", ['ward_supervisor', 'situation_room'], ['app', 'sms'], 30, ['lga_supervisor']],
         'irev_mismatch' => ['IReV differs from our signed result', ['legal', 'data_officer'], ['app'], 15, ['dg']],
         'irev_missing' => ['Result not on IReV', ['data_officer'], ['app'], 60, ['situation_room']],
+        'result_flagged' => ['A reviewer flagged a result', ['legal', 'situation_room'], ['app'], 15, ['dg']],
         'verify_backlog' => ['More than 20 results waiting to be verified', ['verifier'], ['app'], 15, ['situation_room']],
         'failed_logins' => ['Repeated failed sign-ins', ['dg'], ['app', 'sms', 'email'], null, []],
     ];

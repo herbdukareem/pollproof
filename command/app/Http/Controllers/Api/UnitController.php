@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Models\IrevEntry;
 use App\Models\PollingUnit;
+use App\Models\ResultFlag;
 use App\Services\AuditLogger;
 use App\Services\EvidenceBuilder;
 use App\Services\Reconciler;
@@ -21,7 +22,7 @@ class UnitController extends Controller
         $data = $request->validate([
             'lga_id' => ['nullable', 'integer'],
             'ward_id' => ['nullable', 'integer'],
-            'status' => ['nullable', 'in:reported,awaiting,no_agent,flagged'],
+            'status' => ['nullable', 'in:reported,awaiting,no_agent,flagged,review_flagged'],
             'search' => ['nullable', 'string', 'max:50'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
         ]);
@@ -36,6 +37,7 @@ class UnitController extends Controller
             'awaiting' => $scope()->whereDoesntHave('currentResult')->count(),
             'no_agent' => $scope()->whereDoesntHave('agent')->count(),
             'flagged' => $scope()->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote'))->count(),
+            'review_flagged' => $scope()->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN))->count(),
         ];
 
         $units = PollingUnit::where('polling_units.campaign_id', $user->campaign_id)
@@ -47,6 +49,8 @@ class UnitController extends Controller
             ->when(($data['status'] ?? null) === 'awaiting', fn ($q) => $q->whereDoesntHave('currentResult'))
             ->when(($data['status'] ?? null) === 'no_agent', fn ($q) => $q->whereDoesntHave('agent'))
             ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote')))
+            ->when(($data['status'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
+            ->withCount(['resultFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
             ->orderBy('code')
             ->paginate((int) ($data['per_page'] ?? 50));
 
@@ -69,6 +73,7 @@ class UnitController extends Controller
             'agent' => $u->agent ? ['id' => $u->agent->id, 'code' => $u->agent->code, 'name' => $u->agent->name] + ($showPhones ? ['phone' => $u->agent->phone] : []) : null,
             'agent_checked_in' => $checkedIn->has($u->id),
             'irev' => $irev[$u->id] ?? null,
+            'open_flags' => (int) $u->open_flags,
             'result' => $u->currentResult ? [
                 'id' => $u->currentResult->id,
                 'status' => $u->currentResult->status,

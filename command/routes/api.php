@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\PollingUnitController;
 use App\Http\Controllers\Api\ReadinessController;
 use App\Http\Controllers\Api\ResultController;
+use App\Http\Controllers\Api\ResultFlagController;
 use App\Http\Controllers\Api\RosterController;
 use App\Http\Controllers\Api\SetupController;
 use App\Http\Controllers\Api\SmsWebhookController;
@@ -100,6 +101,14 @@ Route::prefix('v1')->group(function () {
             Route::get('results-queue', [ResultController::class, 'queue']);
             Route::post('results/{result}/approve', [ResultController::class, 'approve']);
             Route::post('results/{result}/send-back', [ResultController::class, 'sendBack']);
+        });
+
+        // Flags on results: raised and discussed by reviewers, the situation room, legal and the DG
+        Route::middleware('role:verifier,situation_room,dg,legal')->group(function () {
+            Route::get('results/{result}/flags', [ResultFlagController::class, 'index']);
+            Route::post('results/{result}/flags', [ResultFlagController::class, 'store']);
+            Route::post('result-flags/{flag}/comments', [ResultFlagController::class, 'comment']);
+            Route::patch('result-flags/{flag}', [ResultFlagController::class, 'update']);
         });
 
         // Data entry
