@@ -100,7 +100,7 @@ const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).slice(0, 
                 <div class="mt-2 flex gap-2.5">
                     <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white" aria-hidden="true">{{ initials(f.by?.name) }}</span>
                     <div class="min-w-0 text-sm">
-                        <div class="text-[12.5px] text-ink-2"><b class="text-ink">{{ f.by?.name }}</b> · {{ f.by?.role }}<template v-if="f.status !== 'open'"> · {{ f.label }}</template></div>
+                        <div class="text-[12.5px] text-ink-2"><b class="text-ink">{{ f.by?.name }}</b><template v-if="f.by?.role && f.by.role !== f.by.name"> · {{ f.by.role }}</template><template v-if="f.status !== 'open'"> · {{ f.label }}</template></div>
                         <p class="mt-0.5 leading-snug whitespace-pre-line">{{ f.note }}</p>
                     </div>
                 </div>
@@ -108,7 +108,7 @@ const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).slice(0, 
                 <button v-if="f.comments.length > 2 && !shown[f.id]" class="mt-2 ml-9 text-xs font-bold text-navy hover:underline" @click="shown[f.id] = true">Show {{ f.comments.length - 2 }} earlier comment{{ f.comments.length - 2 === 1 ? '' : 's' }}</button>
                 <ul v-if="f.comments.length" class="mt-2 ml-9 flex flex-col gap-2 border-l-2 border-line pl-3">
                     <li v-for="c in shown[f.id] ? f.comments : f.comments.slice(-2)" :key="c.id" class="text-sm">
-                        <div class="text-[12.5px] text-ink-2"><b class="text-ink">{{ c.by?.name }}</b> · {{ c.by?.role }} · {{ dateTime(c.at) }}</div>
+                        <div class="text-[12.5px] text-ink-2"><b class="text-ink">{{ c.by?.name }}</b><template v-if="c.by?.role && c.by.role !== c.by.name"> · {{ c.by.role }}</template> · {{ dateTime(c.at) }}</div>
                         <p class="leading-snug whitespace-pre-line">{{ c.body }}</p>
                     </li>
                 </ul>
