@@ -88,7 +88,7 @@ function download() {
         <div class="grid max-w-4xl items-start gap-5 lg:grid-cols-[1fr_300px]">
             <section class="card p-6">
                 <div class="flex items-center justify-between gap-3">
-                    <h2 class="text-[17px] font-bold">Two-step sign-in</h2>
+                    <h2 class="card-title ">Two-step sign-in</h2>
                     <Badge :tone="s.enabled ? 'good' : 'warn'">{{ s.enabled ? 'On' : 'Off' }}</Badge>
                 </div>
                 <p class="mt-1 text-sm text-ink-2">After your password, you type a 6-digit code from an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, Authy). Someone with your password alone can't get in.</p>
@@ -141,7 +141,7 @@ function download() {
             </section>
 
             <section class="card p-6">
-                <h2 class="text-[17px] font-bold">Password</h2>
+                <h2 class="card-title ">Password</h2>
                 <p class="mt-1 text-sm text-ink-2">Changing it signs you out on other devices.</p>
                 <RouterLink to="/account/password" class="btn-outline mt-4">Change password</RouterLink>
             </section>

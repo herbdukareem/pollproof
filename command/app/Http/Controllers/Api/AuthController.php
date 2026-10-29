@@ -93,7 +93,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['campaign:id,name,state_name,election_date,require_two_factor', 'pollingUnit.ward.lga', 'ward.lga', 'lga']);
+        $user = $request->user()->load(['campaign:id,name,state_name,election_date,freeze_at,declared_at,require_two_factor', 'pollingUnit.ward.lga', 'ward.lga', 'lga']);
 
         return response()->json([
             'id' => $user->id,

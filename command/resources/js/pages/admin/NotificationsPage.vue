@@ -61,7 +61,7 @@ const names = (list) => (list?.length ? list.map((r) => roleLabel.value[r] ?? r)
     <LoadState :loading="rules.loading.value && !d" :error="rules.error.value" :empty="!d">
         <div class="grid items-start gap-5 xl:grid-cols-[1fr_300px]">
             <section class="card overflow-hidden">
-                <h2 class="px-5 pt-5 pb-1 text-[17px] font-bold">Alert rules</h2>
+                <h2 class="card-title px-5 pt-5 pb-1">Alert rules</h2>
                 <p class="px-5 pb-3 text-[13px] text-ink-2">Supervisors and collation agents only hear about their own LGA or ward. "If no one acts" means the alert is still open, not acknowledged, after that time.</p>
                 <ul>
                     <li v-for="r in d.data" :key="r.id" class="border-t border-[#eef0f3] px-5 py-4" :class="r.enabled ? '' : 'opacity-60'">

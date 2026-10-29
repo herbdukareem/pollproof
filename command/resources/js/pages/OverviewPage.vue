@@ -7,7 +7,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
-import { hasRole } from '../lib/session';
+import { hasRole, session } from '../lib/session';
 import { num, pct } from '../lib/format';
 
 const tally = useResource(() => api.get('tally'), { refreshMs: 30000 });
@@ -21,6 +21,8 @@ const maxVotes = computed(() => Math.max(1, ...(t.value?.candidates.map((c) => c
 const ourCode = computed(() => ours.value?.party);
 const openAlerts = computed(() => alerts.data.value?.data ?? []);
 const high = computed(() => openAlerts.value.filter((a) => a.severity === 'high').length);
+const totalVotes = computed(() => (t.value?.candidates ?? []).reduce((sum, c) => sum + (c.votes ?? 0), 0));
+const ourShare = computed(() => (totalVotes.value && ours.value ? ours.value.votes / totalVotes.value : 0));
 
 function refresh() {
     tally.load();
@@ -39,24 +41,24 @@ async function resolve(alert) {
 </script>
 
 <template>
-    <PageHeader title="Overview" subtitle="Running totals from our agents' signed results." :updated-at="tally.updatedAt.value" :loading="tally.loading.value" @refresh="refresh" />
+    <PageHeader title="Overview" :subtitle="`${session.user?.campaign?.state_name ?? ''} governorship · running totals from our agents' signed results`" :updated-at="tally.updatedAt.value" :loading="tally.loading.value" @refresh="refresh" />
 
     <LoadState :loading="tally.loading.value" :error="tally.error.value" :empty="!t">
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile label="Units reporting" :value="num(t.units_reported)" :pct="t.units ? (t.units_reported / t.units) * 100 : 0" :note="`of ${num(t.units)} polling units`" />
-            <StatTile label="Our votes" :value="num(ours?.votes)" :note="ours ? `${ours.name}${ours.leads ? ' · leading' : ''}` : 'No party marked as ours'" />
+            <StatTile label="Our votes" :value="num(ours?.votes)" :pct="ourShare * 100" :tone="ours?.leads ? 'good' : 'navy'" :note="ours ? `${pct(ourShare)} of votes counted · ${ours.leads ? 'leading' : 'not leading'}` : 'No party marked as ours'" />
             <StatTile label="LGAs at 25% or more" :value="ours ? `${ours.lgas_meeting_threshold} of ${t.lga_count}` : '–'" :pct="t.lga_count ? ((ours?.lgas_meeting_threshold ?? 0) / t.lga_count) * 100 : 0" :tone="ours?.meets_spread ? 'good' : 'bad'" :note="`Threshold needs ${t.lgas_required}`" />
-            <StatTile label="Open alerts" :value="openAlerts.length" :pct="openAlerts.length ? 100 : 0" tone="bad" :note="`${high} high priority`" />
+            <StatTile label="Open alerts" :value="openAlerts.length" :pct="openAlerts.length ? (high / openAlerts.length) * 100 : 0" tone="bad" :note="openAlerts.length ? `${high} high priority` : 'Nothing needs action'" />
         </div>
 
         <div class="mt-5 grid items-start gap-5 xl:grid-cols-[1.35fr_1fr]">
             <section class="card p-5">
                 <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                     <div>
-                        <h2 class="text-[17px] font-bold">25% threshold tracker</h2>
-                        <p class="mt-1 text-[13px] text-ink-2">Our share of valid votes in each LGA. The line marks 25%.</p>
+                        <h2 class="card-title">25% threshold tracker</h2>
+                        <p class="card-sub">Our share of valid votes in each LGA. We need at least 25% in {{ t.lgas_required }} of {{ t.lga_count }}.</p>
                     </div>
-                    <Badge v-if="ours" :tone="ours.meets_spread ? 'good' : 'warn'">{{ ours.lgas_meeting_threshold }} of {{ t.lga_count }} met</Badge>
+                    <span v-if="ours" class="pill" :class="ours.meets_spread ? 'bg-good-bg text-good' : 'bg-warn-bg text-warn'">{{ ours.lgas_meeting_threshold }} of {{ t.lga_count }} met · {{ ours.meets_spread ? 'threshold secured' : `needs ${t.lgas_required}` }}</span>
                 </div>
                 <ul>
                     <li v-for="l in t.lgas" :key="l.id" class="flex h-11 items-center gap-3 border-b border-[#f0f2f5] last:border-0">
@@ -66,7 +68,7 @@ async function resolve(alert) {
                             <div class="absolute inset-y-0 left-0 rounded-full" :class="(l.share[ourCode] ?? 0) >= t.threshold ? 'bg-navy' : 'bg-action'" :style="{ width: (l.share[ourCode] ?? 0) * 100 + '%' }"></div>
                             <div class="absolute -top-1.5 h-5.5 w-0.5 bg-navy" :style="{ left: t.threshold * 100 + '%' }"></div>
                         </div>
-                        <span class="w-12 text-right text-sm font-bold" :class="(l.share[ourCode] ?? 0) >= t.threshold ? '' : 'text-action'">{{ pct(l.share[ourCode] ?? 0) }}</span>
+                        <span class="w-12 text-right text-sm font-bold tabular-nums" :class="(l.share[ourCode] ?? 0) >= t.threshold ? '' : 'text-action'">{{ pct(l.share[ourCode] ?? 0) }}</span>
                     </li>
                 </ul>
             </section>
@@ -74,15 +76,15 @@ async function resolve(alert) {
             <div class="flex flex-col gap-5">
                 <section class="card p-5">
                     <div class="mb-3 flex items-center justify-between">
-                        <h2 class="text-[17px] font-bold">Live alerts</h2>
-                        <RouterLink to="/collation" class="text-[13px] font-bold">Collation checks</RouterLink>
+                        <h2 class="card-title">Live alerts <span v-if="openAlerts.length" class="ml-1 rounded-full bg-action px-2 py-px align-middle text-xs text-white">{{ openAlerts.length }}</span></h2>
+                        <RouterLink to="/collation" class="text-[13px] font-bold underline-offset-2 hover:underline">View all</RouterLink>
                     </div>
                     <LoadState :loading="alerts.loading.value" :error="alerts.error.value" :empty="!openAlerts.length" empty-text="No open alerts.">
-                        <AlertList :alerts="openAlerts" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" />
+                        <AlertList class="max-h-[560px] overflow-y-auto pr-1" :alerts="openAlerts" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" />
                     </LoadState>
                 </section>
                 <section class="card p-5">
-                    <h2 class="mb-4 text-[17px] font-bold">Running totals · {{ num(t.units_reported) }} units</h2>
+                    <h2 class="card-title mb-4">Running totals · {{ num(t.units_reported) }} units</h2>
                     <div v-for="c in t.candidates" :key="c.party" class="mb-3.5 last:mb-0">
                         <div class="mb-1.5 flex justify-between text-sm">
                             <span :class="c.is_ours ? 'font-bold' : ''">{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }}</span>

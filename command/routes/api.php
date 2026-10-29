@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
+use App\Http\Controllers\Api\NavCountsController;
 use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\PollingUnitController;
@@ -83,6 +84,7 @@ Route::prefix('v1')->group(function () {
         // Command room: read
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
             Route::get('tally', TallyController::class);
+            Route::get('nav-counts', NavCountsController::class);
             Route::get('units', [UnitController::class, 'index']);
             Route::get('alerts', [AlertController::class, 'index']);
             Route::get('incidents', [IncidentController::class, 'index']);

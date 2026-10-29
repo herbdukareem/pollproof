@@ -85,7 +85,7 @@ function imported(summary) {
 
         <div class="grid items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
             <section class="card overflow-hidden">
-                <h2 class="px-5 pt-5 pb-3 text-[17px] font-bold">LGA supervisors</h2>
+                <h2 class="card-title px-5 pt-5 pb-3">LGA supervisors</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[620px] text-sm">
                         <thead class="bg-mist"><tr><th class="th">LGA</th><th class="th">Supervisor</th><th class="th">Backup</th><th class="th">Wards covered</th><th class="th text-right">Agents</th></tr></thead>
@@ -104,7 +104,7 @@ function imported(summary) {
 
             <section v-if="d.selected" class="card p-5">
                 <div class="flex items-baseline justify-between gap-2">
-                    <h2 class="text-[17px] font-bold">{{ d.selected.name }} · wards</h2>
+                    <h2 class="card-title ">{{ d.selected.name }} · wards</h2>
                     <span class="text-sm" :class="openWards ? 'font-semibold text-action' : 'text-ink-2'">{{ openWards ? `${openWards} open` : `${d.selected.wards.length} wards` }}</span>
                 </div>
 
