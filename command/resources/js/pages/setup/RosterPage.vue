@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
@@ -12,7 +13,7 @@ import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
 
 const search = ref('');
-const filter = ref('incomplete');
+const filter = ref(['incomplete', 'all', 'reserves', 'unassigned', 'unavailable'].includes(useRoute().query.filter) ? useRoute().query.filter : 'incomplete');
 const page = ref(1);
 const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, page: page.value }));
 const d = computed(() => roster.data.value);
@@ -79,7 +80,7 @@ const go = (p) => { page.value = p; roster.load(); };
             <div class="grid gap-4 sm:grid-cols-5">
                 <div v-for="st in d.stages" :key="st.label">
                     <div class="flex items-baseline justify-between"><span class="text-sm text-ink-2">{{ st.label }}</span><b>{{ num(st.value) }}</b></div>
-                    <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="h-full rounded-full bg-navy" :style="{ width: (d.counts.assigned ? (100 * st.value) / d.counts.assigned : 0) + '%' }"></div></div>
+                    <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="bar-fill h-full rounded-full bg-navy" :style="{ width: (d.counts.assigned ? (100 * st.value) / d.counts.assigned : 0) + '%' }"></div></div>
                 </div>
             </div>
         </section>

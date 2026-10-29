@@ -25,13 +25,15 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
     <LoadState :loading="stipends.loading.value" :error="stipends.error.value" :empty="!d">
         <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
             <section class="card self-start p-5">
-                <div class="text-sm text-ink-2">Eligible now</div>
-                <div class="text-[34px] font-extrabold">{{ num(d.eligible) }} <span class="text-base font-semibold text-ink-2">of {{ num(total) }}</span></div>
+                <button type="button" class="-m-2 block w-[calc(100%+1rem)] rounded-xl p-2 text-left transition hover:bg-[#f6f7f9]" :aria-pressed="show === 'eligible'" title="Show eligible agents" @click="show = 'eligible'">
+                    <div class="text-sm text-ink-2">Eligible now</div>
+                    <div class="text-[34px] font-extrabold">{{ num(d.eligible) }} <span class="text-base font-semibold text-ink-2">of {{ num(total) }}</span></div>
+                </button>
                 <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-[#e9ecf1]">
                     <div class="bg-good" :style="{ width: total ? (d.eligible / total) * 100 + '%' : 0 }"></div>
                     <div class="bg-action" :style="{ width: total ? (d.on_hold / total) * 100 + '%' : 0 }"></div>
                 </div>
-                <h2 class="mt-5 mb-2 text-sm font-bold">On hold · {{ num(d.on_hold) }}</h2>
+                <h2 class="mt-5 mb-2 text-sm font-bold"><button type="button" class="rounded-md underline-offset-2 hover:underline" :aria-pressed="show === 'hold'" @click="show = 'hold'">On hold · {{ num(d.on_hold) }}</button></h2>
                 <ul>
                     <li v-for="(count, reason) in d.hold_reasons" :key="reason" class="flex justify-between border-t border-[#eef0f3] py-2 text-sm"><span class="text-ink-2">{{ reason }}</span><b>{{ num(count) }}</b></li>
                 </ul>

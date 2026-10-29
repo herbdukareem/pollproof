@@ -65,7 +65,7 @@ async function send(agent) {
     <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
     <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <button v-for="[key, text, bar] in tiles" :key="key" class="card flex items-center gap-4 p-4 text-left" :class="filter === key ? 'ring-2 ring-navy' : ''" :aria-pressed="filter === key" @click="filter = filter === key ? '' : key">
+        <button v-for="[key, text, bar] in tiles" :key="key" class="card flex items-center gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-navy/40 hover:shadow-[0_8px_24px_rgba(19,33,60,0.10)]" :class="filter === key ? 'ring-2 ring-navy' : ''" :title="filter === key ? 'Show all agents' : 'Show only these agents'" :aria-pressed="filter === key" @click="filter = filter === key ? '' : key">
             <span class="h-11 w-2.5 rounded-full" :class="bar"></span>
             <span><span class="block text-[26px] leading-none font-extrabold">{{ num(summary[key] ?? 0) }}</span><span class="text-[13px] text-ink-2">{{ text }}</span></span>
         </button>

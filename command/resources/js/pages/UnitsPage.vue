@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
@@ -8,7 +9,13 @@ import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
 import { num, time } from '../lib/format';
 
-const filters = reactive({ status: '', lga_id: '', search: '', page: 1 });
+const route = useRoute();
+const router = useRouter();
+const filters = reactive({ status: route.query.status ?? '', lga_id: route.query.lga_id ? Number(route.query.lga_id) : '', search: route.query.search ?? '', page: 1 });
+// Keep the filters in the address, so cards elsewhere can link straight to a filtered list.
+watch(() => [filters.status, filters.lga_id, filters.search], ([status, lga, search]) => {
+    router.replace({ query: { ...(status ? { status } : {}), ...(lga ? { lga_id: lga } : {}), ...(search ? { search } : {}) } });
+});
 const structure = useResource(() => api.get('structure'));
 const tally = useResource(() => api.get('tally'), { refreshMs: 60000 });
 const units = useResource(() => api.get('units', filters), { refreshMs: 60000 });

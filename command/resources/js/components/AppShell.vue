@@ -104,7 +104,8 @@ async function logout() {
                 >{{ s.label }}</button>
             </div>
 
-            <nav aria-label="Main" class="-mr-2 flex flex-1 flex-col gap-1 overflow-y-auto pr-2">
+            <Transition name="nav" mode="out-in">
+            <nav :key="activeKey" aria-label="Main" class="-mr-2 flex flex-1 flex-col gap-1 overflow-y-auto pr-2">
                 <div class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase">{{ active?.title }}</div>
                 <RouterLink
                     v-for="item in active?.items ?? []"
@@ -118,6 +119,7 @@ async function logout() {
                     <span v-if="item.count && counts[item.count]" class="rounded-full bg-action px-2 py-px text-xs font-bold text-white">{{ counts[item.count] > 99 ? '99+' : counts[item.count] }}</span>
                 </RouterLink>
             </nav>
+            </Transition>
 
             <div class="rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]">
                 <div class="mb-0.5 font-bold text-white">{{ footer.title }}</div>
