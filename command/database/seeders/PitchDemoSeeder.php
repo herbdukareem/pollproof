@@ -188,6 +188,7 @@ class PitchDemoSeeder extends Seeder
 
         $figures = [];
         $rejected = [];
+        $pending = [];
         foreach ($units as $i => $unit) {
             $agent = $agentFor($unit);
             $w = intdiv($i, $u);
@@ -229,6 +230,34 @@ class PitchDemoSeeder extends Seeder
             if ($i % 3 !== 2 && $i !== $overvote) {
                 $this->clock($captured, 25);
                 $this->send($verifier, 'POST', "results/{$id}/approve", []);
+            } else {
+                $pending[] = [$id, $captured];
+            }
+        }
+
+        // Reviewers flag a few results with comments; legal answers one and one is already cleared.
+        $legal = $this->staff(Role::Legal);
+        $flags = [
+            ['figures_differ', 'Party B box on the photo looks overwritten, 26 changed to 126. Figures were typed as 126.', 'Asked the ward supervisor to visit the unit and photograph the posted EC60E.', null],
+            ['photo_unclear', 'Bottom of the sheet is cut off; the presiding officer signature is not visible.', null, 'Agent re-sent a clear photo; signatures present and figures match.'],
+            ['tampering', 'Correction fluid visible over the rejected ballots figure. Needs legal review before we rely on it.', 'Keep this one out of the petition schedule until we see the duplicate.', null],
+            ['irregular_process', 'Agent reports counting finished before 3 pm with no party agents present.', null, null],
+            ['wrong_form', 'Sheet shows a different unit code (03-02-004) from where the agent is posted.', null, null],
+        ];
+        foreach ($flags as $k => [$reason, $note, $reply, $cleared]) {
+            [$id, $captured] = $pending[(int) floor(($k + 0.5) * count($pending) / count($flags))] ?? [null, null];
+            if (! $id) {
+                continue;
+            }
+            $this->clock($captured, 18 + $k);
+            $flag = $this->send($verifier, 'POST', "results/{$id}/flags", ['reason' => $reason, 'note' => $note]);
+            if ($reply) {
+                $this->clock($captured, 31 + $k);
+                $this->send($legal, 'POST', "result-flags/{$flag['id']}/comments", ['body' => $reply]);
+            }
+            if ($cleared) {
+                $this->clock($captured, 44 + $k);
+                $this->send($room, 'PATCH', "result-flags/{$flag['id']}", ['status' => 'cleared', 'note' => $cleared]);
             }
         }
 
