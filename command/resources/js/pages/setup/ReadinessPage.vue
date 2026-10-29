@@ -67,12 +67,12 @@ async function remind(group) {
                 <span class="text-sm text-ink-2">{{ num(r.units) }} polling units</span>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <div v-for="(f, i) in r.funnel" :key="f.key" class="flex flex-col gap-2">
+                <RouterLink v-for="(f, i) in r.funnel" :key="f.key" :to="{ path: '/setup/roster', query: { filter: i === 0 ? 'all' : 'incomplete' } }" class="group -m-2 flex flex-col gap-2 rounded-xl p-2 transition hover:bg-[#f6f7f9]" :title="i === 0 ? 'Open the agent roster' : 'Open agents not fully onboarded'">
                     <div class="text-[28px] leading-none font-extrabold">{{ num(f.value) }}</div>
                     <div class="text-sm font-bold">{{ f.label }}</div>
-                    <div class="h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="h-full rounded-full" :class="i === 4 ? 'bg-action' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></div></div>
+                    <div class="h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="bar-fill h-full rounded-full" :class="i === 4 ? 'bg-action' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></div></div>
                     <div class="text-[13px] text-ink-2">{{ notes[f.key](r) }}</div>
-                </div>
+                </RouterLink>
             </div>
         </section>
 
