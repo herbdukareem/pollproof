@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
@@ -8,7 +8,7 @@ import Pagination from '../components/Pagination.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { session } from '../lib/session';
-import { num, time } from '../lib/format';
+import { ago, dateTime, minutesSince, num, time } from '../lib/format';
 
 const kind = ref('');
 const search = ref('');
@@ -50,10 +50,16 @@ async function decide(action) {
     }
 }
 
-function age(r) {
-    const mins = Math.max(0, Math.round((Date.now() - new Date(r.received_at)) / 60000));
-    return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h`;
-}
+// Ticks every 30 seconds so waiting times stay current between refreshes.
+const now = ref(Date.now());
+const tick = setInterval(() => (now.value = Date.now()), 30000);
+onBeforeUnmount(() => clearInterval(tick));
+const age = (r) => ago(r.received_at, now.value);
+// Over 15 minutes waiting turns amber, over 30 red, so the oldest get picked up.
+const ageClass = (r) => {
+    const m = minutesSince(r.received_at, now.value);
+    return m == null ? 'text-ink-2' : m >= 30 ? 'font-bold text-action' : m >= 15 ? 'font-bold text-[#b4470a]' : 'text-ink-2';
+};
 </script>
 
 <template>
@@ -88,7 +94,7 @@ function age(r) {
                     :class="selected?.id === r.id ? 'border-navy bg-mist' : 'border-transparent hover:bg-mist'"
                     @click="selectedId = r.id"
                 >
-                    <span class="flex justify-between gap-2"><b class="text-sm">{{ r.polling_unit.code }}</b><span class="text-xs text-ink-2">{{ age(r) }}</span></span>
+                    <span class="flex justify-between gap-2"><b class="text-sm">{{ r.polling_unit.code }}</b><span class="text-xs whitespace-nowrap" :class="ageClass(r)" :title="`Received ${dateTime(r.received_at)}`">{{ age(r) }}</span></span>
                     <span class="block text-xs text-ink-2">{{ r.polling_unit.ward }} · {{ r.polling_unit.lga }}</span>
                     <span v-if="r.flags.includes('overvote')" class="mt-1 block text-xs font-bold text-action">Votes exceed accreditation</span>
                     <span v-else-if="r.supersedes_id" class="mt-1 block text-xs font-bold text-warn">Correction</span>
