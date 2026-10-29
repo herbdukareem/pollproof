@@ -23,6 +23,7 @@ class UnitController extends Controller
             'ward_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:reported,awaiting,no_agent,flagged'],
             'search' => ['nullable', 'string', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
         ]);
 
         // Counts for the status chips, within the chosen LGA or ward but across every status.
@@ -47,7 +48,7 @@ class UnitController extends Controller
             ->when(($data['status'] ?? null) === 'no_agent', fn ($q) => $q->whereDoesntHave('agent'))
             ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote')))
             ->orderBy('code')
-            ->paginate(100);
+            ->paginate((int) ($data['per_page'] ?? 50));
 
         $checkedIn = CheckIn::where('campaign_id', $user->campaign_id)
             ->whereIn('polling_unit_id', $units->pluck('id'))

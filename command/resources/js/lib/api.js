@@ -1,3 +1,5 @@
+import { track } from './progress';
+
 // Thin fetch wrapper for the PollProof API. The browser signs in with a session cookie
 // (Sanctum stateful), so every call sends the XSRF token Laravel set in a cookie.
 
@@ -29,7 +31,11 @@ export async function ensureCsrfCookie() {
     await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
 }
 
-export async function request(method, url, body = undefined) {
+export function request(method, url, body = undefined) {
+    return track(send(method, url, body), method !== 'GET');
+}
+
+async function send(method, url, body) {
     const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
     const token = xsrfToken();
     if (token) headers['X-XSRF-TOKEN'] = token;

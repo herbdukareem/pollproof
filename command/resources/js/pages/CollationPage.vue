@@ -3,6 +3,8 @@ import { computed, reactive, ref, watch } from 'vue';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
+import Pagination from '../components/Pagination.vue';
+import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
@@ -16,6 +18,12 @@ watch(level, () => entries.load());
 
 const rank = { bad: 0, warn: 1, neutral: 2, good: 3 };
 const rows = computed(() => [...(entries.data.value?.data ?? [])].sort((a, b) => rank[status(a.comparison)[0]] - rank[status(b.comparison)[0]]));
+const statusFilter = ref('');
+const search = ref('');
+const matches = computed(() => rows.value.filter((e) =>
+    (!statusFilter.value || status(e.comparison)[0] === statusFilter.value)
+    && (!search.value || e.comparison.scope.toLowerCase().includes(search.value.toLowerCase()))));
+const paged = usePaged(matches, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value] });
 const levelLabel = { ward: 'Ward · EC8B', lga: 'LGA · EC8C', state: 'State · EC8D' };
 const parties = computed(() => structure.data.value?.parties ?? []);
 const canEnter = hasRole('data_officer', 'situation_room', 'dg');
@@ -105,23 +113,30 @@ async function submit() {
                 @click="level = l.value"
             >{{ l.label }}</button>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <span class="pill bg-bad-bg text-bad">{{ summary.bad }} mismatch{{ summary.bad === 1 ? '' : 'es' }}</span>
-            <span v-if="summary.warn" class="pill bg-warn-bg text-warn">{{ summary.warn }} differ, units missing</span>
-            <span class="pill bg-mist text-ink-2 ring-1 ring-line ring-inset">{{ summary.neutral }} partial</span>
-            <span class="pill bg-good-bg text-good">{{ summary.good }} match</span>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by result">
+            <button class="pill bg-bad-bg text-bad ring-navy transition hover:brightness-95" :class="statusFilter === 'bad' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'bad'" @click="statusFilter = statusFilter === 'bad' ? '' : 'bad'">{{ summary.bad }} mismatch{{ summary.bad === 1 ? '' : 'es' }}</button>
+            <button v-if="summary.warn" class="pill bg-warn-bg text-warn ring-navy transition hover:brightness-95" :class="statusFilter === 'warn' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'warn'" @click="statusFilter = statusFilter === 'warn' ? '' : 'warn'">{{ summary.warn }} differ, units missing</button>
+            <button class="pill bg-mist text-ink-2 ring-1 ring-line ring-inset transition hover:brightness-95" :class="statusFilter === 'neutral' ? '!ring-2 !ring-navy' : ''" :aria-pressed="statusFilter === 'neutral'" @click="statusFilter = statusFilter === 'neutral' ? '' : 'neutral'">{{ summary.neutral }} partial</button>
+            <button class="pill bg-good-bg text-good ring-navy transition hover:brightness-95" :class="statusFilter === 'good' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'good'" @click="statusFilter = statusFilter === 'good' ? '' : 'good'">{{ summary.good }} match</button>
         </div>
     </div>
 
     <div class="grid items-start gap-5 xl:grid-cols-[1fr_400px]">
-        <section class="card overflow-hidden">
-            <LoadState :loading="entries.loading.value" :error="entries.error.value" :empty="!rows.length" empty-text="No collation sheets entered yet.">
+        <section class="card min-w-0 overflow-hidden">
+            <div class="flex flex-wrap items-center gap-3 border-b border-[#eef0f3] p-4">
+                <div class="relative w-full max-w-xs">
+                    <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                    <input v-model="search" class="field w-full pl-9" placeholder="Ward or LGA name" aria-label="Search collation points" />
+                </div>
+                <button v-if="statusFilter || search" class="text-[13px] font-bold text-navy hover:underline" @click="() => { statusFilter = ''; search = ''; }">Clear filters</button>
+            </div>
+            <LoadState :loading="entries.loading.value" :error="entries.error.value" :empty="!paged.rows.value.length" :empty-text="rows.length ? 'No collation points match.' : 'No collation sheets entered yet.'">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[720px] text-sm">
                         <thead><tr><th class="th">Collation point</th><th class="th text-right">Our units</th><th class="th text-right">Declared</th><th class="th">Difference</th><th class="th">Status</th></tr></thead>
                         <tbody>
                             <tr
-                                v-for="e in rows"
+                                v-for="e in paged.rows.value"
                                 :key="e.id"
                                 class="cursor-pointer"
                                 :class="[selected === e.id ? '!bg-[#eef2fb]' : status(e.comparison)[0] === 'bad' ? 'bg-[#fff8f4]' : '']"
@@ -141,7 +156,8 @@ async function submit() {
                         </tbody>
                     </table>
                 </div>
-                <div class="border-t border-[#eef0f3] px-4 py-3 text-[13px] text-ink-2">Figures are total votes cast. Select a row to see it party by party.</div>
+                <Pagination :meta="paged.meta.value" noun="collation points" @page="paged.setPage" @per-page="paged.setPerPage" />
+                <div class="border-t border-[#eef0f3] px-4 py-2.5 text-[12.5px] text-ink-3">Figures are total votes cast. Select a row to see it party by party.</div>
             </LoadState>
         </section>
 

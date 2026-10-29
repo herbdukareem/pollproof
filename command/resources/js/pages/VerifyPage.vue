@@ -4,13 +4,24 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import Pagination from '../components/Pagination.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { session } from '../lib/session';
 import { num, time } from '../lib/format';
 
-const queue = useResource(() => api.get('results-queue'), { refreshMs: 20000 });
+const kind = ref('');
+const search = ref('');
+const lgaId = ref('');
+const page = ref(1);
+const queue = useResource(() => api.get('results-queue', { kind: kind.value, search: search.value, lga_id: lgaId.value, page: page.value, per_page: 20 }), { refreshMs: 20000 });
+const structure = useResource(() => api.get('structure'));
 const items = computed(() => queue.data.value?.data ?? []);
+const counts = computed(() => queue.data.value?.counts ?? {});
+watch([kind, lgaId], () => { page.value = 1; queue.load(); });
+let t;
+watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; queue.load(); }, 300); });
+const go = (p) => { page.value = p; selectedId.value = null; queue.load(); };
 const selectedId = ref(null);
 const selected = computed(() => items.value.find((r) => r.id === selectedId.value) ?? items.value[0] ?? null);
 const note = ref('');
@@ -47,13 +58,28 @@ function age(r) {
 
 <template>
     <PageHeader title="Verify results" subtitle="A second person checks each result against its EC8A photo before it counts." :updated-at="queue.updatedAt.value" :loading="queue.loading.value" @refresh="queue.load">
-        <template #actions><Badge tone="warn">{{ items.length }} waiting</Badge></template>
+        <template #actions><Badge tone="warn">{{ num(counts.all ?? 0) }} waiting</Badge></template>
     </PageHeader>
     <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
 
-    <LoadState :loading="queue.loading.value" :error="queue.error.value" :empty="!items.length" empty-text="Queue is clear. Every result has been checked.">
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+        <button v-for="[v, text, n] in [['', 'All waiting', counts.all], ['flagged', 'Votes exceed accreditation', counts.flagged], ['corrections', 'Corrections', counts.corrections]]" :key="v" class="chip h-9" :class="kind === v ? 'chip-on' : ''" :aria-pressed="kind === v" @click="kind = v">{{ text }} <b>{{ num(n ?? 0) }}</b></button>
+        <div class="ml-auto flex w-full flex-wrap gap-2 sm:w-auto">
+            <select v-model="lgaId" class="field h-9 w-auto text-sm" aria-label="LGA">
+                <option value="">All LGAs</option>
+                <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
+            </select>
+            <div class="relative min-w-[200px] flex-1">
+                <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                <input v-model="search" class="field h-9 w-full pl-9 text-sm" placeholder="Unit code, name or agent ID" aria-label="Search the queue" />
+            </div>
+        </div>
+    </div>
+
+    <LoadState :loading="queue.loading.value" :error="queue.error.value" :empty="!items.length" :empty-text="kind || search || lgaId ? 'Nothing waiting matches these filters.' : 'Queue is clear. Every result has been checked.'">
         <div class="grid gap-5 lg:grid-cols-[320px_1fr]">
-            <section class="card flex flex-col gap-1 p-2" aria-label="Queue">
+            <section class="card flex flex-col self-start overflow-hidden" aria-label="Queue">
+              <div class="flex flex-col gap-1 p-2">
                 <div class="px-2.5 pt-2 pb-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">Flagged first, then oldest</div>
                 <button
                     v-for="r in items"
@@ -67,6 +93,8 @@ function age(r) {
                     <span v-if="r.flags.includes('overvote')" class="mt-1 block text-xs font-bold text-action">Votes exceed accreditation</span>
                     <span v-else-if="r.supersedes_id" class="mt-1 block text-xs font-bold text-warn">Correction</span>
                 </button>
+              </div>
+              <Pagination :meta="queue.data.value" noun="results" :per-page-options="[20]" :loading="queue.loading.value" @page="go" />
             </section>
 
             <section v-if="selected" class="card p-5">

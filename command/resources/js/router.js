@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { session, loadSession } from './lib/session';
 import { allowed, homeFor, NAV } from './lib/nav';
+import { navEnd, navStart } from './lib/progress';
 
 const roles = (name) => NAV.find((n) => n.name === name)?.roles;
 
@@ -8,6 +9,7 @@ const routes = [
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: { public: true } },
     { path: '/', name: 'home', redirect: () => homeFor(session.user?.role) },
     { path: '/overview', name: 'overview', component: () => import('./pages/OverviewPage.vue'), meta: { roles: roles('overview') } },
+    { path: '/alerts', name: 'alerts', component: () => import('./pages/AlertsPage.vue'), meta: { roles: roles('alerts') } },
     { path: '/units', name: 'units', component: () => import('./pages/UnitsPage.vue'), meta: { roles: roles('units') } },
     { path: '/units/:id/evidence', name: 'evidence', component: () => import('./pages/EvidencePage.vue'), meta: { roles: ['legal', 'dg'] } },
     { path: '/verify', name: 'verify', component: () => import('./pages/VerifyPage.vue'), meta: { roles: roles('verify') } },
@@ -34,7 +36,8 @@ const routes = [
 
 const router = createRouter({ history: createWebHistory(), routes });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
+    if (to.path !== from.path) navStart();
     if (!session.loaded) await loadSession();
     if (to.meta.public) return session.user && to.name === 'login' ? homeFor(session.user.role) : true;
     if (!session.user) return { name: 'login', query: { next: to.fullPath } };
@@ -45,5 +48,8 @@ router.beforeEach(async (to) => {
     if (!allowed(session.user.role, to.meta.roles)) return homeFor(session.user.role);
     return true;
 });
+
+router.afterEach(() => navEnd());
+router.onError(() => navEnd());
 
 export default router;

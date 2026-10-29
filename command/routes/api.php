@@ -78,6 +78,7 @@ Route::prefix('v1')->group(function () {
             Route::get('check-ins/{checkIn}/selfie', [CheckInController::class, 'selfie']);
             Route::get('agents', AgentListController::class);
             Route::post('agents/{agent}/assign', [AgentController::class, 'assign']);
+            Route::middleware('role:situation_room,dg')->patch('agents/{agent}', [AgentController::class, 'update']);
             Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);
         });
 

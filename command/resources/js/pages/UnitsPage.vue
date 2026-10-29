@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
+import Pagination from '../components/Pagination.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
@@ -11,7 +12,7 @@ import { num, time } from '../lib/format';
 
 const route = useRoute();
 const router = useRouter();
-const filters = reactive({ status: route.query.status ?? '', lga_id: route.query.lga_id ? Number(route.query.lga_id) : '', search: route.query.search ?? '', page: 1 });
+const filters = reactive({ status: route.query.status ?? '', lga_id: route.query.lga_id ? Number(route.query.lga_id) : '', search: route.query.search ?? '', page: 1, per_page: 50 });
 // Keep the filters in the address, so cards elsewhere can link straight to a filtered list.
 watch(() => [filters.status, filters.lga_id, filters.search], ([status, lga, search]) => {
     router.replace({ query: { ...(status ? { status } : {}), ...(lga ? { lga_id: lga } : {}), ...(search ? { search } : {}) } });
@@ -134,14 +135,7 @@ function go(page) {
                         </tbody>
                     </table>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#eef0f3] px-4 py-3 text-[13px] text-ink-2">
-                    <span>Showing {{ num(meta.from) }}–{{ num(meta.to) }} of {{ num(meta.total) }}</span>
-                    <div v-if="meta.last_page > 1" class="flex items-center gap-2">
-                        <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-                        <button class="btn-ghost h-9" :disabled="meta.current_page <= 1" @click="go(meta.current_page - 1)">Previous</button>
-                        <button class="btn-ghost h-9" :disabled="meta.current_page >= meta.last_page" @click="go(meta.current_page + 1)">Next</button>
-                    </div>
-                </div>
+                <Pagination :meta="meta" noun="units" :per-page-options="[25, 50, 100, 200]" :loading="units.loading.value" @page="go" @per-page="(n) => { filters.per_page = n; go(1); }" />
             </LoadState>
         </section>
     </div>
