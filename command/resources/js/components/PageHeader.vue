@@ -1,23 +1,34 @@
 <script setup>
+import { onBeforeUnmount, watchEffect } from 'vue';
 import { time } from '../lib/format';
+import { page } from '../lib/page';
 import Icon from './Icon.vue';
 
-defineProps({ title: String, subtitle: String, updatedAt: Date, loading: Boolean });
+const props = defineProps({ title: String, subtitle: String, updatedAt: Date, loading: Boolean });
 defineEmits(['refresh']);
+
+// The title and subtitle live in the shell's top bar; actions are teleported beside them.
+const owner = Symbol('page');
+watchEffect(() => {
+    page.title = props.title || '';
+    page.subtitle = props.subtitle || '';
+    page.owner = owner;
+});
+onBeforeUnmount(() => {
+    if (page.owner === owner) {
+        page.title = '';
+        page.subtitle = '';
+        page.owner = null;
+    }
+});
 </script>
 
 <template>
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="text-[26px] font-extrabold tracking-tight text-ink">{{ title }}</h1>
-            <p v-if="subtitle" class="mt-1 text-sm text-ink-2">{{ subtitle }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <slot name="actions" />
-            <button v-if="updatedAt !== undefined" class="btn-outline" :disabled="loading" @click="$emit('refresh')">
-                <Icon name="refresh" :size="16" :class="loading ? 'animate-spin' : ''" />
-                <span>{{ updatedAt ? 'Updated ' + time(updatedAt) : 'Refresh' }}</span>
-            </button>
-        </div>
-    </div>
+    <Teleport defer to="#pp-actions">
+        <slot name="actions" />
+        <button v-if="updatedAt !== undefined" class="btn-ghost" :disabled="loading" :title="updatedAt ? 'Refresh now' : 'Refresh'" @click="$emit('refresh')">
+            <Icon name="refresh" :size="16" :class="loading ? 'animate-spin' : ''" />
+            <span>{{ updatedAt ? 'Updated ' + time(updatedAt) : 'Refresh' }}</span>
+        </button>
+    </Teleport>
 </template>

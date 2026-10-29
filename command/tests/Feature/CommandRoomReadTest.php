@@ -83,4 +83,46 @@ class CommandRoomReadTest extends TestCase
         $this->actingAsUser($this->staff(Role::Verifier));
         $this->get("/api/v1/results/{$id}/photo")->assertOk();
     }
+
+    public function test_units_list_carries_status_counts_and_the_irev_comparison(): void
+    {
+        $this->submitResult('PU1', ['A' => 10, 'B' => 5], 20);
+        $this->submitResult('PU2', ['A' => 8, 'B' => 4], 20);
+        $officer = $this->actingAsUser($this->staff(Role::DataOfficer));
+        $this->postJson('/api/v1/irev-entries', ['polling_unit_id' => $this->units['PU1']->id, 'not_on_irev' => false, 'votes' => ['A' => 10, 'B' => 5], 'seen_at' => now()->toIso8601String()])->assertCreated();
+        $this->postJson('/api/v1/irev-entries', ['polling_unit_id' => $this->units['PU2']->id, 'not_on_irev' => false, 'votes' => ['A' => 8, 'B' => 40], 'seen_at' => now()->toIso8601String()])->assertCreated();
+        $this->postJson('/api/v1/irev-entries', ['polling_unit_id' => $this->units['PU3']->id, 'not_on_irev' => true, 'seen_at' => now()->toIso8601String()])->assertCreated();
+
+        $res = $this->getJson('/api/v1/units')->assertOk()
+            ->assertJsonPath('counts.all', 6)
+            ->assertJsonPath('counts.reported', 2)
+            ->assertJsonPath('counts.awaiting', 4)
+            ->assertJsonPath('counts.no_agent', 4);
+        $irev = collect($res->json('data'))->pluck('irev', 'code');
+        $this->assertSame(['PU1' => 'match', 'PU2' => 'differs', 'PU3' => 'not_on_irev', 'PU4' => null], $irev->only(['PU1', 'PU2', 'PU3', 'PU4'])->all());
+
+        // Counts follow the LGA filter but not the status filter.
+        $this->getJson('/api/v1/units?status=reported&lga_id='.$this->lgas['L1']->id)->assertOk()
+            ->assertJsonPath('counts.all', 2)->assertJsonPath('counts.reported', 2)->assertJsonCount(2, 'data');
+    }
+
+    public function test_nav_counts_show_what_is_waiting_for_each_role(): void
+    {
+        $this->submitResult('PU1', ['A' => 10], 20);
+        $this->units['PU6']->update(['latitude' => null, 'longitude' => null]);
+
+        $this->actingAsUser($this->staff(Role::Dg));
+        $this->getJson('/api/v1/nav-counts')->assertOk()
+            ->assertJsonPath('verify', 1)
+            ->assertJsonPath('structure', 1)
+            ->assertJsonPath('supervisors', 3)
+            ->assertJsonPath('incidents', 0)
+            ->assertJsonPath('collation', 0);
+
+        $this->actingAsUser($this->staff(Role::Legal));
+        $this->getJson('/api/v1/nav-counts')->assertOk()->assertJsonMissingPath('verify')->assertJsonMissingPath('structure');
+
+        $this->actingAsUser($this->agentFor('PU2'));
+        $this->getJson('/api/v1/nav-counts')->assertForbidden();
+    }
 }

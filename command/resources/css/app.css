@@ -27,11 +27,60 @@
     --color-bad-bg: #fde7da;
 }
 
+@layer base {
+    html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+    body {
+        @apply bg-mist text-ink;
+    }
+    :focus-visible {
+        outline: 2px solid var(--color-action);
+        outline-offset: 2px;
+    }
+    tbody tr {
+        transition: background-color 120ms ease;
+    }
+    tbody tr:hover {
+        background-color: #fafbfc;
+    }
+    td, th {
+        font-variant-numeric: tabular-nums;
+    }
+    ::selection {
+        background: #ffd9c2;
+    }
+    nav::-webkit-scrollbar {
+        width: 6px;
+    }
+    nav::-webkit-scrollbar-thumb {
+        background: #2a3d63;
+        border-radius: 3px;
+    }
+}
+
 @utility card {
-    @apply rounded-2xl border border-line bg-white;
+    @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(19,33,60,0.04)];
+}
+@utility card-title {
+    @apply text-[17px] font-bold text-ink;
+}
+@utility card-sub {
+    @apply mt-1 text-[13px] text-ink-2;
+}
+@utility chip {
+    @apply inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#d6dae1] bg-white px-3.5 text-sm font-semibold text-ink transition hover:border-navy;
+}
+@utility chip-on {
+    @apply border-navy bg-navy text-white hover:border-navy;
+}
+@utility pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold whitespace-nowrap;
 }
 @utility btn {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
     @apply btn bg-action text-white hover:bg-action-dark;
@@ -41,6 +90,9 @@
 }
 @utility btn-outline {
     @apply btn border-[1.5px] border-navy bg-white text-navy hover:bg-mist;
+}
+@utility btn-ghost {
+    @apply btn border border-[#d6dae1] bg-white font-semibold text-ink-2 hover:border-navy hover:text-ink;
 }
 @utility btn-good {
     @apply btn bg-good text-white hover:opacity-90;
@@ -52,7 +104,7 @@
     @apply mb-1.5 block text-[13px] font-bold text-ink;
 }
 @utility th {
-    @apply px-4 py-3 text-left text-xs font-bold tracking-wide text-ink-2 uppercase;
+    @apply bg-[#f6f7f9] px-4 py-3 text-left text-[12px] font-bold tracking-[0.04em] whitespace-nowrap text-ink-2 uppercase;
 }
 @utility td {
     @apply border-t border-[#eef0f3] px-4 py-3 align-middle;

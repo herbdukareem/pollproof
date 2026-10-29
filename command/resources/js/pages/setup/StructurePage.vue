@@ -148,7 +148,7 @@ async function goToMissing(m) {
 
             <section class="card overflow-hidden">
                 <div class="px-5 pt-5 pb-3">
-                    <h2 class="text-[17px] font-bold">{{ selectedWard ? `${selectedWard.lga} · ${selectedWard.name}` : 'Choose a ward' }}</h2>
+                    <h2 class="card-title ">{{ selectedWard ? `${selectedWard.lga} · ${selectedWard.name}` : 'Choose a ward' }}</h2>
                     <p v-if="selectedWard" class="text-[13px] text-ink-2">{{ selectedWard.units }} polling units</p>
                 </div>
                 <ul v-if="s.units.length">

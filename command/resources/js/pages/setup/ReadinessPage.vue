@@ -63,7 +63,7 @@ async function remind(group) {
 
         <section class="card mb-5 p-5">
             <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="text-[17px] font-bold">From assigned to ready</h2>
+                <h2 class="card-title ">From assigned to ready</h2>
                 <span class="text-sm text-ink-2">{{ num(r.units) }} polling units</span>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -79,7 +79,7 @@ async function remind(group) {
         <div class="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
             <section class="card overflow-hidden">
                 <div class="flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
-                    <h2 class="text-[17px] font-bold">Readiness by LGA</h2>
+                    <h2 class="card-title ">Readiness by LGA</h2>
                     <span class="text-xs text-ink-2">Lowest confirmation first · % of units</span>
                 </div>
                 <div class="overflow-x-auto">
@@ -103,7 +103,7 @@ async function remind(group) {
             </section>
 
             <section class="card p-5">
-                <h2 class="mb-3 text-[17px] font-bold">Close the gaps</h2>
+                <h2 class="card-title mb-3 ">Close the gaps</h2>
                 <ul class="flex flex-col gap-2">
                     <li v-for="g in gaps" :key="g.title" class="flex items-center gap-4 rounded-xl bg-mist p-3.5">
                         <div class="w-14 shrink-0 text-center text-[22px] font-extrabold" :class="g.count ? g.tone : 'text-ink-3'">{{ num(g.count) }}</div>

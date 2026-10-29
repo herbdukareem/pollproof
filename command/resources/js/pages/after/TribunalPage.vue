@@ -113,6 +113,17 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
         <p v-if="!cases.data.value?.length" class="text-sm text-ink-2 md:col-span-4">No petition yet. When one is served, add it here and build the answer ground by ground.</p>
     </form>
 
+    <section v-if="cases.data.value && !cases.data.value.length" class="mb-5 rounded-2xl bg-navy p-6 text-white">
+        <h2 class="text-lg font-extrabold">Petition window: 21 days from the declaration</h2>
+        <p class="mt-1 text-sm text-[#c9d1de]">When a petition is served, the workspace keeps everything counsel needs in one place.</p>
+        <ol class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <li v-for="(step, k) in ['Add the case and who filed it', 'List each ground of the petition', 'Answer each ground from our signed records', 'Build the reply bundle for counsel']" :key="k" class="flex gap-3">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold">{{ k + 1 }}</span>
+                <span class="text-sm leading-snug font-semibold">{{ step }}</span>
+            </li>
+        </ol>
+    </section>
+
     <LoadState :loading="loading && !c" :empty="!c && !!route.params.id" empty-text="Case not found.">
         <template v-if="c">
             <section class="mb-5 rounded-2xl bg-navy p-5 text-white">
@@ -139,7 +150,7 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
             <div class="grid items-start gap-5 xl:grid-cols-[1.5fr_1fr]">
                 <section class="card p-5">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <h2 class="text-[17px] font-bold">Grounds in the petition, and our answer</h2>
+                        <h2 class="card-title ">Grounds in the petition, and our answer</h2>
                         <span class="text-sm" :class="ready === c.grounds.length && c.grounds.length ? 'font-semibold text-good' : 'text-ink-2'">{{ ready }} of {{ c.grounds.length }} answers ready</span>
                     </div>
                     <ul class="mt-4 flex flex-col gap-3">
@@ -185,7 +196,7 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
 
                 <div class="flex flex-col gap-5">
                     <section class="card p-5">
-                        <h2 class="text-[17px] font-bold">Tasks</h2>
+                        <h2 class="card-title ">Tasks</h2>
                         <ul class="mt-3">
                             <li v-for="t in c.tasks" :key="t.id" class="flex items-start gap-3 border-t border-[#eef0f3] py-2.5 first:border-0">
                                 <input type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 accent-[#17694b]" :checked="!!t.done_at" :aria-label="`Done: ${t.title}`" :disabled="busy === `t${t.id}`" @change="toggleTask(t)" />
@@ -202,7 +213,7 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
                         </form>
                     </section>
                     <section class="card p-5">
-                        <h2 class="text-[17px] font-bold">Our evidence for the reply</h2>
+                        <h2 class="card-title ">Our evidence for the reply</h2>
                         <p class="mt-1 text-[13px] text-ink-2">Every unit cited goes into the bundle with its signed results, EC8A photos, IReV captures and the audit log, plus a SHA-256 manifest counsel can check.</p>
                         <p v-if="!evidenceUnits.length" class="mt-3 text-sm text-ink-3">No units cited yet.</p>
                         <ul class="mt-2">

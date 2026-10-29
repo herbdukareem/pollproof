@@ -95,7 +95,7 @@ const printReport = () => window.print();
             <section class="card overflow-hidden">
                 <div class="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5 pb-3">
                     <div>
-                        <h2 class="text-[17px] font-bold">Declared result against our signed records</h2>
+                        <h2 class="card-title ">Declared result against our signed records</h2>
                         <p v-if="d.declared" class="text-[13px] text-ink-2">{{ differences.length ? `Differences: ${differences.map((r) => `${r.party} ${signed(r.difference)}`).join(', ')}.` : 'The declared figures match our records for every party.' }}</p>
                         <p v-else class="text-[13px] text-ink-2">No declaration recorded yet. Our running totals are shown.</p>
                     </div>
@@ -127,7 +127,7 @@ const printReport = () => window.print();
             </section>
 
             <section class="card p-5">
-                <h2 class="text-[17px] font-bold">What happens to the data</h2>
+                <h2 class="card-title ">What happens to the data</h2>
                 <p class="mt-1 text-[13px] text-ink-2">
                     Stored: {{ num(d.stored.results) }} signed results, {{ num(d.stored.photos) }} EC8A, collation and IReV images, {{ num(d.stored.check_ins) }} check-ins, {{ num(d.stored.incidents) }} incidents and {{ num(d.stored.audit_entries) }} audit entries.
                 </p>

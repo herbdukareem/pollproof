@@ -102,7 +102,7 @@ async function send(agent) {
         </section>
 
         <section class="card self-start p-5">
-            <h2 class="text-[17px] font-bold">Check-ins to confirm</h2>
+            <h2 class="card-title ">Check-ins to confirm</h2>
             <p class="mt-1 mb-3 text-[13px] text-ink-2">Agents who checked in outside the unit area and say they're there.</p>
             <LoadState :loading="pending.loading.value" :error="pending.error.value" :empty="!(pending.data.value?.data ?? []).length" empty-text="Nothing to confirm.">
                 <ul class="flex flex-col gap-2">

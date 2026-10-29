@@ -57,7 +57,7 @@ const removeParty = (p) => act(`d${p.id}`, () => api.delete(`parties/${p.id}`), 
 
         <div class="grid items-start gap-5 xl:grid-cols-2">
             <form class="card flex flex-col gap-4 p-5" @submit.prevent="save">
-                <h2 class="text-[17px] font-bold">Election</h2>
+                <h2 class="card-title ">Election</h2>
                 <div><label class="label" for="c-name">Campaign name</label><input id="c-name" v-model="form.name" class="field" required /></div>
                 <div><label class="label" for="c-state">State</label><input id="c-state" v-model="form.state_name" class="field" required /></div>
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -74,7 +74,7 @@ const removeParty = (p) => act(`d${p.id}`, () => api.delete(`parties/${p.id}`), 
             </form>
 
             <section class="card p-5">
-                <h2 class="text-[17px] font-bold">Parties on the ballot</h2>
+                <h2 class="card-title ">Parties on the ballot</h2>
                 <p class="mt-1 text-[13px] text-ink-2">Codes are what agents type in the app and in SMS results, so keep them as on the ballot. A party can't be removed once results include it.</p>
                 <ul class="mt-3">
                     <li v-for="p in d.parties" :key="p.id" class="border-t border-[#eef0f3] py-2.5">

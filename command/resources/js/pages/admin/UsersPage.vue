@@ -91,7 +91,7 @@ async function copy() {
     <LoadState :loading="users.loading.value && !d" :error="users.error.value" :empty="!d">
         <section class="card mb-5 overflow-hidden">
             <div class="px-5 pt-5 pb-3">
-                <h2 class="text-[17px] font-bold">What each role can do</h2>
+                <h2 class="card-title ">What each role can do</h2>
                 <p class="text-[13px] text-ink-2">Agent phone numbers and payment lists are limited to the roles that need them.</p>
             </div>
             <div class="overflow-x-auto">
@@ -112,7 +112,7 @@ async function copy() {
 
         <section class="card overflow-hidden">
             <div class="flex flex-wrap items-center justify-between gap-3 p-4">
-                <h2 class="text-[17px] font-bold">People</h2>
+                <h2 class="card-title ">People</h2>
                 <input v-model="search" class="field h-10 max-w-xs" placeholder="Search users" aria-label="Search users" />
             </div>
             <div class="overflow-x-auto">
