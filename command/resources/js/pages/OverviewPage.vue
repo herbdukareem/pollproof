@@ -5,13 +5,14 @@ import StatTile from '../components/StatTile.vue';
 import AlertList from '../components/AlertList.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
+import Icon from '../components/Icon.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole, session } from '../lib/session';
 import { num, pct } from '../lib/format';
 
 const tally = useResource(() => api.get('tally'), { refreshMs: 30000 });
-const alerts = useResource(() => api.get('alerts', { status: 'open' }), { refreshMs: 30000 });
+const alerts = useResource(() => api.get('alerts', { status: 'open', per_page: 5, sort: 'latest' }), { refreshMs: 30000 });
 const busy = ref(null);
 
 const t = computed(() => tally.data.value);
@@ -19,8 +20,10 @@ const ours = computed(() => t.value?.candidates.find((c) => c.is_ours));
 const top = computed(() => t.value?.candidates[0]);
 const maxVotes = computed(() => Math.max(1, ...(t.value?.candidates.map((c) => c.votes) ?? [1])));
 const ourCode = computed(() => ours.value?.party);
+// The overview shows the five newest; the count and high-priority figure cover every open alert.
 const openAlerts = computed(() => alerts.data.value?.data ?? []);
-const high = computed(() => openAlerts.value.filter((a) => a.severity === 'high').length);
+const openCount = computed(() => alerts.data.value?.total ?? 0);
+const high = computed(() => alerts.data.value?.counts?.severity?.high ?? 0);
 const totalVotes = computed(() => (t.value?.candidates ?? []).reduce((sum, c) => sum + (c.votes ?? 0), 0));
 const ourShare = computed(() => (totalVotes.value && ours.value ? ours.value.votes / totalVotes.value : 0));
 
@@ -48,11 +51,11 @@ async function resolve(alert) {
             <StatTile to="/units?status=reported" label="Units reporting" :value="num(t.units_reported)" :pct="t.units ? (t.units_reported / t.units) * 100 : 0" :note="`of ${num(t.units)} polling units`" />
             <StatTile to="#running-totals" label="Our votes" :value="num(ours?.votes)" :pct="ourShare * 100" :tone="ours?.leads ? 'good' : 'navy'" :note="ours ? `${pct(ourShare)} of votes counted · ${ours.leads ? 'leading' : 'not leading'}` : 'No party marked as ours'" />
             <StatTile to="#threshold" label="LGAs at 25% or more" :value="ours ? `${ours.lgas_meeting_threshold} of ${t.lga_count}` : '–'" :pct="t.lga_count ? ((ours?.lgas_meeting_threshold ?? 0) / t.lga_count) * 100 : 0" :tone="ours?.meets_spread ? 'good' : 'bad'" :note="`Threshold needs ${t.lgas_required}`" />
-            <StatTile to="#alerts" label="Open alerts" :value="openAlerts.length" :pct="openAlerts.length ? (high / openAlerts.length) * 100 : 0" tone="bad" :note="openAlerts.length ? `${high} high priority` : 'Nothing needs action'" />
+            <StatTile to="/alerts" label="Open alerts" :value="openCount" :pct="openCount ? (high / openCount) * 100 : 0" tone="bad" :note="openCount ? `${high} high priority` : 'Nothing needs action'" />
         </div>
 
-        <div class="mt-5 grid items-start gap-5 xl:grid-cols-[1.35fr_1fr]">
-            <section id="threshold" class="card scroll-mt-24 p-5 transition">
+        <div class="mt-5 grid items-start gap-5 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <section id="threshold" class="card scroll-mt-4 p-5 transition">
                 <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                     <div>
                         <h2 class="card-title">25% threshold tracker</h2>
@@ -75,17 +78,23 @@ async function resolve(alert) {
                 </ul>
             </section>
 
-            <div class="flex flex-col gap-5">
-                <section id="alerts" class="card scroll-mt-24 p-5 transition">
-                    <div class="mb-3 flex items-center justify-between">
-                        <h2 class="card-title">Live alerts <span v-if="openAlerts.length" class="ml-1 rounded-full bg-action px-2 py-px align-middle text-xs text-white">{{ openAlerts.length }}</span></h2>
-                        <RouterLink to="/collation" class="text-[13px] font-bold underline-offset-2 hover:underline">View all</RouterLink>
+            <div class="flex min-w-0 flex-col gap-5">
+                <section id="alerts" class="card scroll-mt-4 p-5 transition">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h2 class="card-title flex items-center gap-2">
+                            Live alerts
+                            <span v-if="openCount" class="rounded-full bg-action px-2 py-px text-xs text-white">{{ openCount }}</span>
+                        </h2>
+                        <span v-if="openCount > openAlerts.length" class="text-xs text-ink-2">Newest {{ openAlerts.length }}</span>
                     </div>
                     <LoadState :loading="alerts.loading.value" :error="alerts.error.value" :empty="!openAlerts.length" empty-text="No open alerts.">
-                        <AlertList class="max-h-[560px] overflow-y-auto pr-1" :alerts="openAlerts" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" />
+                        <AlertList compact :alerts="openAlerts" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" />
                     </LoadState>
+                    <RouterLink to="/alerts" class="btn-ghost mt-3 w-full">
+                        {{ openCount > openAlerts.length ? `View all ${openCount} alerts` : 'Open the alerts page' }} <Icon name="chevron" :size="16" />
+                    </RouterLink>
                 </section>
-                <section id="running-totals" class="card scroll-mt-24 p-5 transition">
+                <section id="running-totals" class="card scroll-mt-4 p-5 transition">
                     <h2 class="card-title mb-4">Running totals · {{ num(t.units_reported) }} units</h2>
                     <div v-for="c in t.candidates" :key="c.party" class="mb-3.5 last:mb-0">
                         <div class="mb-1.5 flex justify-between text-sm">

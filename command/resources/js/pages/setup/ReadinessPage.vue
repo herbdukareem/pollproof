@@ -76,7 +76,7 @@ async function remind(group) {
             </div>
         </section>
 
-        <div class="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <div class="grid items-start gap-5 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <section class="card overflow-hidden">
                 <div class="flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
                     <h2 class="card-title ">Readiness by LGA</h2>

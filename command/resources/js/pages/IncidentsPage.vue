@@ -4,24 +4,29 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import Pagination from '../components/Pagination.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
 import { dateTime, titleCase } from '../lib/format';
 
 const status = ref('open');
-const incidents = useResource(() => api.get('incidents', { status: status.value }), { refreshMs: 30000 });
-watch(status, () => incidents.load());
-
-const all = computed(() => incidents.data.value?.data ?? []);
 const type = ref('');
-const rows = computed(() => (type.value ? all.value.filter((i) => i.type === type.value) : all.value));
-const typeCounts = computed(() => {
-    const out = {};
-    for (const i of all.value) out[i.type] = (out[i.type] ?? 0) + 1;
-    return out;
-});
-watch(status, () => (type.value = ''));
+const severity = ref('');
+const search = ref('');
+const page = ref(1);
+const perPage = ref(25);
+const incidents = useResource(() => api.get('incidents', { status: status.value, type: type.value, severity: severity.value, search: search.value, page: page.value, per_page: perPage.value }), { refreshMs: 30000 });
+watch([status, type, severity], () => { page.value = 1; incidents.load(); });
+let t;
+watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; incidents.load(); }, 300); });
+const go = (p) => { page.value = p; incidents.load(); };
+
+const rows = computed(() => incidents.data.value?.data ?? []);
+const meta = computed(() => incidents.data.value);
+const typeCounts = computed(() => incidents.data.value?.counts?.types ?? {});
+const statusCounts = computed(() => incidents.data.value?.counts?.status ?? {});
+const typeTotal = computed(() => Object.values(typeCounts.value).reduce((a, b) => a + b, 0));
 const selectedId = ref(null);
 const selected = computed(() => rows.value.find((i) => i.id === selectedId.value) ?? rows.value[0] ?? null);
 const canEdit = hasRole('situation_room', 'dg', 'legal');
@@ -55,19 +60,34 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
     <PageHeader title="Incidents" subtitle="Reports from agents, with who is handling each one." :updated-at="incidents.updatedAt.value" :loading="incidents.loading.value" @refresh="incidents.load">
         <template #actions>
             <div class="flex rounded-xl border border-[#d6dae1] bg-white p-1" role="group" aria-label="Status">
-                <button v-for="s in ['open', 'handling', 'resolved']" :key="s" class="btn h-8 px-3" :class="status === s ? 'bg-navy text-white' : 'text-ink'" :aria-pressed="status === s" @click="status = s">{{ titleCase(s) }}</button>
+                <button v-for="s in ['open', 'handling', 'resolved']" :key="s" class="btn h-8 px-3" :class="status === s ? 'bg-navy text-white' : 'text-ink'" :aria-pressed="status === s" @click="status = s">{{ titleCase(s) }} <span class="ml-1 text-xs opacity-70">{{ statusCounts[s] ?? 0 }}</span></button>
             </div>
         </template>
     </PageHeader>
 
-    <div v-if="all.length" class="mb-4 flex flex-wrap gap-2" role="group" aria-label="Type">
-        <button class="chip h-9" :class="type === '' ? 'chip-on' : ''" :aria-pressed="type === ''" @click="type = ''">All <b>{{ all.length }}</b></button>
-        <button v-for="(n, t) in typeCounts" :key="t" class="chip h-9" :class="type === t ? 'chip-on' : ''" :aria-pressed="type === t" @click="type = t">{{ typeLabel[t] }} <b>{{ n }}</b></button>
+    <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Type">
+        <button class="chip h-9" :class="type === '' ? 'chip-on' : ''" :aria-pressed="type === ''" @click="type = ''">All types <b>{{ typeTotal }}</b></button>
+        <button v-for="(n, t) in typeCounts" :key="t" class="chip h-9" :class="type === t ? 'chip-on' : ''" :aria-pressed="type === t" @click="type = t">{{ typeLabel[t] ?? titleCase(t) }} <b>{{ n }}</b></button>
+        <div class="ml-auto flex w-full flex-wrap gap-2 sm:w-auto">
+            <label class="sr-only" for="inc-sev">Severity</label>
+            <select id="inc-sev" v-model="severity" class="field h-9 w-auto text-sm">
+                <option value="">Any severity</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+            <div class="relative min-w-[260px] flex-1">
+                <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                <label class="sr-only" for="inc-search">Search incidents</label>
+                <input id="inc-search" v-model="search" class="field h-9 w-full pl-9 text-sm" placeholder="Unit code, place or words in the report" />
+            </div>
+        </div>
     </div>
 
-    <LoadState :loading="incidents.loading.value" :error="incidents.error.value" :empty="!rows.length" :empty-text="`No ${status} incidents.`">
+    <LoadState :loading="incidents.loading.value" :error="incidents.error.value" :empty="!rows.length" :empty-text="search || type || severity ? 'No incidents match these filters.' : `No ${status} incidents.`">
         <div class="grid items-start gap-5 lg:grid-cols-[380px_1fr]">
-            <section class="card flex max-h-[calc(100vh-220px)] flex-col gap-1 overflow-y-auto p-2" aria-label="Incident list">
+            <section class="card flex max-h-[calc(100dvh-230px)] flex-col overflow-hidden" aria-label="Incident list">
+              <div class="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
                 <button v-for="i in rows" :key="i.id" class="flex gap-3 rounded-xl border-2 px-3.5 py-3 text-left transition" :class="selected?.id === i.id ? 'border-navy bg-white shadow-sm' : 'border-transparent hover:bg-mist'" @click="selectedId = i.id">
                     <span class="w-1 shrink-0 rounded-full" :class="{ high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' }[i.severity]"></span>
                     <span class="min-w-0 flex-1">
@@ -76,6 +96,8 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
                         <span class="mt-1.5 flex gap-1.5"><Badge :tone="sevTone[i.severity]">{{ i.severity }}</Badge><Badge :tone="statusTone[i.status]">{{ i.status }}</Badge></span>
                     </span>
                 </button>
+              </div>
+              <Pagination :meta="meta" noun="incidents" :per-page-options="[25, 50, 100]" :loading="incidents.loading.value" @page="go" @per-page="(n) => { perPage = n; go(1); }" />
             </section>
 
             <section v-if="selected" class="card p-5">

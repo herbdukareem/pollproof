@@ -24,6 +24,7 @@ class NavCountsController extends Controller
         $user = $request->user();
         $campaign = $user->campaign_id;
         $counts = [
+            'alerts' => Alert::where('campaign_id', $campaign)->where('status', '!=', 'resolved')->count(),
             'collation' => Alert::where('campaign_id', $campaign)->where('status', '!=', 'resolved')->where('type', 'collation_mismatch')->count(),
             'incidents' => Incident::where('campaign_id', $campaign)->where('status', 'open')->count(),
         ];

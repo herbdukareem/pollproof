@@ -214,4 +214,55 @@
     tbody tr {
         animation: fade-in 0.3s ease backwards;
     }
+    .alert-enter-active,
+    .alert-leave-active,
+    .alert-move {
+        transition: all 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .alert-enter-from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    .alert-leave-to {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+    .alert-leave-active {
+        position: absolute;
+        left: 0;
+        right: 0;
+    }
+}
+
+@utility pager-btn {
+    @apply inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[#d6dae1] bg-white px-2 text-[13px] font-bold text-ink transition hover:border-navy active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d6dae1];
+}
+@utility pager-on {
+    @apply border-navy bg-navy text-white hover:border-navy;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .modal-enter-active,
+    .modal-leave-active {
+        transition: opacity 0.2s ease;
+    }
+    .modal-enter-active .modal-panel,
+    .modal-leave-active .modal-panel {
+        transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .modal-enter-from,
+    .modal-leave-to {
+        opacity: 0;
+    }
+    .modal-enter-from .modal-panel,
+    .modal-leave-to .modal-panel {
+        transform: translateY(16px) scale(0.98);
+    }
+    .pop-enter-active {
+        transition: opacity 0.14s ease, margin 0.14s ease;
+    }
+    .pop-enter-from {
+        opacity: 0;
+        margin-top: -4px;
+    }
 }

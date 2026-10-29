@@ -4,6 +4,10 @@ import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
+import Pagination from '../../components/Pagination.vue';
+import ActionMenu from '../../components/ActionMenu.vue';
+import Modal from '../../components/Modal.vue';
+import { usePaged } from '../../lib/usePaged';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { dateTime } from '../../lib/format';
@@ -11,7 +15,36 @@ import { dateTime } from '../../lib/format';
 const users = useResource(() => api.get('users'));
 const d = computed(() => users.data.value);
 const search = ref('');
-const rows = computed(() => (d.value?.data ?? []).filter((u) => !search.value || `${u.name} ${u.email} ${u.role_label}`.toLowerCase().includes(search.value.toLowerCase())));
+const roleFilter = ref('');
+const statusFilter = ref('active');
+const statusTests = { active: (u) => u.active, inactive: (u) => !u.active, no2fa: (u) => u.active && !u.two_factor, temp: (u) => u.active && u.must_change_password, '': () => true };
+const matches = computed(() => (d.value?.data ?? []).filter((u) =>
+    (!search.value || `${u.name} ${u.email} ${u.role_label}`.toLowerCase().includes(search.value.toLowerCase()))
+    && (!roleFilter.value || u.role === roleFilter.value)
+    && statusTests[statusFilter.value](u)));
+const paged = usePaged(matches, { perPage: 25, resetOn: () => [search.value, roleFilter.value, statusFilter.value] });
+const rows = paged.rows;
+const confirm = ref(null);
+const editing = reactive({ user: null, name: '' });
+const menuFor = (u) => [
+    { label: 'Edit name', icon: 'edit', run: () => Object.assign(editing, { user: u, name: u.name }) },
+    ...(u.active ? [{ label: 'Reset password', icon: 'key', hint: 'Gives a temporary password to pass on', run: () => (confirm.value = { kind: 'password', user: u }) }] : []),
+    ...(u.active && u.two_factor ? [{ label: 'Reset two-step sign-in', icon: 'shield', hint: 'For a lost phone', run: () => (confirm.value = { kind: 'twofa', user: u }) }] : []),
+    u.active
+        ? { label: 'Deactivate', icon: 'power', danger: true, hint: 'Signs them out everywhere', run: () => (confirm.value = { kind: 'deactivate', user: u }) }
+        : { label: 'Reactivate', icon: 'power', run: () => toggle(u) },
+];
+async function confirmed() {
+    const { kind, user } = confirm.value;
+    if (kind === 'password') await reset(user);
+    else if (kind === 'twofa') await resetTwoFactor(user);
+    else await toggle(user);
+    if (!error.value) confirm.value = null;
+}
+const saveName = () => act(`n${editing.user.id}`, async () => {
+    await api.patch(`users/${editing.user.id}`, { name: editing.name.trim() });
+    editing.user = null;
+});
 const form = reactive({ open: false, name: '', email: '', role: 'situation_room' });
 const secret = ref(null);
 const busy = ref('');
@@ -111,13 +144,27 @@ async function copy() {
         </section>
 
         <section class="card overflow-hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 p-4">
-                <h2 class="card-title ">People</h2>
-                <input v-model="search" class="field h-10 max-w-xs" placeholder="Search users" aria-label="Search users" />
+            <div class="flex flex-wrap items-center gap-3 border-b border-[#eef0f3] p-4">
+                <h2 class="card-title mr-auto">People</h2>
+                <div class="relative w-full max-w-[240px]">
+                    <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                    <input v-model="search" class="field h-10 w-full pl-9" placeholder="Name or email" aria-label="Search users" />
+                </div>
+                <select v-model="roleFilter" class="field h-10 w-auto" aria-label="Role">
+                    <option value="">All roles</option>
+                    <option v-for="r in d.roles" :key="r.value" :value="r.value">{{ r.label }} ({{ r.count }})</option>
+                </select>
+                <select v-model="statusFilter" class="field h-10 w-auto" aria-label="Status">
+                    <option value="active">Active</option>
+                    <option value="no2fa">Two-step not set up</option>
+                    <option value="temp">Temporary password</option>
+                    <option value="inactive">Deactivated</option>
+                    <option value="">Everyone</option>
+                </select>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[920px] text-sm">
-                    <thead class="bg-mist"><tr><th class="th">User</th><th class="th">Role</th><th class="th">Status</th><th class="th">Two-step</th><th class="th">Last active</th><th class="th"></th></tr></thead>
+                    <thead class="bg-mist"><tr><th class="th">User</th><th class="th">Role</th><th class="th">Status</th><th class="th">Two-step</th><th class="th">Last active</th><th class="th text-right">Actions</th></tr></thead>
                     <tbody>
                         <tr v-for="u in rows" :key="u.id" :class="u.active ? '' : 'opacity-60'">
                             <td class="td">
@@ -140,16 +187,33 @@ async function copy() {
                             <td class="td"><Badge :tone="u.two_factor ? 'good' : 'bad'">{{ u.two_factor ? 'On' : 'Not set up' }}</Badge></td>
                             <td class="td text-ink-2">{{ u.last_active_at ? dateTime(u.last_active_at) : 'Never' }}</td>
                             <td class="td">
-                                <div v-if="!u.is_me" class="flex justify-end gap-2">
-                                    <button v-if="u.active && u.two_factor" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `t${u.id}`" title="For a lost phone: they set it up again at next sign-in" @click="resetTwoFactor(u)">Reset two-step</button>
-                                    <button v-if="u.active" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `p${u.id}`" @click="reset(u)">Reset password</button>
-                                    <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `a${u.id}`" @click="toggle(u)">{{ u.active ? 'Deactivate' : 'Reactivate' }}</button>
-                                </div>
+                                <div class="flex justify-end"><ActionMenu v-if="!u.is_me" :items="menuFor(u)" :label="`Actions for ${u.name}`" /></div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+                <p v-if="!rows.length" class="px-4 py-10 text-center text-sm text-ink-2">No users match these filters.</p>
             </div>
+            <Pagination :meta="paged.meta.value" noun="users" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
     </LoadState>
+
+    <Modal :open="!!editing.user" :title="`Edit ${editing.user?.name}`" :busy="busy.startsWith('n')" @close="editing.user = null">
+        <form id="user-edit" @submit.prevent="saveName"><label class="flex flex-col gap-1.5 text-sm font-semibold">Full name <input v-model="editing.name" class="field" required maxlength="120" /></label></form>
+        <p class="mt-3 text-xs text-ink-2">Change the role from the Role column. Email addresses can't be changed; add a new user instead.</p>
+        <template #footer>
+            <button class="btn-ghost" @click="editing.user = null">Cancel</button>
+            <button class="btn-navy" form="user-edit" :disabled="busy.startsWith('n')">Save</button>
+        </template>
+    </Modal>
+
+    <Modal :open="!!confirm" :title="confirm ? { password: `Reset ${confirm.user.name}'s password?`, twofa: `Reset two-step sign-in for ${confirm.user.name}?`, deactivate: `Deactivate ${confirm.user.name}?` }[confirm.kind] : ''" :busy="!!busy" @close="confirm = null">
+        <p v-if="confirm?.kind === 'password'" class="text-sm text-ink-2">They are signed out and get a temporary password, shown to you once. They must change it at their next sign-in.</p>
+        <p v-else-if="confirm?.kind === 'twofa'" class="text-sm text-ink-2">Use this when they lose their phone. They are signed out and set two-step sign-in up again next time.</p>
+        <p v-else class="text-sm text-ink-2">They are signed out everywhere and can't sign in until reactivated. Their past actions stay in the audit log.</p>
+        <template #footer>
+            <button class="btn-ghost" @click="confirm = null">Cancel</button>
+            <button :class="confirm?.kind === 'deactivate' ? 'btn-primary' : 'btn-navy'" :disabled="!!busy" @click="confirmed">{{ confirm?.kind === 'deactivate' ? 'Deactivate' : 'Reset' }}</button>
+        </template>
+    </Modal>
 </template>

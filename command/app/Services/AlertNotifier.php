@@ -112,6 +112,12 @@ final class AlertNotifier
         return [null, null];
     }
 
+    /** The command-room screen where this alert is dealt with. */
+    public function link(Alert $alert): string
+    {
+        return $this->url($alert);
+    }
+
     private function url(Alert $alert): string
     {
         return match ($alert->type) {

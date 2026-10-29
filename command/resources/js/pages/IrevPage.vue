@@ -85,7 +85,7 @@ const label = { match: 'Match', differs: 'Differs', not_on_irev: 'Not on IReV', 
 <template>
     <PageHeader title="IReV entry" subtitle="Record what IReV shows for a unit, or that it isn't there, so it can be compared with our signed result." />
 
-    <div class="grid gap-5 xl:grid-cols-[1fr_340px]">
+    <div class="grid gap-5 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_340px]">
         <form class="card p-5" @submit.prevent="submit">
             <div class="grid gap-3 md:grid-cols-[1fr_220px]">
                 <div class="relative">
@@ -110,14 +110,14 @@ const label = { match: 'Match', differs: 'Differs', not_on_irev: 'Not on IReV', 
                 <span class="ml-auto"><Badge :tone="ours ? 'good' : 'neutral'">{{ ours ? 'Our signed result is in' : 'No signed result yet' }}</Badge></span>
             </div>
 
-            <div v-if="!form.not_on_irev" class="mt-4 overflow-hidden rounded-xl border border-line">
+            <div v-if="!form.not_on_irev" class="mt-4 overflow-x-auto rounded-xl border border-line">
                 <table class="w-full text-sm">
                     <thead><tr><th class="th">Figure</th><th class="th text-right">Our signed</th><th class="th text-right">IReV</th><th class="th w-28">Check</th></tr></thead>
                     <tbody>
                         <tr v-for="r in rowsFor" :key="r.key" :class="check(r.ours, val(r)) === false ? 'bg-[#fff8f4]' : ''">
                             <td class="td font-semibold"><label :for="`i-${r.key}`">{{ r.label }}</label></td>
                             <td class="td text-right text-ink-2">{{ ours ? num(r.ours ?? 0) : '–' }}</td>
-                            <td class="td text-right"><input :id="`i-${r.key}`" :value="val(r)" type="number" min="0" inputmode="numeric" class="field ml-auto h-9 w-28 text-right font-bold" :class="check(r.ours, val(r)) === false ? '!border-action' : ''" @input="set(r, $event.target.value)" /></td>
+                            <td class="td text-right"><input :id="`i-${r.key}`" :value="val(r)" type="number" min="0" inputmode="numeric" class="field ml-auto h-9 w-24 text-right font-bold sm:w-28" :class="check(r.ours, val(r)) === false ? '!border-action' : ''" @input="set(r, $event.target.value)" /></td>
                             <td class="td text-[13px] font-bold">
                                 <span v-if="check(r.ours, val(r)) === true" class="text-good">Match</span>
                                 <span v-else-if="check(r.ours, val(r)) === false" class="text-action">{{ signed(Number(val(r)) - Number(r.ours ?? 0)) }}</span>

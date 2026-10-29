@@ -81,9 +81,9 @@ async function logout() {
 </script>
 
 <template>
-    <div class="flex min-h-screen bg-mist">
+    <div class="flex h-dvh overflow-hidden bg-mist print:block print:h-auto print:overflow-visible">
         <aside
-            class="fixed inset-y-0 left-0 z-40 flex w-[256px] shrink-0 flex-col gap-5 bg-navy px-4 py-5 text-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
+            class="fixed inset-y-0 left-0 z-40 flex w-[256px] shrink-0 flex-col gap-5 overflow-hidden bg-navy px-4 py-5 text-white transition-transform duration-200 lg:static lg:h-full lg:translate-x-0 print:hidden"
             :class="open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'"
         >
             <RouterLink to="/" class="flex items-center gap-2.5 px-2">
@@ -128,8 +128,8 @@ async function logout() {
         </aside>
         <div v-if="open" class="fixed inset-0 z-30 bg-navy/40 backdrop-blur-[1px] lg:hidden" @click="open = false"></div>
 
-        <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-20 flex min-h-[68px] flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e3e6ec] bg-white/95 px-4 py-3 backdrop-blur sm:px-7">
+        <div class="flex h-full min-w-0 flex-1 flex-col print:block print:h-auto">
+            <header class="z-20 flex min-h-[68px] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e3e6ec] bg-white/95 px-4 py-3 backdrop-blur sm:px-7 print:hidden">
                 <button class="btn-outline h-10 w-10 !px-0 lg:hidden" aria-label="Open menu" @click="open = true"><Icon name="menu" /></button>
                 <div class="min-w-0 flex-1">
                     <h1 class="truncate text-[22px] leading-tight font-extrabold tracking-[-0.3px] text-ink">{{ title }}</h1>
@@ -164,7 +164,7 @@ async function logout() {
                     </div>
                 </div>
             </header>
-            <main class="flex-1 px-4 py-6 sm:px-7">
+            <main id="pp-main" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-6 sm:px-7 print:overflow-visible">
                 <slot />
             </main>
         </div>

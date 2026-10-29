@@ -10,6 +10,7 @@ export const NAV = [
     { name: 'roster', label: 'Agent roster', path: '/setup/roster', icon: 'list', roles: SETUP, section: 'setup' },
     { name: 'supervisors', label: 'Supervisors', path: '/setup/supervisors', icon: 'tree', roles: SETUP, section: 'setup', count: 'supervisors' },
     { name: 'overview', label: 'Overview', path: '/overview', icon: 'grid', roles: READ, section: 'election' },
+    { name: 'alerts', label: 'Live alerts', path: '/alerts', icon: 'bell', roles: READ, section: 'election', count: 'alerts' },
     { name: 'units', label: 'Units', path: '/units', icon: 'pin', roles: READ, section: 'election' },
     { name: 'verify', label: 'Verify results', path: '/verify', icon: 'check', roles: ['verifier', 'situation_room', 'dg'], section: 'election', count: 'verify' },
     { name: 'collation', label: 'Collation checks', path: '/collation', icon: 'layers', roles: READ, section: 'election', count: 'collation' },

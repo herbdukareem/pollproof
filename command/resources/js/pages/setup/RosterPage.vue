@@ -8,6 +8,8 @@ import Icon from '../../components/Icon.vue';
 import CsvUpload from '../../components/CsvUpload.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
+import Pagination from '../../components/Pagination.vue';
+import AgentActions from '../../components/AgentActions.vue';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
@@ -15,7 +17,10 @@ import { num } from '../../lib/format';
 const search = ref('');
 const filter = ref(['incomplete', 'all', 'reserves', 'unassigned', 'unavailable'].includes(useRoute().query.filter) ? useRoute().query.filter : 'incomplete');
 const page = ref(1);
-const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, page: page.value }));
+const perPage = ref(50);
+const lgaId = ref('');
+const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, page: page.value, per_page: perPage.value }));
+const structure = useResource(() => api.get('structure'));
 const d = computed(() => roster.data.value);
 const notInstalled = computed(() => (d.value ? d.value.counts.assigned - d.value.stages[1].value : 0));
 const report = ref(null);
@@ -29,7 +34,7 @@ watch(search, () => {
     clearTimeout(t);
     t = setTimeout(() => { page.value = 1; roster.load(); }, 300);
 });
-watch(filter, () => { page.value = 1; roster.load(); });
+watch([filter, lgaId], () => { page.value = 1; roster.load(); });
 
 const stepNotes = ['Not invited', 'Not installed', 'No practice result', 'Training due', 'Not confirmed', 'Ready'];
 const actionFor = (a) => (a.step <= 1 ? 'Send invite' : null);
@@ -60,6 +65,12 @@ function imported(summary) {
 }
 
 const go = (p) => { page.value = p; roster.load(); };
+const setPerPage = (n) => { perPage.value = n; go(1); };
+function changed(text) {
+    message.value = text;
+    error.value = '';
+    roster.load();
+}
 </script>
 
 <template>
@@ -98,12 +109,17 @@ const go = (p) => { page.value = p; roster.load(); };
                         <option value="unassigned">Waiting for a unit</option>
                         <option value="unavailable">Said they can't make it</option>
                     </select>
-                    <span class="self-center text-sm text-ink-2">{{ num(d.total) }} shown</span>
+                    <label class="sr-only" for="roster-lga">LGA</label>
+                    <select id="roster-lga" v-model="lgaId" class="field h-10 w-auto">
+                        <option value="">All LGAs</option>
+                        <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
+                    </select>
+                    <span class="self-center text-sm text-ink-2">{{ num(d.total) }} match</span>
                 </div>
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[760px] text-sm">
-                            <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Phone</th><th class="th">Unit</th><th class="th" title="Invited · installed · practice · trained · confirmed">Onboarding</th><th class="th"></th></tr></thead>
+                            <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Phone</th><th class="th">Unit</th><th class="th" title="Invited · installed · practice · trained · confirmed">Onboarding</th><th class="th text-right">Actions</th></tr></thead>
                             <tbody>
                                 <tr v-for="a in d.data" :key="a.id">
                                     <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div></td>
@@ -118,15 +134,17 @@ const go = (p) => { page.value = p; roster.load(); };
                                         </div>
                                         <div class="mt-1 text-xs font-semibold" :class="a.unavailable ? 'text-action' : a.step === 5 ? 'text-good' : 'text-[#b4470a]'">{{ a.unavailable ? "Can't make it" : stepNotes[a.step] }}{{ a.quiz_score != null && a.step < 4 ? ` · quiz ${a.quiz_score}/10` : '' }}</div>
                                     </td>
-                                    <td class="td text-right"><button v-if="actionFor(a)" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `i${a.id}`" @click="inviteOne(a)">{{ a.step ? 'Resend invite' : 'Send invite' }}</button></td>
+                                    <td class="td">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button v-if="actionFor(a)" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `i${a.id}`" @click="inviteOne(a)">{{ a.step ? 'Resend invite' : 'Send invite' }}</button>
+                                            <AgentActions :agent="{ ...a, active: true }" can-edit :can-assign="!d.frozen" @done="changed" />
+                                        </div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <div v-if="d.last_page > 1" class="flex items-center justify-between border-t border-[#eef0f3] px-4 py-3 text-sm text-ink-2">
-                        <span>Page {{ d.page }} of {{ d.last_page }}</span>
-                        <div class="flex gap-2"><button class="btn-outline h-9" :disabled="d.page <= 1" @click="go(d.page - 1)">Previous</button><button class="btn-outline h-9" :disabled="d.page >= d.last_page" @click="go(d.page + 1)">Next</button></div>
-                    </div>
+                    <Pagination :meta="d" noun="agents" :per-page-options="[25, 50, 100, 200]" :loading="roster.loading.value" @page="go" @per-page="setPerPage" />
                 </LoadState>
             </section>
 

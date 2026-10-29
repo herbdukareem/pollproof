@@ -4,6 +4,8 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import Pagination from '../components/Pagination.vue';
+import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { num } from '../lib/format';
@@ -11,7 +13,15 @@ import { num } from '../lib/format';
 const stipends = useResource(() => api.get('stipends'));
 const d = computed(() => stipends.data.value);
 const show = ref('hold');
-const rows = computed(() => (d.value?.agents ?? []).filter((a) => (show.value === 'hold' ? !a.eligible : a.eligible)));
+const search = ref('');
+const reason = ref('');
+const reasons = computed(() => Object.keys(d.value?.hold_reasons ?? {}));
+const matches = computed(() => (d.value?.agents ?? []).filter((a) =>
+    (show.value === 'all' || (show.value === 'hold' ? !a.eligible : a.eligible))
+    && (!reason.value || a.reason === reason.value)
+    && (!search.value || `${a.agent_code} ${a.name} ${a.polling_unit}`.toLowerCase().includes(search.value.toLowerCase()))));
+const paged = usePaged(matches, { perPage: 25, resetOn: () => [show.value, search.value, reason.value] });
+const rows = paged.rows;
 const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0));
 </script>
 
@@ -41,11 +51,20 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
             </section>
 
             <section class="card overflow-hidden">
-                <div class="flex gap-2 border-b border-[#eef0f3] p-3">
-                    <button class="btn h-9" :class="show === 'hold' ? 'bg-navy text-white' : 'text-ink'" @click="show = 'hold'">On hold</button>
-                    <button class="btn h-9" :class="show === 'eligible' ? 'bg-navy text-white' : 'text-ink'" @click="show = 'eligible'">Eligible</button>
+                <div class="flex flex-wrap items-center gap-2 border-b border-[#eef0f3] p-3">
+                    <div class="inline-flex rounded-xl border border-line p-1" role="tablist" aria-label="Show">
+                        <button v-for="[v, text, n] in [['hold', 'On hold', d.on_hold], ['eligible', 'Eligible', d.eligible], ['all', 'All', total]]" :key="v" role="tab" :aria-selected="show === v" class="h-8 rounded-lg px-3 text-sm font-bold transition" :class="show === v ? 'bg-navy text-white' : 'text-ink-2 hover:text-ink'" @click="show = v">{{ text }} <span class="ml-1 text-xs opacity-70">{{ num(n) }}</span></button>
+                    </div>
+                    <select v-if="show !== 'eligible' && reasons.length" v-model="reason" class="field h-10 w-auto text-sm" aria-label="Reason on hold">
+                        <option value="">Any reason</option>
+                        <option v-for="x in reasons" :key="x" :value="x">{{ x }}</option>
+                    </select>
+                    <div class="relative ml-auto w-full max-w-[240px]">
+                        <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                        <input v-model="search" class="field h-10 w-full pl-9" placeholder="Agent ID, name or unit" aria-label="Search agents" />
+                    </div>
                 </div>
-                <LoadState :empty="!rows.length" empty-text="Nobody in this list.">
+                <LoadState :empty="!rows.length" :empty-text="search || reason ? 'No agents match.' : 'Nobody in this list.'">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[560px] text-sm">
                             <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Unit</th><th class="th">Checked in</th><th class="th">Result</th><th class="th">Status</th></tr></thead>
@@ -61,6 +80,7 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
                         </table>
                     </div>
                 </LoadState>
+                <Pagination :meta="paged.meta.value" noun="agents" @page="paged.setPage" @per-page="paged.setPerPage" />
             </section>
         </div>
     </LoadState>

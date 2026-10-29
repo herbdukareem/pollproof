@@ -105,16 +105,32 @@ class ResultController extends Controller
     /** Results waiting for a second person to check them against the photo, oldest first; flagged ones first. */
     public function queue(Request $request): JsonResponse
     {
-        $items = ResultSubmission::where('campaign_id', $request->user()->campaign_id)
+        $data = $request->validate([
+            'search' => ['nullable', 'string', 'max:60'],
+            'lga_id' => ['nullable', 'integer'],
+            'kind' => ['nullable', 'in:flagged,corrections'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+        $base = fn () => ResultSubmission::where('campaign_id', $request->user()->campaign_id)
             ->where('is_current', true)
             ->where('status', ResultSubmission::PENDING_REVIEW)
+            ->when($data['lga_id'] ?? null, fn ($q, $l) => $q->whereHas('pollingUnit.ward', fn ($w) => $w->where('lga_id', $l)))
+            ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereHas('pollingUnit', fn ($u) => $u->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%"))
+                ->orWhereHas('user', fn ($u) => $u->whereLike('code', "%{$s}%"))));
+        $page = $base()
+            ->when(($data['kind'] ?? null) === 'flagged', fn ($q) => $q->whereJsonContains('flags', 'overvote'))
+            ->when(($data['kind'] ?? null) === 'corrections', fn ($q) => $q->whereNotNull('supersedes_id'))
             ->with(['pollingUnit.ward.lga', 'votes.party', 'user:id,name,code'])
             ->orderByRaw("CASE WHEN JSON_CONTAINS(flags, '\"overvote\"') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
-            ->limit(100)
-            ->get();
+            ->paginate((int) ($data['per_page'] ?? 20));
+        $page->getCollection()->transform(fn ($r) => $this->present($r));
 
-        return response()->json(['data' => $items->map(fn ($r) => $this->present($r))]);
+        return response()->json($page->toArray() + ['counts' => [
+            'all' => $base()->count(),
+            'flagged' => $base()->whereJsonContains('flags', 'overvote')->count(),
+            'corrections' => $base()->whereNotNull('supersedes_id')->count(),
+        ]]);
     }
 
     public function show(Request $request, ResultSubmission $result): JsonResponse
