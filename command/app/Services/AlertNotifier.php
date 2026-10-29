@@ -126,6 +126,7 @@ final class AlertNotifier
             'incident' => '/incidents',
             'agent_absent', 'agent_unavailable' => '/agents',
             'irev_mismatch', 'irev_missing' => '/irev',
+            'result_flagged' => $alert->subject instanceof ResultSubmission ? '/units?search='.$alert->subject->pollingUnit?->code : '/verify',
             'verify_backlog' => '/verify',
             'failed_logins' => '/admin/users',
             default => '/overview',

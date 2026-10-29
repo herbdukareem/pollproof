@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import ResultFlags from '../components/ResultFlags.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { dateTime, num, signed, titleCase } from '../lib/format';
@@ -30,6 +31,10 @@ const timeline = computed(() => {
         if (r.review.at) ev.push({ at: r.review.at, text: `Second check: ${titleCase(r.review.status)}`, kind: r.review.status === 'approved' ? 'ok' : 'warn' });
     });
     if (d.value.irev) ev.push({ at: d.value.irev.seen_at, text: `IReV: ${irevLabel[d.value.irev.comparison.status] ?? d.value.irev.comparison.status}`, kind: d.value.irev.comparison.status === 'match' ? 'ok' : 'bad' });
+    for (const f of d.value.flags ?? []) {
+        ev.push({ at: f.at, text: `Flagged by ${f.by?.name}: ${f.label.toLowerCase()}`, kind: 'bad' });
+        if (f.cleared_at) ev.push({ at: f.cleared_at, text: `Flag cleared by ${f.cleared_by}`, kind: 'ok' });
+    }
     for (const c of d.value.collation) ev.push({ at: c.announced_at, text: `${titleCase(c.comparison.level)} sheet ${Object.keys(c.comparison.differences).length ? 'differs from our units' : 'matches our units'}`, kind: Object.keys(c.comparison.differences).length ? 'bad' : 'ok' });
     return ev.filter((e) => e.at).sort((a, b) => new Date(a.at) - new Date(b.at));
 });
@@ -43,6 +48,7 @@ const compareRows = computed(() => {
 const headline = computed(() => {
     if (!d.value) return null;
     if (current.value?.flags.includes('overvote')) return ['bad', 'Overvote'];
+    if ((d.value.flags ?? []).some((f) => f.status === 'open')) return ['bad', 'Flagged by a reviewer'];
     if (d.value.irev?.comparison.status === 'differs') return ['bad', 'IReV differs'];
     if (d.value.irev?.comparison.status === 'not_on_irev') return ['warn', 'Not on IReV'];
     if (d.value.collation.some((c) => Object.keys(c.comparison.differences).length)) return ['bad', 'Collation differs'];
@@ -92,6 +98,10 @@ const headline = computed(() => {
                     <figcaption class="px-3 py-2 text-xs text-ink-2">EC8A as photographed at the unit</figcaption>
                 </figure>
             </div>
+        </section>
+
+        <section v-if="current" class="card mb-5 p-5">
+            <ResultFlags :result-id="current.id" @changed="pack.load" />
         </section>
 
         <div class="mb-5 grid items-start gap-5 lg:grid-cols-[1.2fr_1fr]">

@@ -16,6 +16,11 @@ class PollingUnit extends Model
         return ['latitude' => 'float', 'longitude' => 'float'];
     }
 
+    public function resultFlags(): HasMany
+    {
+        return $this->hasMany(ResultFlag::class);
+    }
+
     public function ward(): BelongsTo
     {
         return $this->belongsTo(Ward::class);

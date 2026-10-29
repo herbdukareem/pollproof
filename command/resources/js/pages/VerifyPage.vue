@@ -5,6 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import ResultFlags from '../components/ResultFlags.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { session } from '../lib/session';
@@ -21,6 +22,12 @@ const counts = computed(() => queue.data.value?.counts ?? {});
 watch([kind, lgaId], () => { page.value = 1; queue.load(); });
 let t;
 watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; queue.load(); }, 300); });
+const flagsPanel = ref(null);
+// A new or cleared flag changes the counts in the queue.
+const flagsChanged = (open) => {
+    if (selected.value) selected.value.open_flags = open;
+    queue.load();
+};
 const go = (p) => { page.value = p; selectedId.value = null; queue.load(); };
 const selectedId = ref(null);
 const selected = computed(() => items.value.find((r) => r.id === selectedId.value) ?? items.value[0] ?? null);
@@ -69,7 +76,7 @@ const ageClass = (r) => {
     <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
 
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <button v-for="[v, text, n] in [['', 'All waiting', counts.all], ['flagged', 'Votes exceed accreditation', counts.flagged], ['corrections', 'Corrections', counts.corrections]]" :key="v" class="chip h-9" :class="kind === v ? 'chip-on' : ''" :aria-pressed="kind === v" @click="kind = v">{{ text }} <b>{{ num(n ?? 0) }}</b></button>
+        <button v-for="[v, text, n] in [['', 'All waiting', counts.all], ['flagged', 'Votes exceed accreditation', counts.flagged], ['corrections', 'Corrections', counts.corrections], ['review_flagged', 'Flagged by reviewers', counts.review_flagged]]" :key="v" class="chip h-9" :class="kind === v ? 'chip-on' : ''" :aria-pressed="kind === v" @click="kind = v">{{ text }} <b>{{ num(n ?? 0) }}</b></button>
         <div class="ml-auto flex w-full flex-wrap gap-2 sm:w-auto">
             <select v-model="lgaId" class="field h-9 w-auto text-sm" aria-label="LGA">
                 <option value="">All LGAs</option>
@@ -98,6 +105,7 @@ const ageClass = (r) => {
                     <span class="block text-xs text-ink-2">{{ r.polling_unit.ward }} · {{ r.polling_unit.lga }}</span>
                     <span v-if="r.flags.includes('overvote')" class="mt-1 block text-xs font-bold text-action">Votes exceed accreditation</span>
                     <span v-else-if="r.supersedes_id" class="mt-1 block text-xs font-bold text-warn">Correction</span>
+                    <span v-if="r.open_flags" class="mt-1 flex items-center gap-1 text-xs font-bold text-action"><Icon name="flag" :size="13" /> {{ r.open_flags }} reviewer flag{{ r.open_flags === 1 ? '' : 's' }}</span>
                 </button>
               </div>
               <Pagination :meta="queue.data.value" noun="results" :per-page-options="[20]" :loading="queue.loading.value" @page="go" />
@@ -111,6 +119,7 @@ const ageClass = (r) => {
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <Badge v-if="selected.flags.includes('overvote')" tone="bad">Overvote</Badge>
+                        <Badge v-if="selected.open_flags" tone="bad">{{ selected.open_flags }} open flag{{ selected.open_flags === 1 ? '' : 's' }}</Badge>
                         <Badge :tone="selected.signature_valid ? 'good' : 'warn'">{{ selected.signature_valid ? 'Signature valid' : `Via ${selected.channel}` }}</Badge>
                     </div>
                 </div>
@@ -144,8 +153,14 @@ const ageClass = (r) => {
                 <div class="mt-4 flex flex-wrap gap-3">
                     <button class="btn-good h-11" :disabled="busy || ownResult" @click="decide('approve')">Approve: matches the photo</button>
                     <button class="btn-outline h-11" :disabled="busy || ownResult || !note" @click="decide('send-back')">Send back to agent</button>
+                    <button class="btn h-11 border-[1.5px] border-action bg-white text-action hover:bg-bad-bg sm:ml-auto" :disabled="busy" @click="flagsPanel?.open()"><Icon name="flag" :size="16" /> Flag with a comment</button>
                 </div>
-                <p class="mt-3 text-xs text-ink-2">The agent's signed record never changes. A send-back asks them to submit a correction.</p>
+                <p v-if="selected.open_flags" class="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-[13px] text-warn">This result has {{ selected.open_flags }} open flag{{ selected.open_flags === 1 ? '' : 's' }}. Read the comments below before approving.</p>
+                <p class="mt-3 text-xs text-ink-2">The agent's signed record never changes. A send-back asks them to submit a correction; a flag alerts legal and the situation room without holding the result.</p>
+
+                <div class="mt-6 border-t border-line pt-5">
+                    <ResultFlags ref="flagsPanel" :key="selected.id" :result-id="selected.id" @changed="flagsChanged" />
+                </div>
             </section>
         </div>
     </LoadState>

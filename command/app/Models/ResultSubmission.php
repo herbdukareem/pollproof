@@ -44,6 +44,11 @@ class ResultSubmission extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function reviewFlags(): HasMany
+    {
+        return $this->hasMany(ResultFlag::class);
+    }
+
     public function supersedes(): BelongsTo
     {
         return $this->belongsTo(self::class, 'supersedes_id');

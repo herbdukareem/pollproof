@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\ResultFlag;
 use App\Models\ResultSubmission;
 use App\Services\AuditLogger;
 use App\Services\ResultRecorder;
@@ -108,7 +109,7 @@ class ResultController extends Controller
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:60'],
             'lga_id' => ['nullable', 'integer'],
-            'kind' => ['nullable', 'in:flagged,corrections'],
+            'kind' => ['nullable', 'in:flagged,corrections,review_flagged'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ]);
         $base = fn () => ResultSubmission::where('campaign_id', $request->user()->campaign_id)
@@ -120,7 +121,9 @@ class ResultController extends Controller
         $page = $base()
             ->when(($data['kind'] ?? null) === 'flagged', fn ($q) => $q->whereJsonContains('flags', 'overvote'))
             ->when(($data['kind'] ?? null) === 'corrections', fn ($q) => $q->whereNotNull('supersedes_id'))
+            ->when(($data['kind'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('reviewFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
             ->with(['pollingUnit.ward.lga', 'votes.party', 'user:id,name,code'])
+            ->withCount(['reviewFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
             ->orderByRaw("CASE WHEN JSON_CONTAINS(flags, '\"overvote\"') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
             ->paginate((int) ($data['per_page'] ?? 20));
@@ -130,6 +133,7 @@ class ResultController extends Controller
             'all' => $base()->count(),
             'flagged' => $base()->whereJsonContains('flags', 'overvote')->count(),
             'corrections' => $base()->whereNotNull('supersedes_id')->count(),
+            'review_flagged' => $base()->whereHas('reviewFlags', fn ($f) => $f->where('status', ResultFlag::OPEN))->count(),
         ]]);
     }
 
@@ -192,6 +196,7 @@ class ResultController extends Controller
             'captured_at' => $r->captured_at,
             'received_at' => $r->created_at,
             'review_note' => $r->review_note,
+            'open_flags' => (int) ($r->open_flags ?? $r->reviewFlags()->where('status', ResultFlag::OPEN)->count()),
         ];
     }
 }
