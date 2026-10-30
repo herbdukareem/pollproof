@@ -123,6 +123,7 @@ class AuthController extends Controller
                 'max_gps_accuracy_m' => $c->max_gps_accuracy_m,
                 'require_selfie' => $c->require_selfie,
                 'sms_number' => config('pollproof.sms_number'),
+                'ussd_code' => config('pollproof.ussd.code'),
                 'declared' => $c->isDeclared(),
             ] : null,
             'supervisor' => $this->supervisorFor($user),

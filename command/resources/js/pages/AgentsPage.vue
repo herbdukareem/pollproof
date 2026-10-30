@@ -160,7 +160,8 @@ async function send(agent) {
                 <ul class="flex flex-col gap-2">
                     <li v-for="c in pending.data.value.data" :key="c.id" class="rounded-xl bg-mist p-3.5">
                         <div class="flex justify-between gap-2 text-sm"><b>{{ c.polling_unit.code }}</b><span class="text-xs text-ink-2">{{ dateTime(c.captured_at) }}</span></div>
-                        <p class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }} · {{ c.distance_m != null ? `${c.distance_m} m away` : 'unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
+                        <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }}{{ c.agent.name ? ` · ${c.agent.name}` : '' }} · <b class="text-ink">by USSD, no GPS</b>. Call the agent to confirm they are at the unit.</p>
+                        <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }} · {{ c.distance_m != null ? `${c.distance_m} m away` : 'unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
                         <div class="mt-2.5 flex gap-2">
                             <button class="btn-good h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'approve')">Approve</button>
                             <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'reject')">Reject</button>

@@ -13,6 +13,7 @@ class FallbackScreen extends StatelessWidget {
     final unit = app.unit?['code'] ?? 'PU004';
     final number =
         app.rules['sms_number'] as String? ?? '[campaign SMS number]';
+    final ussd = app.rules['ussd_code'] as String?;
     final sample =
         'R $unit AC448 ${app.parties.take(4).map((p) => '${p['code']}${[214, 187, 22, 9][app.parties.indexOf(p) % 4]}').join(' ')} X6';
     return Scaffold(
@@ -24,6 +25,44 @@ class FallbackScreen extends StatelessWidget {
             'Use any phone, even without data. Your supervisor will still see your result.',
             style: TextStyle(color: C.ink2, fontSize: 15),
           ),
+          if (ussd != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: C.action,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'EASIEST: DIAL FROM THIS PHONE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    ussd,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Choose 1, then type each figure when asked. No data needed. You get a reference number at the end.',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(18),

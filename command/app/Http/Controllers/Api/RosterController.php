@@ -44,7 +44,8 @@ class RosterController extends Controller
         $url = config('pollproof.app_download_url');
         foreach ($agents as $agent) {
             $where = $agent->pollingUnit ? "the agent for {$agent->pollingUnit->code} ({$agent->pollingUnit->name})" : 'a reserve agent';
-            SendSms::dispatch($agent->phone, "PollProof: you are {$where}. Install the app from {$url} and sign in with this phone number. Your agent ID is {$agent->code}.");
+            $ussd = config('pollproof.ussd.code') ? ' No data? Dial '.config('pollproof.ussd.code').' to send results.' : '';
+            SendSms::dispatch($agent->phone, "PollProof: you are {$where}. Install the app from {$url} and sign in with this phone number. Your agent ID is {$agent->code}.{$ussd}");
         }
         User::whereIn('id', $agents->pluck('id'))->update(['invited_at' => now()]);
         $this->audit->log($user, 'roster.invited', null, ['agents' => $agents->count()], $request->ip());

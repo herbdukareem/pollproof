@@ -23,11 +23,11 @@ const printPack = () => window.print();
 const timeline = computed(() => {
     if (!d.value) return [];
     const ev = [];
-    for (const c of d.value.check_ins) ev.push({ at: c.captured_at, text: `Agent checked in${c.distance_m != null ? `, ${c.distance_m} m from the unit` : ''}`, kind: ['verified', 'approved'].includes(c.status) ? 'ok' : 'warn' });
+    for (const c of d.value.check_ins) ev.push({ at: c.captured_at, text: `Agent checked in${c.channel === 'ussd' ? ' by USSD (no GPS)' : c.distance_m != null ? `, ${c.distance_m} m from the unit` : ''}`, kind: ['verified', 'approved'].includes(c.status) ? 'ok' : 'warn' });
     for (const i of d.value.incidents) ev.push({ at: i.occurred_at, text: `Incident: ${i.type === 'bvas_problem' ? 'BVAS problem' : titleCase(i.type)}`, kind: i.severity === 'high' ? 'bad' : 'warn' });
     d.value.results.forEach((r, k) => {
         ev.push({ at: r.captured_at, text: `${k ? 'Correction' : 'Result'} signed on the agent's phone`, kind: r.signature_valid ? 'ok' : 'info' });
-        ev.push({ at: r.received_at, text: `Received by the command room${r.channel === 'sms' ? ' by SMS' : ''}`, kind: 'info' });
+        ev.push({ at: r.received_at, text: `Received by the command room${r.channel !== 'app' ? ' by ' + r.channel.toUpperCase() : ''}`, kind: 'info' });
         if (r.review.at) ev.push({ at: r.review.at, text: `Second check: ${titleCase(r.review.status)}`, kind: r.review.status === 'approved' ? 'ok' : 'warn' });
     });
     if (d.value.irev) ev.push({ at: d.value.irev.seen_at, text: `IReV: ${irevLabel[d.value.irev.comparison.status] ?? d.value.irev.comparison.status}`, kind: d.value.irev.comparison.status === 'match' ? 'ok' : 'bad' });
@@ -80,7 +80,7 @@ const headline = computed(() => {
                                 <td class="td whitespace-nowrap">{{ dateTime(r.received_at) }}<div class="text-xs text-ink-2">captured {{ dateTime(r.captured_at) }}</div></td>
                                 <td class="td text-right">{{ num(r.accredited) }}</td>
                                 <td class="td text-right font-semibold" v-for="p in parties" :key="p">{{ num(r.votes[p] ?? 0) }}</td>
-                                <td class="td"><Badge :tone="r.signature_valid ? 'good' : r.channel === 'sms' ? 'neutral' : 'bad'">{{ r.signature_valid ? 'Valid' : r.channel === 'sms' ? 'SMS, unsigned' : 'Invalid' }}</Badge></td>
+                                <td class="td"><Badge :tone="r.signature_valid ? 'good' : r.channel !== 'app' ? 'neutral' : 'bad'">{{ r.signature_valid ? 'Valid' : r.channel !== 'app' ? `${r.channel.toUpperCase()}, unsigned` : 'Invalid' }}</Badge></td>
                             </tr>
                         </tbody>
                     </table>

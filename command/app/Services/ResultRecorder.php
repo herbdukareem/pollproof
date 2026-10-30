@@ -70,12 +70,12 @@ final class ResultRecorder
         }
 
         // A unit has one current result. Anything after it must be an explicit correction, except the
-        // signed app copy of figures the agent first sent by SMS, which is linked automatically.
+        // signed app copy of figures the agent first sent by SMS or USSD, which is linked automatically.
         $existing = ResultSubmission::where('polling_unit_id', $unit->id)->where('is_current', true)->first();
         if ($existing && ! $previous) {
-            if ($channel === 'app' && $existing->channel === 'sms' && $existing->user_id === $agent->id) {
+            if ($channel === 'app' && in_array($existing->channel, ['sms', 'ussd'], true) && $existing->user_id === $agent->id) {
                 $previous = $existing;
-                $correctionReason ??= 'Signed app copy of the SMS result';
+                $correctionReason ??= 'Signed app copy of the '.strtoupper($existing->channel).' result';
             } else {
                 throw ValidationException::withMessages(['supersedes_id' => "This unit already has a result (#{$existing->id}). Send a correction that references it."]);
             }

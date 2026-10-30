@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Incident;
 use App\Services\AlertService;
 use App\Services\AuditLogger;
+use App\Services\IncidentReporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class IncidentController extends Controller
 {
     public const TYPES = ['disruption', 'vote_buying', 'bvas_problem', 'agent_turned_away', 'materials_late', 'other'];
 
-    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts, private readonly IncidentReporter $reporter) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -37,25 +38,8 @@ class IncidentController extends Controller
             ->map(fn ($f) => $f->store("campaigns/{$user->campaign_id}/incidents", config('pollproof.evidence_disk')))
             ->all();
 
-        $incident = Incident::create([
-            'campaign_id' => $user->campaign_id,
-            'user_id' => $user->id,
-            'polling_unit_id' => $user->polling_unit_id,
-            'type' => $data['type'],
-            'severity' => $data['severity'],
-            'description' => $data['description'],
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
-            'media_paths' => $paths,
-            'occurred_at' => $data['occurred_at'],
-            'updates' => [],
-            'client_ref' => $data['client_ref'] ?? null,
-        ]);
-        if ($incident->severity === 'high') {
-            $where = $user->pollingUnit?->code ?? 'Unassigned agent';
-            $this->alerts->raise($user->campaign_id, 'incident', 'high', "incident:{$incident->id}",
-                "{$where}: ".str_replace('_', ' ', $incident->type), $incident->description, $incident);
-        }
+        $incident = $this->reporter->report($user, $data['type'], $data['severity'], $data['description'], $data['occurred_at'],
+            $data['latitude'] ?? null, $data['longitude'] ?? null, $paths, $data['client_ref'] ?? null);
         $this->audit->log($user, 'incident.reported', $incident, ['type' => $incident->type, 'severity' => $incident->severity], $request->ip());
 
         return response()->json(['id' => $incident->id, 'status' => $incident->status], 201);
