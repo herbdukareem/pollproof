@@ -23,9 +23,12 @@ say() { printf '\n==> %s\n' "$*"; }
 
 say "Checking PHP"
 "$PHP" -r 'exit(version_compare(PHP_VERSION, "8.3.0", ">=") ? 0 : 1);' || { echo "PHP 8.3 or newer is needed (found $("$PHP" -r 'echo PHP_VERSION;')). Set it in hPanel, or set PHP_BIN."; exit 1; }
-for ext in sodium pdo_mysql mbstring openssl fileinfo zip; do
+for ext in pdo_mysql mbstring openssl fileinfo zip; do
   "$PHP" -r "exit(extension_loaded('$ext') ? 0 : 1);" || { echo "The PHP extension '$ext' is not enabled. Turn it on in hPanel > Advanced > PHP Configuration."; exit 1; }
 done
+# Without sodium a slower pure-PHP copy (sodium_compat) signs and checks results; turn it on if you can.
+"$PHP" -r "exit(extension_loaded('sodium') ? 0 : 1);" || echo "Note: the PHP extension 'sodium' is off, so signatures are checked in plain PHP (slower). Turn it on in hPanel > Advanced > PHP Configuration."
+
 
 say "Shared storage and settings"
 mkdir -p "$APP/shared/storage/app/private" "$APP/shared/storage/framework/cache/data" \
