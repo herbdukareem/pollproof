@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\TribunalController;
 use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UssdController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -40,6 +41,9 @@ Route::prefix('v1')->group(function () {
 
     // Aggregator webhook for results sent by SMS
     Route::post('sms/inbound', SmsWebhookController::class)->middleware('throttle:600,1');
+
+    // Africa's Talking USSD callback; the secret is in the URL because AT can't send a header
+    Route::post('ussd/africastalking/{token}', UssdController::class)->middleware('throttle:1200,1');
 
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);

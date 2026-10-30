@@ -95,6 +95,7 @@ class CheckInController extends Controller
             'id' => $c->id,
             'agent' => $c->user->only(['id', 'name', 'code']),
             'polling_unit' => $c->pollingUnit->only(['id', 'code', 'name']),
+            'channel' => $c->channel,
             'distance_m' => $c->distance_m,
             'accuracy_m' => $c->accuracy_m,
             'has_selfie' => $c->selfie_path !== null,

@@ -74,6 +74,8 @@ jobs:
           SMS_DRIVER: ${{ vars.POLLPROOF_SMS_DRIVER || secrets.POLLPROOF_SMS_DRIVER }}
           SMS_NUMBER: ${{ vars.POLLPROOF_SMS_NUMBER || secrets.POLLPROOF_SMS_NUMBER }}
           SMS_WEBHOOK_TOKEN: ${{ secrets.POLLPROOF_SMS_WEBHOOK_TOKEN }}
+          USSD_TOKEN: ${{ secrets.POLLPROOF_USSD_TOKEN }}
+          USSD_CODE: ${{ vars.POLLPROOF_USSD_CODE || secrets.POLLPROOF_USSD_CODE }}
           TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
           TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID || secrets.TERMII_SENDER_ID }}
           MAIL_HOST: ${{ vars.MAIL_HOST || secrets.MAIL_HOST }}
@@ -108,6 +110,8 @@ jobs:
             echo "POLLPROOF_SMS_DRIVER=${SMS_DRIVER:-log}"
             echo "POLLPROOF_SMS_NUMBER=$(q "$SMS_NUMBER")"
             echo "POLLPROOF_SMS_WEBHOOK_TOKEN=$(q "$SMS_WEBHOOK_TOKEN")"
+            echo "POLLPROOF_USSD_TOKEN=$(q "$USSD_TOKEN")"
+            echo "POLLPROOF_USSD_CODE=$(q "$USSD_CODE")"
             echo "TERMII_API_KEY=$(q "$TERMII_API_KEY")"
             echo "TERMII_SENDER_ID=$(q "${TERMII_SENDER_ID:-PollProof}")"
             echo "TERMII_CHANNEL=dnd"

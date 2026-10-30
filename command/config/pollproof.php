@@ -16,6 +16,14 @@ return [
     // Number agents text results and YES/NO replies to (shown in the app's fallback screen).
     'sms_number' => env('POLLPROOF_SMS_NUMBER'),
 
+    // USSD through Africa's Talking, for agents whose phones have no data. The callback URL set in the
+    // Africa's Talking dashboard is https://<your domain>/api/v1/ussd/africastalking/<token>.
+    'ussd' => [
+        'token' => env('POLLPROOF_USSD_TOKEN'),
+        // The code agents dial, e.g. *384*1234#. Shown in the invite SMS and the app's fallback screen.
+        'code' => env('POLLPROOF_USSD_CODE'),
+    ],
+
     // Link sent to agents in the invite SMS.
     'app_download_url' => env('POLLPROOF_APP_URL', 'https://pollproof.ng/app'),
 
