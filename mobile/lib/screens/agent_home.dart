@@ -91,6 +91,8 @@ class _AgentHomeState extends State<AgentHome> {
           : pendingResult != null
           ? (pendingResult.status == OutboxStatus.refused
                 ? 'Not accepted: ${pendingResult.error}'
+                : pendingResult.status == OutboxStatus.sent
+                ? 'Signed · ref ${pendingResult.meta['fingerprint']} · sent, waiting for verification'
                 : 'Signed and saved · ref ${pendingResult.meta['fingerprint']} · waiting to send')
           : 'Photo of the EC8A, figures, sign';
       final photoDone =
