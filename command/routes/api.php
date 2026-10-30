@@ -13,11 +13,13 @@ use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
+use App\Http\Controllers\Api\NavCountsController;
 use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\PollingUnitController;
 use App\Http\Controllers\Api\ReadinessController;
 use App\Http\Controllers\Api\ResultController;
+use App\Http\Controllers\Api\ResultFlagController;
 use App\Http\Controllers\Api\RosterController;
 use App\Http\Controllers\Api\SetupController;
 use App\Http\Controllers\Api\SmsWebhookController;
@@ -28,6 +30,7 @@ use App\Http\Controllers\Api\TribunalController;
 use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UssdController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -38,6 +41,9 @@ Route::prefix('v1')->group(function () {
 
     // Aggregator webhook for results sent by SMS
     Route::post('sms/inbound', SmsWebhookController::class)->middleware('throttle:600,1');
+
+    // Africa's Talking USSD callback; the secret is in the URL because AT can't send a header
+    Route::post('ussd/africastalking/{token}', UssdController::class)->middleware('throttle:1200,1');
 
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
@@ -77,12 +83,14 @@ Route::prefix('v1')->group(function () {
             Route::get('check-ins/{checkIn}/selfie', [CheckInController::class, 'selfie']);
             Route::get('agents', AgentListController::class);
             Route::post('agents/{agent}/assign', [AgentController::class, 'assign']);
+            Route::middleware('role:situation_room,dg')->patch('agents/{agent}', [AgentController::class, 'update']);
             Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);
         });
 
         // Command room: read
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
             Route::get('tally', TallyController::class);
+            Route::get('nav-counts', NavCountsController::class);
             Route::get('units', [UnitController::class, 'index']);
             Route::get('alerts', [AlertController::class, 'index']);
             Route::get('incidents', [IncidentController::class, 'index']);
@@ -97,6 +105,14 @@ Route::prefix('v1')->group(function () {
             Route::get('results-queue', [ResultController::class, 'queue']);
             Route::post('results/{result}/approve', [ResultController::class, 'approve']);
             Route::post('results/{result}/send-back', [ResultController::class, 'sendBack']);
+        });
+
+        // Flags on results: raised and discussed by reviewers, the situation room, legal and the DG
+        Route::middleware('role:verifier,situation_room,dg,legal')->group(function () {
+            Route::get('results/{result}/flags', [ResultFlagController::class, 'index']);
+            Route::post('results/{result}/flags', [ResultFlagController::class, 'store']);
+            Route::post('result-flags/{flag}/comments', [ResultFlagController::class, 'comment']);
+            Route::patch('result-flags/{flag}', [ResultFlagController::class, 'update']);
         });
 
         // Data entry

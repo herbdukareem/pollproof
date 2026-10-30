@@ -48,6 +48,12 @@ async function submit() {
             <div class="mt-12 max-w-md lg:mt-0">
                 <h1 class="text-4xl leading-tight font-extrabold tracking-tight lg:text-5xl">Protect every vote you win.</h1>
                 <p class="mt-4 text-[17px] leading-relaxed text-[#c9d1de]">The command room for your governorship campaign, from polling unit to declaration.</p>
+                <ul class="mt-8 flex flex-col gap-3 text-[15px] text-white">
+                    <li v-for="f in ['Verified agents at every polling unit', 'Every EC8A signed on the agent’s phone', 'Collation checked while it can still be challenged']" :key="f" class="flex items-center gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange/20 text-peach"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg></span>
+                        {{ f }}
+                    </li>
+                </ul>
             </div>
             <p class="mt-10 text-sm text-[#8d98ab] lg:mt-0">by Ashlab Technologies</p>
             <svg class="pointer-events-none absolute -right-24 -bottom-24 h-96 w-96 opacity-[0.06]" viewBox="0 0 64 64" aria-hidden="true">

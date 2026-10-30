@@ -7,6 +7,7 @@ use App\Models\CollationEntry;
 use App\Models\Incident;
 use App\Models\IrevEntry;
 use App\Models\PollingUnit;
+use App\Models\ResultFlag;
 use App\Models\ResultSubmission;
 
 /** Everything held about one polling unit, as used in the evidence pack and in tribunal bundles. */
@@ -55,9 +56,10 @@ final class EvidenceBuilder
                 'review' => ['status' => $r->status, 'by' => $r->reviewed_by, 'at' => $r->reviewed_at, 'note' => $r->review_note],
             ]),
             'irev' => $irev ? ['seen_at' => $irev->seen_at, 'not_on_irev' => $irev->not_on_irev, 'votes' => $irev->votes, 'has_screenshot' => $irev->screenshot_path !== null, 'comparison' => $this->reconciler->compareIrev($irev)] : null,
-            'check_ins' => CheckIn::where('polling_unit_id', $unit->id)->orderBy('id')->get(['id', 'user_id', 'status', 'distance_m', 'accuracy_m', 'captured_at', 'reviewed_by']),
+            'check_ins' => CheckIn::where('polling_unit_id', $unit->id)->orderBy('id')->get(['id', 'user_id', 'channel', 'status', 'distance_m', 'accuracy_m', 'captured_at', 'reviewed_by']),
             'incidents' => Incident::where('polling_unit_id', $unit->id)->orderBy('occurred_at')->get(['id', 'type', 'severity', 'description', 'status', 'occurred_at']),
             'collation' => $collation,
+            'flags' => ResultFlag::where('polling_unit_id', $unit->id)->orderBy('id')->get()->map->present(),
         ];
     }
 }

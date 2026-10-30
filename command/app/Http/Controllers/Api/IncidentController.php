@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Incident;
 use App\Services\AlertService;
 use App\Services\AuditLogger;
+use App\Services\IncidentReporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class IncidentController extends Controller
 {
     public const TYPES = ['disruption', 'vote_buying', 'bvas_problem', 'agent_turned_away', 'materials_late', 'other'];
 
-    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts, private readonly IncidentReporter $reporter) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -37,25 +38,8 @@ class IncidentController extends Controller
             ->map(fn ($f) => $f->store("campaigns/{$user->campaign_id}/incidents", config('pollproof.evidence_disk')))
             ->all();
 
-        $incident = Incident::create([
-            'campaign_id' => $user->campaign_id,
-            'user_id' => $user->id,
-            'polling_unit_id' => $user->polling_unit_id,
-            'type' => $data['type'],
-            'severity' => $data['severity'],
-            'description' => $data['description'],
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
-            'media_paths' => $paths,
-            'occurred_at' => $data['occurred_at'],
-            'updates' => [],
-            'client_ref' => $data['client_ref'] ?? null,
-        ]);
-        if ($incident->severity === 'high') {
-            $where = $user->pollingUnit?->code ?? 'Unassigned agent';
-            $this->alerts->raise($user->campaign_id, 'incident', 'high', "incident:{$incident->id}",
-                "{$where}: ".str_replace('_', ' ', $incident->type), $incident->description, $incident);
-        }
+        $incident = $this->reporter->report($user, $data['type'], $data['severity'], $data['description'], $data['occurred_at'],
+            $data['latitude'] ?? null, $data['longitude'] ?? null, $paths, $data['client_ref'] ?? null);
         $this->audit->log($user, 'incident.reported', $incident, ['type' => $incident->type, 'severity' => $incident->severity], $request->ip());
 
         return response()->json(['id' => $incident->id, 'status' => $incident->status], 201);
@@ -63,14 +47,30 @@ class IncidentController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $data = $request->validate(['status' => ['nullable', 'in:open,handling,resolved'], 'type' => ['nullable', 'in:'.implode(',', self::TYPES)]]);
-        $incidents = Incident::where('campaign_id', $request->user()->campaign_id)
-            ->when($data['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
-            ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
+        $data = $request->validate([
+            'status' => ['nullable', 'in:open,handling,resolved'],
+            'type' => ['nullable', 'in:'.implode(',', self::TYPES)],
+            'severity' => ['nullable', 'in:high,medium,low'],
+            'search' => ['nullable', 'string', 'max:60'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+        $scope = fn (array $skip = []) => Incident::where('campaign_id', $request->user()->campaign_id)
+            ->when(! in_array('status', $skip) ? $data['status'] ?? null : null, fn ($q, $s) => $q->where('status', $s))
+            ->when(! in_array('type', $skip) ? $data['type'] ?? null : null, fn ($q, $t) => $q->where('type', $t))
+            ->when($data['severity'] ?? null, fn ($q, $s) => $q->where('severity', $s))
+            ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereLike('description', "%{$s}%")
+                ->orWhereHas('pollingUnit', fn ($u) => $u->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%"))));
+        $incidents = $scope()
             ->with(['pollingUnit:id,code,name', 'user:id,name,code'])
             ->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END")
             ->latest('occurred_at')
-            ->paginate(50);
+            ->paginate((int) ($data['per_page'] ?? 25));
+
+        // Counts for the filter chips: each counted with the other filters applied.
+        $incidents = $incidents->toArray() + ['counts' => [
+            'types' => $scope(['type'])->selectRaw('type, COUNT(*) c')->groupBy('type')->pluck('c', 'type'),
+            'status' => $scope(['status'])->selectRaw('status, COUNT(*) c')->groupBy('status')->pluck('c', 'status'),
+        ]];
 
         return response()->json($incidents);
     }

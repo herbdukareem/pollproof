@@ -112,6 +112,12 @@ final class AlertNotifier
         return [null, null];
     }
 
+    /** The command-room screen where this alert is dealt with. */
+    public function link(Alert $alert): string
+    {
+        return $this->url($alert);
+    }
+
     private function url(Alert $alert): string
     {
         return match ($alert->type) {
@@ -120,6 +126,7 @@ final class AlertNotifier
             'incident' => '/incidents',
             'agent_absent', 'agent_unavailable' => '/agents',
             'irev_mismatch', 'irev_missing' => '/irev',
+            'result_flagged' => $alert->subject instanceof ResultSubmission ? '/units?search='.$alert->subject->pollingUnit?->code : '/verify',
             'verify_backlog' => '/verify',
             'failed_logins' => '/admin/users',
             default => '/overview',

@@ -64,6 +64,7 @@ In the repository, open **Settings → Secrets and variables → Actions**.
 | `DB_HOST` | Optional; defaults to `localhost` |
 | `TERMII_API_KEY` | Optional until you send real SMS |
 | `POLLPROOF_SMS_WEBHOOK_TOKEN` | Optional; a long random string, if your SMS gateway forwards replies |
+| `POLLPROOF_USSD_TOKEN` | Optional; a long random string for the Africa's Talking USSD callback (see `docs/ussd.md`) |
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | Optional; a Hostinger mailbox for email alerts |
 
 **Variables**
@@ -74,6 +75,7 @@ In the repository, open **Settings → Secrets and variables → Actions**.
 | `POLLPROOF_SMS_DRIVER` | `log` while testing, `termii` to send real SMS |
 | `TERMII_SENDER_ID` | Your Termii-approved sender ID |
 | `POLLPROOF_SMS_NUMBER` | The number agents text results and YES/NO replies to |
+| `POLLPROOF_USSD_CODE` | The USSD code agents dial, e.g. `*384*1234#` |
 | `MAIL_HOST` | Optional; `smtp.hostinger.com` to send email alerts |
 | `HOSTINGER_AUTO_DEPLOY` | `true` to deploy on every push to `main`; leave unset to deploy only when you press the button |
 | `HOSTINGER_PHP_BIN` | Leave unset. Set only if SSH's `php` is older than 8.3 (see Troubleshooting) |

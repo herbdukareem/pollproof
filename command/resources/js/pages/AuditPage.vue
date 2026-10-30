@@ -4,13 +4,18 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import Pagination from '../components/Pagination.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { dateTime, titleCase } from '../lib/format';
 
 const action = ref('');
 const page = ref(1);
-const logs = useResource(() => api.get('audit-logs', { action: action.value, page: page.value }));
+const perPage = ref(50);
+const search = ref('');
+const logs = useResource(() => api.get('audit-logs', { action: action.value, search: search.value, page: page.value, per_page: perPage.value }));
+let t;
+watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; logs.load(); }, 300); });
 const check = useResource(() => api.get('audit-logs/verify'));
 watch(action, () => { page.value = 1; logs.load(); });
 
@@ -36,8 +41,13 @@ function go(p) {
         </p>
     </div>
 
-    <div class="mb-4 flex flex-wrap gap-2">
-        <button v-for="[value, text] in kinds" :key="value" class="btn h-9 border text-[13.5px]" :class="action === value ? 'border-navy bg-navy text-white' : 'border-[#d6dae1] bg-white text-ink'" @click="action = value">{{ text }}</button>
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+        <button v-for="[value, text] in kinds" :key="value" class="chip h-9 text-[13.5px]" :class="action === value ? 'chip-on' : ''" :aria-pressed="action === value" @click="action = value">{{ text }}</button>
+        <div class="relative ml-auto w-full max-w-xs">
+            <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+            <label class="sr-only" for="audit-search">Search the log</label>
+            <input id="audit-search" v-model="search" class="field w-full pl-9" placeholder="Person, agent ID, action or IP" />
+        </div>
     </div>
 
     <section class="card overflow-hidden">
@@ -56,13 +66,7 @@ function go(p) {
                     </tbody>
                 </table>
             </div>
-            <div v-if="meta && meta.last_page > 1" class="flex items-center justify-between border-t border-[#eef0f3] px-4 py-3 text-sm text-ink-2">
-                <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-                <div class="flex gap-2">
-                    <button class="btn-outline h-9" :disabled="meta.current_page <= 1" @click="go(meta.current_page - 1)">Newer</button>
-                    <button class="btn-outline h-9" :disabled="meta.current_page >= meta.last_page" @click="go(meta.current_page + 1)">Older</button>
-                </div>
-            </div>
+            <Pagination :meta="meta" noun="entries" :per-page-options="[50, 100, 200]" :loading="logs.loading.value" @page="go" @per-page="(n) => { perPage = n; go(1); }" />
         </LoadState>
     </section>
 </template>

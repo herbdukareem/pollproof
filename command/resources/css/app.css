@@ -27,11 +27,60 @@
     --color-bad-bg: #fde7da;
 }
 
+@layer base {
+    html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+    body {
+        @apply bg-mist text-ink;
+    }
+    :focus-visible {
+        outline: 2px solid var(--color-action);
+        outline-offset: 2px;
+    }
+    tbody tr {
+        transition: background-color 120ms ease;
+    }
+    tbody tr:hover {
+        background-color: #fafbfc;
+    }
+    td, th {
+        font-variant-numeric: tabular-nums;
+    }
+    ::selection {
+        background: #ffd9c2;
+    }
+    nav::-webkit-scrollbar {
+        width: 6px;
+    }
+    nav::-webkit-scrollbar-thumb {
+        background: #2a3d63;
+        border-radius: 3px;
+    }
+}
+
 @utility card {
-    @apply rounded-2xl border border-line bg-white;
+    @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(19,33,60,0.04)];
+}
+@utility card-title {
+    @apply text-[17px] font-bold text-ink;
+}
+@utility card-sub {
+    @apply mt-1 text-[13px] text-ink-2;
+}
+@utility chip {
+    @apply inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#d6dae1] bg-white px-3.5 text-sm font-semibold text-ink transition hover:border-navy;
+}
+@utility chip-on {
+    @apply border-navy bg-navy text-white hover:border-navy;
+}
+@utility pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold whitespace-nowrap;
 }
 @utility btn {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold whitespace-nowrap transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
     @apply btn bg-action text-white hover:bg-action-dark;
@@ -41,6 +90,9 @@
 }
 @utility btn-outline {
     @apply btn border-[1.5px] border-navy bg-white text-navy hover:bg-mist;
+}
+@utility btn-ghost {
+    @apply btn border border-[#d6dae1] bg-white font-semibold text-ink-2 hover:border-navy hover:text-ink;
 }
 @utility btn-good {
     @apply btn bg-good text-white hover:opacity-90;
@@ -52,8 +104,165 @@
     @apply mb-1.5 block text-[13px] font-bold text-ink;
 }
 @utility th {
-    @apply px-4 py-3 text-left text-xs font-bold tracking-wide text-ink-2 uppercase;
+    @apply bg-[#f6f7f9] px-4 py-3 text-left text-[12px] font-bold tracking-[0.04em] whitespace-nowrap text-ink-2 uppercase;
 }
 @utility td {
     @apply border-t border-[#eef0f3] px-4 py-3 align-middle;
+}
+
+/* Motion: everything here is skipped for people who ask their device for less motion. */
+@keyframes card-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+}
+@keyframes bar-grow {
+    from {
+        width: 0;
+    }
+}
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}
+@keyframes shimmer {
+    to {
+        background-position: -200% 0;
+    }
+}
+@keyframes value-flash {
+    0% {
+        box-shadow: 0 0 0 0 rgba(232, 89, 12, 0);
+    }
+    20% {
+        box-shadow: 0 0 0 4px rgba(232, 89, 12, 0.28);
+        border-color: #e8590c;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(232, 89, 12, 0);
+    }
+}
+
+.skeleton {
+    border-radius: 8px;
+    background: linear-gradient(90deg, #eceff3 25%, #f6f7f9 50%, #eceff3 75%);
+    background-size: 200% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    main .card {
+        animation: card-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    }
+    main .grid > .card:nth-child(2),
+    main .grid > :nth-child(2) > .card:first-child {
+        animation-delay: 0.05s;
+    }
+    main .grid > .card:nth-child(3) {
+        animation-delay: 0.1s;
+    }
+    main .grid > .card:nth-child(4) {
+        animation-delay: 0.15s;
+    }
+    main .grid > .card:nth-child(n + 5) {
+        animation-delay: 0.2s;
+    }
+    .bar-fill {
+        animation: bar-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+        transition: width 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .fade-in {
+        animation: fade-in 0.3s ease backwards;
+    }
+    .skeleton {
+        animation: shimmer 1.4s linear infinite;
+    }
+    .value-flash {
+        animation: value-flash 1.4s ease-out;
+    }
+    .page-enter-active {
+        transition:
+            opacity 0.26s ease,
+            transform 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .page-leave-active {
+        transition: opacity 0.12s ease;
+    }
+    .page-enter-from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    .page-leave-to {
+        opacity: 0;
+    }
+    .nav-enter-active {
+        transition:
+            opacity 0.2s ease,
+            transform 0.2s ease;
+    }
+    .nav-leave-active {
+        transition: opacity 0.1s ease;
+    }
+    .nav-enter-from {
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+    .nav-leave-to {
+        opacity: 0;
+    }
+    tbody tr {
+        animation: fade-in 0.3s ease backwards;
+    }
+    .alert-enter-active,
+    .alert-leave-active,
+    .alert-move {
+        transition: all 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .alert-enter-from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    .alert-leave-to {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+    .alert-leave-active {
+        position: absolute;
+        left: 0;
+        right: 0;
+    }
+}
+
+@utility pager-btn {
+    @apply inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[#d6dae1] bg-white px-2 text-[13px] font-bold text-ink transition hover:border-navy active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d6dae1];
+}
+@utility pager-on {
+    @apply border-navy bg-navy text-white hover:border-navy;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .modal-enter-active,
+    .modal-leave-active {
+        transition: opacity 0.2s ease;
+    }
+    .modal-enter-active .modal-panel,
+    .modal-leave-active .modal-panel {
+        transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .modal-enter-from,
+    .modal-leave-to {
+        opacity: 0;
+    }
+    .modal-enter-from .modal-panel,
+    .modal-leave-to .modal-panel {
+        transform: translateY(16px) scale(0.98);
+    }
+    .pop-enter-active {
+        transition: opacity 0.14s ease, margin 0.14s ease;
+    }
+    .pop-enter-from {
+        opacity: 0;
+        margin-top: -4px;
+    }
 }

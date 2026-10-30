@@ -63,6 +63,8 @@ class SetupController extends Controller
             'search' => ['nullable', 'string', 'max:60'],
             'filter' => ['nullable', 'in:all,incomplete,reserves,unassigned,unavailable'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
+            'lga_id' => ['nullable', 'integer'],
         ]);
 
         $agents = User::where('campaign_id', $user->campaign_id)->where('role', Role::Agent)->whereNull('deactivated_at')
@@ -79,12 +81,13 @@ class SetupController extends Controller
                 'unavailable' => $a->unavailable_at !== null,
                 default => true,
             })
+            ->filter(fn ($a) => empty($data['lga_id']) || (int) (($a->pollingUnit?->ward ?? $a->ward)?->lga_id ?? $a->lga_id) === (int) $data['lga_id'])
             ->filter(fn ($a) => $search === '' || str_contains(strtolower("{$a->code} {$a->name} {$a->phone} {$a->pollingUnit?->code}"), $search))
             ->sortBy(fn ($a) => [$a->polling_unit_id ? 0 : 1, $a->step, $a->code])
             ->values();
 
         $page = $data['page'] ?? 1;
-        $perPage = 50;
+        $perPage = (int) ($data['per_page'] ?? 50);
         $showPhones = $user->role->canSeePhones();
 
         return response()->json([
@@ -100,6 +103,8 @@ class SetupController extends Controller
             'frozen' => $user->campaign->isFrozen(),
             'total' => $filtered->count(),
             'page' => $page,
+            'current_page' => $page,
+            'per_page' => $perPage,
             'last_page' => max(1, (int) ceil($filtered->count() / $perPage)),
             'data' => $filtered->forPage($page, $perPage)->values()->map(function (User $a) use ($showPhones) {
                 $ward = $a->pollingUnit?->ward ?? $a->ward;

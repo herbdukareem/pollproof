@@ -63,23 +63,23 @@ async function remind(group) {
 
         <section class="card mb-5 p-5">
             <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="text-[17px] font-bold">From assigned to ready</h2>
+                <h2 class="card-title ">From assigned to ready</h2>
                 <span class="text-sm text-ink-2">{{ num(r.units) }} polling units</span>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <div v-for="(f, i) in r.funnel" :key="f.key" class="flex flex-col gap-2">
+                <RouterLink v-for="(f, i) in r.funnel" :key="f.key" :to="{ path: '/setup/roster', query: { filter: i === 0 ? 'all' : 'incomplete' } }" class="group -m-2 flex flex-col gap-2 rounded-xl p-2 transition hover:bg-[#f6f7f9]" :title="i === 0 ? 'Open the agent roster' : 'Open agents not fully onboarded'">
                     <div class="text-[28px] leading-none font-extrabold">{{ num(f.value) }}</div>
                     <div class="text-sm font-bold">{{ f.label }}</div>
-                    <div class="h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="h-full rounded-full" :class="i === 4 ? 'bg-action' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></div></div>
+                    <div class="h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="bar-fill h-full rounded-full" :class="i === 4 ? 'bg-action' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></div></div>
                     <div class="text-[13px] text-ink-2">{{ notes[f.key](r) }}</div>
-                </div>
+                </RouterLink>
             </div>
         </section>
 
-        <div class="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <div class="grid items-start gap-5 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <section class="card overflow-hidden">
                 <div class="flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
-                    <h2 class="text-[17px] font-bold">Readiness by LGA</h2>
+                    <h2 class="card-title ">Readiness by LGA</h2>
                     <span class="text-xs text-ink-2">Lowest confirmation first · % of units</span>
                 </div>
                 <div class="overflow-x-auto">
@@ -103,7 +103,7 @@ async function remind(group) {
             </section>
 
             <section class="card p-5">
-                <h2 class="mb-3 text-[17px] font-bold">Close the gaps</h2>
+                <h2 class="card-title mb-3 ">Close the gaps</h2>
                 <ul class="flex flex-col gap-2">
                     <li v-for="g in gaps" :key="g.title" class="flex items-center gap-4 rounded-xl bg-mist p-3.5">
                         <div class="w-14 shrink-0 text-center text-[22px] font-extrabold" :class="g.count ? g.tone : 'text-ink-3'">{{ num(g.count) }}</div>

@@ -1,19 +1,78 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PinLogo from './PinLogo.vue';
 import Icon from './Icon.vue';
-import { session, signOut } from '../lib/session';
-import { sectionsFor } from '../lib/nav';
 import NoticeBell from './NoticeBell.vue';
+import { session, signOut } from '../lib/session';
+import { itemForPath, sectionsFor } from '../lib/nav';
+import { page } from '../lib/page';
+import { api } from '../lib/api';
 
 const route = useRoute();
 const router = useRouter();
 const open = ref(false);
+const menu = ref(false);
+const counts = ref({});
 const sections = computed(() => sectionsFor(session.user?.role));
+const current = computed(() => itemForPath(route.path));
+const chosen = ref(null);
+const activeKey = computed(() => chosen.value ?? current.value?.section ?? sections.value[0]?.key);
+const active = computed(() => sections.value.find((s) => s.key === activeKey.value) ?? sections.value[0]);
+const campaign = computed(() => session.user?.campaign ?? {});
 const initials = computed(() => (session.user?.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase());
+const live = computed(() => current.value?.section === 'election');
+const title = computed(() => page.title || current.value?.label || '');
 
-watch(() => route.fullPath, () => (open.value = false));
+const fmtDate = (d) => (d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '');
+const daysTo = (d) => (d ? Math.round((new Date(String(d).slice(0, 10) + 'T12:00:00') - new Date(new Date().toDateString() + ' 12:00')) / 86400000) : null);
+
+/** The card at the foot of the menu, about where the campaign is in its calendar. */
+const footer = computed(() => {
+    const c = campaign.value;
+    const days = daysTo(c.election_date);
+    switch (activeKey.value) {
+        case 'setup': {
+            const left = daysTo(c.freeze_at);
+            return {
+                title: left != null && left <= 0 ? 'Setup locked' : 'Code freeze',
+                text: c.freeze_at ? `${fmtDate(c.freeze_at)} · no changes to units, agents or supervisors after this date` : 'No freeze date set yet',
+            };
+        }
+        case 'after':
+            return c.declared_at
+                ? { title: 'Records locked', text: `Declared ${fmtDate(c.declared_at)}. Election-day records are read-only.` }
+                : { title: 'Declaration pending', text: 'Record the declared result under Close-out to lock election-day records.' };
+        case 'admin':
+            return { title: 'Campaign workspace', text: `${c.name ?? ''} · kept separate from every other campaign's data` };
+        default:
+            return {
+                title: days === 0 ? 'Election day' : days > 0 ? `${days} day${days === 1 ? '' : 's'} to election day` : 'Situation room',
+                text: `${c.state_name ?? ''} governorship · ${fmtDate(c.election_date)}`,
+            };
+    }
+});
+
+async function loadCounts() {
+    try {
+        counts.value = await api.get('nav-counts');
+    } catch {
+        counts.value = {};
+    }
+}
+let timer;
+onMounted(() => {
+    loadCounts();
+    timer = setInterval(loadCounts, 60000);
+});
+onBeforeUnmount(() => clearInterval(timer));
+
+watch(() => route.fullPath, () => {
+    open.value = false;
+    menu.value = false;
+    chosen.value = null;
+    loadCounts();
+});
 
 async function logout() {
     await signOut();
@@ -22,49 +81,90 @@ async function logout() {
 </script>
 
 <template>
-    <div class="flex min-h-screen bg-mist">
+    <div class="flex h-dvh overflow-hidden bg-mist print:block print:h-auto print:overflow-visible">
         <aside
-            class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col gap-6 bg-navy px-4 py-5 text-white transition-transform lg:static lg:translate-x-0"
-            :class="open ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-40 flex w-[256px] shrink-0 flex-col gap-5 overflow-hidden bg-navy px-4 py-5 text-white transition-transform duration-200 lg:static lg:h-full lg:translate-x-0 print:hidden"
+            :class="open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'"
         >
             <RouterLink to="/" class="flex items-center gap-2.5 px-2">
                 <PinLogo :size="30" />
-                <span class="text-[21px] tracking-tight"><b class="font-extrabold">Poll</b><span class="font-medium">Proof</span></span>
+                <span class="text-[21px] tracking-[-0.4px]"><b class="font-extrabold">Poll</b><span class="font-medium">Proof</span></span>
             </RouterLink>
-            <nav aria-label="Main" class="-mr-2 flex flex-col gap-4 overflow-y-auto pr-2">
-                <div v-for="section in sections" :key="section.title" class="flex flex-col gap-0.5">
-                    <div v-if="sections.length > 1" class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase">{{ section.title }}</div>
-                    <RouterLink
-                        v-for="item in section.items"
-                        :key="item.name"
-                        :to="item.path"
-                        class="flex h-10 items-center gap-3 rounded-xl px-3 text-[14.5px] text-[#c9d1de] hover:bg-navy-2 hover:text-white"
-                        active-class="!bg-navy-3 !text-white font-bold"
-                    >
-                        <Icon :name="item.icon" />
-                        {{ item.label }}
-                    </RouterLink>
-                </div>
+
+            <div v-if="sections.length > 1" role="tablist" aria-label="Menu sections" class="grid gap-1 rounded-xl bg-navy-2 p-1" :style="{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }">
+                <button
+                    v-for="s in sections"
+                    :key="s.key"
+                    role="tab"
+                    :aria-selected="s.key === activeKey"
+                    :title="s.title"
+                    class="h-8 rounded-lg px-1 text-[12px] font-bold transition"
+                    :class="s.key === activeKey ? 'bg-white text-navy shadow-sm' : 'text-[#c9d1de] hover:text-white'"
+                    @click="chosen = s.key"
+                >{{ s.label }}</button>
+            </div>
+
+            <Transition name="nav" mode="out-in">
+            <nav :key="activeKey" aria-label="Main" class="-mr-2 flex flex-1 flex-col gap-1 overflow-y-auto pr-2">
+                <div class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase">{{ active?.title }}</div>
+                <RouterLink
+                    v-for="item in active?.items ?? []"
+                    :key="item.name"
+                    :to="item.path"
+                    class="group flex h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] text-[#c9d1de] transition hover:bg-navy-2 hover:text-white"
+                    :class="current?.name === item.name ? '!bg-navy-3 font-bold !text-white' : ''"
+                >
+                    <Icon :name="item.icon" class="opacity-80 group-hover:opacity-100" />
+                    <span class="flex-1 truncate">{{ item.label }}</span>
+                    <span v-if="item.count && counts[item.count]" class="rounded-full bg-action px-2 py-px text-xs font-bold text-white">{{ counts[item.count] > 99 ? '99+' : counts[item.count] }}</span>
+                </RouterLink>
             </nav>
-            <div class="mt-auto rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]">
-                <div class="font-bold text-white">{{ session.user?.campaign?.name }}</div>
-                {{ session.user?.campaign?.state_name }} · election {{ session.user?.campaign?.election_date?.slice(0, 10) }}
+            </Transition>
+
+            <div class="rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]">
+                <div class="mb-0.5 font-bold text-white">{{ footer.title }}</div>
+                {{ footer.text }}
             </div>
         </aside>
-        <div v-if="open" class="fixed inset-0 z-20 bg-navy/40 lg:hidden" @click="open = false"></div>
+        <div v-if="open" class="fixed inset-0 z-30 bg-navy/40 backdrop-blur-[1px] lg:hidden" @click="open = false"></div>
 
-        <div class="flex min-w-0 flex-1 flex-col">
-            <header class="flex h-16 items-center gap-3 border-b border-line bg-white px-4 sm:px-7">
+        <div class="flex h-full min-w-0 flex-1 flex-col print:block print:h-auto">
+            <header class="z-20 flex min-h-[68px] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e3e6ec] bg-white/95 px-4 py-3 backdrop-blur sm:px-7 print:hidden">
                 <button class="btn-outline h-10 w-10 !px-0 lg:hidden" aria-label="Open menu" @click="open = true"><Icon name="menu" /></button>
-                <div class="min-w-0 flex-1 truncate text-sm text-ink-2">
-                    Signed in as <b class="text-ink">{{ session.user?.name }}</b> <template v-if="session.user?.role_label !== session.user?.name">· {{ session.user?.role_label }}</template>
+                <div class="min-w-0 flex-1">
+                    <h1 class="truncate text-[22px] leading-tight font-extrabold tracking-[-0.3px] text-ink">{{ title }}</h1>
+                    <p v-if="page.subtitle" class="truncate text-[13px] text-ink-2">{{ page.subtitle }}</p>
                 </div>
-                <NoticeBell />
-                <div class="hidden h-10 w-10 items-center justify-center rounded-full bg-navy text-sm font-bold text-white sm:flex" aria-hidden="true">{{ initials }}</div>
-                <RouterLink to="/account/security" class="btn-outline hidden sm:inline-flex" title="Password and two-step sign-in"><Icon name="key" :size="16" /><span class="sr-only">Password and two-step sign-in</span></RouterLink>
-                <button class="btn-outline" @click="logout"><Icon name="logout" :size="16" /> Sign out</button>
+                <div class="order-last flex w-full flex-wrap items-center gap-2.5 empty:hidden sm:order-none sm:w-auto">
+                    <span v-if="live" class="hidden items-center gap-1.5 rounded-full bg-good-bg px-3 py-1.5 text-[13px] font-bold text-good sm:inline-flex">
+                        <span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-good opacity-60"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-good"></span></span>
+                        Live
+                    </span>
+                    <div id="pp-actions" class="flex flex-wrap items-center gap-2.5"></div>
+                </div>
+                <div class="flex items-center gap-2.5 sm:order-last">
+                    <NoticeBell />
+                    <div class="relative">
+                        <button
+                            class="flex h-10 w-10 items-center justify-center rounded-full bg-navy text-sm font-bold text-white ring-offset-2 transition hover:ring-2 hover:ring-navy/30"
+                            :aria-expanded="menu"
+                            aria-haspopup="menu"
+                            :aria-label="`Account: ${session.user?.name}`"
+                            @click="menu = !menu"
+                        >{{ initials }}</button>
+                        <div v-if="menu" class="fixed inset-0 z-30" @click="menu = false"></div>
+                        <div v-if="menu" role="menu" class="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
+                            <div class="border-b border-line px-4 py-3">
+                                <div class="truncate text-sm font-bold">{{ session.user?.name }}</div>
+                                <div class="truncate text-[12.5px] text-ink-2">{{ session.user?.role_label }} · {{ campaign.name }}</div>
+                            </div>
+                            <RouterLink role="menuitem" to="/account/security" class="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-mist"><Icon name="key" :size="16" /> Password and two-step sign-in</RouterLink>
+                            <button role="menuitem" class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-action hover:bg-mist" @click="logout"><Icon name="logout" :size="16" /> Sign out</button>
+                        </div>
+                    </div>
+                </div>
             </header>
-            <main class="flex-1 px-4 py-6 sm:px-7">
+            <main id="pp-main" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-6 sm:px-7 print:overflow-visible">
                 <slot />
             </main>
         </div>
