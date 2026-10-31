@@ -22,6 +22,9 @@ final class SupervisorAssigner
         if ($user && $user->campaign_id !== $campaign->id) {
             return 'Phone is registered to another campaign';
         }
+        if ($user && $user->hasRole(Role::Agent)) {
+            return "Phone belongs to agent {$user->code}".($user->pollingUnit ? " at {$user->pollingUnit->code}" : '').'. To make them a supervisor, use Replace or Add supervisor and choose them.';
+        }
         if ($user && ! $user->hasRole(Role::LgaSupervisor, Role::WardSupervisor)) {
             return 'Phone belongs to a '.$user->role->label();
         }

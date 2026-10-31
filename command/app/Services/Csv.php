@@ -28,9 +28,31 @@ final class Csv
             if ($cells === [null] || implode('', $cells) === '') {
                 continue;
             }
-            yield $line => array_combine($header, array_slice(array_pad(array_map('trim', $cells), count($header), ''), 0, count($header)));
+            yield $line => array_combine($header, array_slice(array_pad(array_map(fn ($c) => self::clean((string) $c), $cells), count($header), ''), 0, count($header)));
         }
         fclose($handle);
+    }
+
+    /** A cell as text: trimmed, and ="01-01-001" (how our templates keep Excel from changing codes) unwrapped. */
+    public static function clean(string $value): string
+    {
+        $value = trim($value);
+
+        return preg_match('/^="(.*)"$/s', $value, $m) ? trim($m[1]) : $value;
+    }
+
+    /**
+     * A code compared without the leading zeros a spreadsheet may drop: "01-01-001", "1-1-1" and "01-1-001" match.
+     */
+    public static function codeKey(?string $code): string
+    {
+        return implode('-', array_map(fn ($part) => ltrim($part, '0') ?: '0', explode('-', strtoupper(trim((string) $code)))));
+    }
+
+    /** A value written so spreadsheets keep it as text (leading zeros, codes that look like dates). */
+    public static function text(?string $value): string
+    {
+        return $value === null || $value === '' ? '' : '="'.str_replace('"', '', $value).'"';
     }
 
     public static function truthy(?string $value): bool

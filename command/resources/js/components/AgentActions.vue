@@ -4,6 +4,7 @@ import ActionMenu from './ActionMenu.vue';
 import Modal from './Modal.vue';
 import Icon from './Icon.vue';
 import { api } from '../lib/api';
+import AssignSupervisorModal from './AssignSupervisorModal.vue';
 
 /**
  * Row actions for a polling-unit agent: edit details, move to a unit, release to the reserves,
@@ -24,11 +25,18 @@ const target = ref(null);
 const emptyUnits = ref(false);
 
 const a = computed(() => props.agent);
+// The agent as the supervisor window describes people.
+const asPerson = computed(() => ({
+    id: a.value.id, code: a.value.code, name: a.value.name, phone: a.value.phone, role: 'agent',
+    unit: a.value.polling_unit?.code ?? null, has_result: !!a.value.result,
+    post: a.value.polling_unit ? `Agent at ${a.value.polling_unit.code}` : 'Reserve agent',
+}));
 const items = computed(() => {
     const list = [];
     if (props.canEdit) list.push({ label: 'Edit details', icon: 'edit', hint: 'Name and phone number', run: () => openDialog('edit') });
     if (props.canAssign && a.value.active !== false) list.push({ label: a.value.polling_unit ? 'Move to another unit' : 'Assign to a unit', icon: 'move', run: () => openDialog('move') });
     if (props.canEdit && a.value.polling_unit && a.value.active !== false) list.push({ label: 'Release to reserves', icon: 'undo', hint: `Frees ${a.value.polling_unit.code}`, run: () => openDialog('release') });
+    if (props.canEdit && a.value.active !== false) list.push({ label: 'Make supervisor', icon: 'users', hint: 'Ward or LGA supervisor', run: () => (dialog.value = 'supervisor') });
     if (props.canEdit) {
         list.push(a.value.active === false
             ? { label: 'Reactivate', icon: 'power', hint: 'Comes back as a reserve', run: () => openDialog('reactivate') }
@@ -93,6 +101,7 @@ const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { ac
 
 <template>
     <ActionMenu v-if="items.length" :items="items" :label="`Actions for ${agent.code}`" />
+    <AssignSupervisorModal :open="dialog === 'supervisor'" :person="asPerson" @close="dialog = ''" @done="(m) => emit('done', m)" />
 
     <Modal :open="dialog === 'edit'" :title="`Edit ${agent.code}`" subtitle="Corrections are recorded in the audit log." :busy="busy" @close="dialog = ''">
         <form id="agent-edit" class="flex flex-col gap-4" @submit.prevent="saveEdit">
