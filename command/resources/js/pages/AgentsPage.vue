@@ -7,6 +7,9 @@ import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
 import TableBusy from '../components/TableBusy.vue';
+import BulkBar from '../components/BulkBar.vue';
+import Modal from '../components/Modal.vue';
+import { useSelection } from '../lib/useSelection';
 import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../lib/useSort';
@@ -83,6 +86,44 @@ const sortedAll = computed(() => sortRows(all.value, sort));
 const paged = usePaged(sortedAll, { perPage: 25, resetOn: () => [filter.value, search.value, lgaId.value, sort.key, sort.dir] });
 const rows = paged.rows;
 const canEdit = computed(() => agents.data.value?.can_edit ?? false);
+
+// Ticked agents (across pages) and ticked check-ins, for the bulk actions.
+const picked = useSelection();
+const pickedCheckIns = useSelection();
+const pageIds = computed(() => rows.value.map((a) => a.id));
+const pickedRows = computed(() => (agents.data.value?.data ?? []).filter((a) => picked.has(a.id)));
+const bulkConfirm = ref(null);
+async function bulk(action) {
+    busy.value = 'bulk';
+    error.value = '';
+    try {
+        const r = await api.post('agents/bulk', { ids: picked.list(), action });
+        const verb = { release: 'released to the reserves', deactivate: 'deactivated and signed out', reactivate: 'reactivated as reserves' }[action];
+        message.value = `${r.done} ${r.done === 1 ? 'agent' : 'agents'} ${verb}.${r.skipped ? ` ${r.skipped} skipped: the change didn't apply to them.` : ''}`;
+        picked.clear();
+        bulkConfirm.value = null;
+        await agents.load();
+    } catch (e) {
+        error.value = e.firstError();
+    } finally {
+        busy.value = null;
+    }
+}
+const printPicked = () => window.open(`/id-tags?ids=${picked.list().join(',')}`, '_blank');
+async function reviewPicked(decision) {
+    busy.value = 'bulk-checkins';
+    error.value = '';
+    try {
+        const r = await api.post('check-ins/bulk-review', { ids: pickedCheckIns.list(), decision });
+        message.value = `${decision === 'approve' ? 'Approved' : 'Rejected'} ${r.done} ${r.done === 1 ? 'check-in' : 'check-ins'}.${r.skipped ? ` ${r.skipped} were already handled or outside your area.` : ''}`;
+        pickedCheckIns.clear();
+        await Promise.all([pending.load(), agents.load()]);
+    } catch (e) {
+        error.value = e.firstError();
+    } finally {
+        busy.value = null;
+    }
+}
 const filtered = computed(() => !!(search.value || lgaId.value));
 const busy = ref(null);
 const message = ref('');
@@ -169,9 +210,10 @@ async function send(agent) {
                 <div class="relative overflow-x-auto">
                     <TableBusy :busy="agents.busy.value" />
                     <table class="w-full min-w-[680px] text-sm">
-                        <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
+                        <thead class="bg-mist"><tr><th v-if="canEdit" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
                         <tbody>
-                            <tr v-for="a in rows" :key="a.id" :class="a.active === false ? 'opacity-60' : ''">
+                            <tr v-for="a in rows" :key="a.id" :class="[a.active === false ? 'opacity-60' : '', picked.has(a.id) ? '!bg-[#eef2fb]' : '']">
+                                <td v-if="canEdit" class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
                                 <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div><div v-if="a.phone"><a :href="`tel:${a.phone}`" class="text-xs text-ink-3 hover:text-navy hover:underline" title="Call (copies the number on a computer)" @click="callOrCopy($event, a.phone, a.name || a.code)">{{ a.phone }}</a></div></td>
                                 <td class="td"><template v-if="a.polling_unit"><div class="font-semibold">{{ a.polling_unit.code }}</div><div class="text-xs text-ink-2">{{ a.polling_unit.ward }} · {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
                                 <td class="td">
@@ -194,6 +236,12 @@ async function send(agent) {
                     </table>
                 </div>
             </LoadState>
+            <BulkBar :count="picked.count.value" :noun="picked.count.value === 1 ? 'agent selected' : 'agents selected'" @clear="picked.clear()">
+                <button class="btn-bar" @click="printPicked"><Icon name="download" :size="14" /> Print ID tags</button>
+                <button class="btn-bar" :disabled="busy === 'bulk' || !pickedRows.some((a) => a.polling_unit && a.active !== false)" @click="bulkConfirm = 'release'"><Icon name="undo" :size="14" /> Release to reserves</button>
+                <button v-if="pickedRows.some((a) => a.active === false)" class="btn-bar" :disabled="busy === 'bulk'" @click="bulk('reactivate')"><Icon name="power" :size="14" /> Reactivate</button>
+                <button class="btn-bar" :disabled="busy === 'bulk' || !pickedRows.some((a) => a.active !== false)" @click="bulkConfirm = 'deactivate'"><Icon name="power" :size="14" /> Deactivate</button>
+            </BulkBar>
             <Pagination :meta="paged.meta.value" :sort="sort" noun="agents" :per-page-options="[25, 50, 100]" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
 
@@ -203,11 +251,19 @@ async function send(agent) {
                 <span v-if="queue.length" class="rounded-full bg-action px-2.5 py-0.5 text-xs font-bold text-white">{{ queue.length }}</span>
             </div>
             <p class="mt-1 mb-3 text-[13px] text-ink-2">Agents who checked in outside the unit area, or by USSD with no GPS. New ones appear at the top.</p>
+            <div v-if="queue.length > 1" class="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+                <label class="flex items-center gap-2 font-semibold text-ink-2"><input type="checkbox" class="checkbox" :checked="pickedCheckIns.allOn(queue.map((c) => c.id))" :indeterminate.prop="pickedCheckIns.someOn(queue.map((c) => c.id))" @change="pickedCheckIns.setMany(queue.map((c) => c.id), $event.target.checked)" /> {{ pickedCheckIns.count.value ? `${pickedCheckIns.count.value} ticked` : 'Tick all' }}</label>
+                <template v-if="pickedCheckIns.count.value">
+                    <button class="btn-good ml-auto h-8 px-3 text-xs" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('approve')">Approve {{ pickedCheckIns.count.value }}</button>
+                    <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('reject')">Reject {{ pickedCheckIns.count.value }}</button>
+                </template>
+            </div>
             <LoadState :loading="pending.loading.value" :error="pending.error.value" :empty="!queue.length" empty-text="Nothing to confirm.">
                 <TransitionGroup name="alert" tag="ul" class="relative flex flex-col gap-2">
                     <li v-for="c in queue" :key="c.id" class="rounded-xl border p-3.5 transition-colors" :class="fresh.has(c.id) ? 'checkin-new border-[#1c6fc2]/40 bg-[#eef5fc]' : 'border-transparent bg-mist'">
                         <div class="flex items-start justify-between gap-2 text-sm">
                             <span class="flex flex-wrap items-center gap-1.5">
+                                <input v-if="queue.length > 1" type="checkbox" class="checkbox" :aria-label="`Tick check-in for ${c.polling_unit.code}`" :checked="pickedCheckIns.has(c.id)" @change="pickedCheckIns.toggle(c.id)" />
                                 <b>{{ c.polling_unit.code }}</b>
                                 <span v-if="fresh.has(c.id)" class="rounded-full bg-[#1c6fc2] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-white uppercase">New</span>
                                 <span class="rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase" :class="c.channel === 'ussd' ? 'bg-[#fff1d6] text-[#8a5a00]' : 'bg-white text-ink-2'">{{ c.channel === 'ussd' ? 'USSD' : 'App' }}</span>
@@ -227,4 +283,11 @@ async function send(agent) {
             </LoadState>
         </section>
     </div>
+    <Modal :open="!!bulkConfirm" :title="bulkConfirm === 'deactivate' ? `Deactivate ${picked.count.value} agents?` : `Release ${picked.count.value} agents to the reserves?`" :busy="busy === 'bulk'" @close="bulkConfirm = null">
+        <p class="text-sm text-ink-2">{{ bulkConfirm === 'deactivate' ? 'They are signed out of the app at once and their units are left without an agent. You can reactivate them later as reserves.' : 'Their units are left without an agent until you send someone. They stay active as reserves.' }}</p>
+        <template #footer>
+            <button class="btn-ghost" :disabled="busy === 'bulk'" @click="bulkConfirm = null">Cancel</button>
+            <button class="btn-primary" :disabled="busy === 'bulk'" @click="bulk(bulkConfirm)">{{ busy === 'bulk' ? 'Working…' : bulkConfirm === 'deactivate' ? 'Deactivate' : 'Release' }}</button>
+        </template>
+    </Modal>
 </template>

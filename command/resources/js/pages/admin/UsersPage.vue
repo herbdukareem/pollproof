@@ -28,7 +28,7 @@ const sort = useSortState({
 const users = useResource(() => api.get('users', sort.params));
 const d = computed(() => users.data.value);
 const search = ref('');
-const roleFilter = ref('');
+const roleFilter = ref(new URLSearchParams(window.location.search).get('role') ?? '');
 const statusFilter = ref('active');
 const statusTests = { active: (u) => u.active, inactive: (u) => !u.active, no2fa: (u) => u.active && !u.two_factor, temp: (u) => u.active && u.must_change_password, '': () => true };
 const matches = computed(() => (d.value?.data ?? []).filter((u) =>

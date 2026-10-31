@@ -12,6 +12,9 @@ import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
 import TableBusy from '../../components/TableBusy.vue';
+import BulkBar from '../../components/BulkBar.vue';
+import Modal from '../../components/Modal.vue';
+import { useSelection } from '../../lib/useSelection';
 import SearchSelect from '../../components/SearchSelect.vue';
 import SortTh from '../../components/SortTh.vue';
 import { useSortState } from '../../lib/useSort';
@@ -79,6 +82,18 @@ async function run(key, fn, done) {
     }
 }
 
+// Ticked agents, kept across pages, for the bulk actions.
+const picked = useSelection();
+const pageIds = computed(() => (d.value?.data ?? []).map((a) => a.id));
+const bulkConfirm = ref(null);
+const invitePicked = () => run('bulk', () => api.post('roster/invite', { ids: picked.list() }), (r) => { picked.clear(); return `Queued ${num(r.sent)} invites.`; });
+const printPicked = () => window.open(`/id-tags?ids=${picked.list().join(',')}`, '_blank');
+const bulkAgents = (action) => run('bulk', () => api.post('agents/bulk', { ids: picked.list(), action }), (r) => {
+    picked.clear();
+    bulkConfirm.value = null;
+    return `${r.done} ${r.done === 1 ? 'agent' : 'agents'} ${action === 'release' ? 'released to the reserves' : 'deactivated and signed out'}.${r.skipped ? ` ${r.skipped} skipped.` : ''}`;
+});
+
 const inviteAll = () => run('invite', () => api.post('roster/invite', {}), (r) => `Queued ${num(r.sent)} invites.`);
 const inviteOne = (a) => run(`i${a.id}`, () => api.post('roster/invite', { ids: [a.id] }), () => `Invite queued for ${a.code}.`);
 const previewAssign = () => run('preview', async () => (preview.value = await api.post('roster/auto-assign', { apply: false })), (r) => (r.count ? '' : 'Nobody to match: every agent registered in a ward already has a unit, or the ward has no free unit.'));
@@ -145,9 +160,10 @@ function changed(text) {
                     <div class="relative overflow-x-auto">
                         <TableBusy :busy="roster.busy.value" />
                         <table class="w-full min-w-[760px] text-sm">
-                            <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
+                            <thead class="bg-mist"><tr><th class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
                             <tbody>
-                                <tr v-for="a in d.data" :key="a.id">
+                                <tr v-for="a in d.data" :key="a.id" :class="picked.has(a.id) ? '!bg-[#eef2fb]' : ''">
+                                    <td class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
                                     <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div></td>
                                     <td class="td whitespace-nowrap text-ink-2">{{ a.phone }}</td>
                                     <td class="td">
@@ -170,6 +186,12 @@ function changed(text) {
                             </tbody>
                         </table>
                     </div>
+                    <BulkBar :count="picked.count.value" :noun="picked.count.value === 1 ? 'agent selected' : 'agents selected'" @clear="picked.clear()">
+                        <button class="btn-bar" :disabled="busy === 'bulk'" @click="invitePicked"><Icon name="send" :size="14" /> Send invite</button>
+                        <button class="btn-bar" @click="printPicked"><Icon name="download" :size="14" /> Print ID tags</button>
+                        <button class="btn-bar" :disabled="busy === 'bulk' || d.frozen" @click="bulkConfirm = 'release'"><Icon name="undo" :size="14" /> Release to reserves</button>
+                        <button class="btn-bar" :disabled="busy === 'bulk'" @click="bulkConfirm = 'deactivate'"><Icon name="power" :size="14" /> Deactivate</button>
+                    </BulkBar>
                     <Pagination :meta="d" :sort="sort" noun="agents" :per-page-options="[25, 50, 100, 200]" :loading="roster.loading.value" @page="go" @per-page="setPerPage" />
                 </LoadState>
             </section>
@@ -210,4 +232,11 @@ function changed(text) {
         @done="imported"
     />
     <AddAgentModal :open="adding" @close="adding = false" @done="(m) => { message = m; roster.load(); }" />
+    <Modal :open="!!bulkConfirm" :title="bulkConfirm === 'deactivate' ? `Deactivate ${picked.count.value} agents?` : `Release ${picked.count.value} agents to the reserves?`" :busy="busy === 'bulk'" @close="bulkConfirm = null">
+        <p class="text-sm text-ink-2">{{ bulkConfirm === 'deactivate' ? 'They are signed out of the app at once and their units are left without an agent.' : 'Their units are left without an agent until someone is assigned. They stay as reserves.' }}</p>
+        <template #footer>
+            <button class="btn-ghost" :disabled="busy === 'bulk'" @click="bulkConfirm = null">Cancel</button>
+            <button class="btn-primary" :disabled="busy === 'bulk'" @click="bulkAgents(bulkConfirm)">{{ busy === 'bulk' ? 'Working…' : bulkConfirm === 'deactivate' ? 'Deactivate' : 'Release' }}</button>
+        </template>
+    </Modal>
 </template>

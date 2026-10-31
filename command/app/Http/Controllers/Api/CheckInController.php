@@ -153,6 +153,31 @@ class CheckInController extends Controller
         return response()->json(['id' => $checkIn->id, 'status' => $checkIn->status]);
     }
 
+    /** Approve or reject several check-ins at once. Ones already handled, or outside the supervisor's area, are skipped. */
+    public function bulkReview(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->campaign->abortIfDeclared();
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'], 'ids.*' => ['integer'],
+            'decision' => ['required', 'in:approve,reject'],
+        ]);
+        $items = CheckIn::where('check_ins.campaign_id', $user->campaign_id)->whereIn('id', $data['ids'])->where('status', CheckIn::PENDING_REVIEW)
+            ->when($user->hasRole(Role::WardSupervisor), fn ($q) => $q->whereHas('pollingUnit', fn ($u) => $u->where('ward_id', $user->ward_id)))
+            ->when($user->hasRole(Role::LgaSupervisor), fn ($q) => $q->whereHas('pollingUnit.ward', fn ($w) => $w->where('lga_id', $user->lga_id)))
+            ->get();
+        foreach ($items as $checkIn) {
+            $checkIn->update(['status' => $data['decision'] === 'approve' ? CheckIn::APPROVED : CheckIn::REJECTED, 'reviewed_by' => $user->id, 'reviewed_at' => now()]);
+            $this->audit->log($user, 'checkin.'.$data['decision'], $checkIn, ['bulk' => true], $request->ip());
+            $this->reviews->settled($checkIn);
+            if ($checkIn->counts()) {
+                $this->alerts->clear($checkIn->campaign_id, "agent_absent:{$checkIn->polling_unit_id}");
+            }
+        }
+
+        return response()->json(['done' => $items->count(), 'skipped' => count($data['ids']) - $items->count()]);
+    }
+
     /** The selfie sent with a check-in, for the supervisor deciding whether to approve it. */
     public function selfie(Request $request, CheckIn $checkIn): StreamedResponse
     {
