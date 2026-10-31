@@ -5,6 +5,7 @@ import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
 import Pagination from '../../components/Pagination.vue';
+import TableBusy from '../../components/TableBusy.vue';
 import SortTh from '../../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../../lib/useSort';
 import ActionMenu from '../../components/ActionMenu.vue';
@@ -175,7 +176,8 @@ async function copy() {
                     <option value="">Everyone</option>
                 </select>
             </div>
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
+                <TableBusy :busy="users.busy.value" />
                 <table class="w-full min-w-[920px] text-sm">
                     <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">User</SortTh><SortTh :sort="sort" k="role">Role</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="twofa">Two-step</SortTh><SortTh :sort="sort" k="active">Last active</SortTh><th class="th text-right">Actions</th></tr></thead>
                     <tbody>

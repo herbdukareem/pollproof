@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
+import TableBusy from '../components/TableBusy.vue';
 import AlertList from '../components/AlertList.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
@@ -128,7 +129,7 @@ async function resolve(alert) {
             </select>
         </div>
         <LoadState :loading="alerts.loading.value" :error="alerts.error.value" :empty="!rows.length" :empty-text="filters.status === 'open' ? 'No open alerts match. All clear here.' : 'No alerts match.'">
-            <AlertList class="p-4" :alerts="rows" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" />
+            <div class="relative"><TableBusy :busy="alerts.busy.value" /><AlertList class="p-4" :alerts="rows" :can-resolve="hasRole('situation_room', 'dg', 'legal')" :busy="busy" @resolve="resolve" /></div>
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#eef0f3] px-4 py-3 text-[13px] text-ink-2">
                 <span>Showing {{ num(meta.from) }}–{{ num(meta.to) }} of {{ num(meta.total) }}</span>
                 <div v-if="meta.last_page > 1" class="flex items-center gap-2">

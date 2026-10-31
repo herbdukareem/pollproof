@@ -5,6 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
@@ -78,7 +79,8 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
                     </div>
                 </div>
                 <LoadState :empty="!rows.length" :empty-text="search || reason ? 'No agents match.' : 'Nobody in this list.'">
-                    <div class="overflow-x-auto">
+                    <div class="relative overflow-x-auto">
+                        <TableBusy :busy="stipends.busy.value" />
                         <table class="w-full min-w-[560px] text-sm">
                             <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="checked">Checked in</SortTh><SortTh :sort="sort" k="result">Result</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                             <tbody>

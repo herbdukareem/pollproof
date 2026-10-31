@@ -5,6 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import SortTh from '../components/SortTh.vue';
 import { useSortState } from '../lib/useSort';
 import { api } from '../lib/api';
@@ -61,7 +62,8 @@ function go(p) {
 
     <section class="card overflow-hidden">
         <LoadState :loading="logs.loading.value" :error="logs.error.value" :empty="!rows.length" empty-text="No entries.">
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
+                <TableBusy :busy="logs.busy.value" />
                 <table class="w-full min-w-[760px] text-sm">
                     <thead class="bg-mist"><tr><SortTh :sort="sort" k="time">Time</SortTh><SortTh :sort="sort" k="user">User</SortTh><SortTh :sort="sort" k="action">Action</SortTh><th class="th">Detail</th><SortTh :sort="sort" k="ip">IP</SortTh></tr></thead>
                     <tbody>

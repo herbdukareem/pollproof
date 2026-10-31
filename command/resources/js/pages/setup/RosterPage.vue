@@ -11,6 +11,7 @@ import AgentAppButton from '../../components/AgentAppButton.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
+import TableBusy from '../../components/TableBusy.vue';
 import SearchSelect from '../../components/SearchSelect.vue';
 import SortTh from '../../components/SortTh.vue';
 import { useSortState } from '../../lib/useSort';
@@ -141,7 +142,8 @@ function changed(text) {
                     <span class="self-center text-sm text-ink-2">{{ num(d.total) }} match</span>
                 </div>
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">
-                    <div class="overflow-x-auto">
+                    <div class="relative overflow-x-auto">
+                        <TableBusy :busy="roster.busy.value" />
                         <table class="w-full min-w-[760px] text-sm">
                             <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
                             <tbody>

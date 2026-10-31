@@ -5,6 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import ResultFlags from '../components/ResultFlags.vue';
 import { api } from '../lib/api';
 import SearchSelect from '../components/SearchSelect.vue';
@@ -89,7 +90,8 @@ const ageClass = (r) => {
 
     <LoadState :loading="queue.loading.value" :error="queue.error.value" :empty="!items.length" :empty-text="kind || search || lgaId ? 'Nothing waiting matches these filters.' : 'Queue is clear. Every result has been checked.'">
         <div class="grid gap-5 lg:grid-cols-[320px_1fr]">
-            <section class="card flex flex-col self-start overflow-hidden" aria-label="Queue">
+            <section class="card relative flex flex-col self-start overflow-hidden" aria-label="Queue">
+                <TableBusy :busy="queue.busy.value" />
               <div class="flex flex-col gap-1 p-2">
                 <div class="px-2.5 pt-2 pb-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">Flagged first, then oldest</div>
                 <button

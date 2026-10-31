@@ -15,6 +15,7 @@ use App\Services\EvidenceBuilder;
 use App\Services\Reconciler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class UnitController extends Controller
 {
@@ -27,6 +28,10 @@ class UnitController extends Controller
             'ward_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:reported,awaiting,no_agent,flagged,review_flagged'],
             'search' => ['nullable', 'string', 'max:50'],
+            'agent' => ['nullable', 'in:present,absent,none'],
+            'result' => ['nullable', 'in:verified,pending,sent_back,none'],
+            'irev' => ['nullable', 'in:match,differs,missing,unchecked'],
+            'channel' => ['nullable', 'in:app,sms,ussd'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
             'sort' => ['nullable', 'in:result,code,agent,flags'],
             'dir' => ['nullable', 'in:asc,desc'],
@@ -63,6 +68,7 @@ class UnitController extends Controller
                 'result_seq' => ResultSubmission::select('id')->whereColumn('polling_unit_id', 'polling_units.id')->where('is_current', true)->limit(1),
                 'agent_code' => User::select('code')->whereColumn('polling_unit_id', 'polling_units.id')->where('role', Role::Agent)->whereNull('deactivated_at')->limit(1),
             ])
+            ->tap(fn ($q) => $this->moreFilters($q, $data, $user->campaign_id))
             ->withCount(['resultFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
             // Latest result first unless a column header asks otherwise; blanks always go last.
             ->when($sort === 'result', fn ($q) => $q->orderByRaw('result_seq is null')->orderBy('result_seq', $dir))
@@ -118,5 +124,38 @@ class UnitController extends Controller
         $audit->log($user, 'evidence.viewed', $unit, [], $request->ip());
 
         return response()->json($pack);
+    }
+
+    /** The filters under the search box: agent attendance, result review, IReV and how the result came in. */
+    private function moreFilters($q, array $data, int $campaignId): void
+    {
+        $present = fn ($c) => $c->where('campaign_id', $campaignId)->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED]);
+        $openAlert = fn (string $type) => fn ($w) => $w->select(DB::raw(1))->from('alerts')
+            ->where('alerts.campaign_id', $campaignId)->where('alerts.status', '!=', 'resolved')
+            ->whereRaw('alerts.dedupe_key = CONCAT(?, polling_units.id)', ["{$type}:unit:"]);
+
+        match ($data['agent'] ?? null) {
+            'present' => $q->whereHas('agent')->whereHas('checkIns', $present),
+            'absent' => $q->whereHas('agent')->whereDoesntHave('checkIns', $present),
+            'none' => $q->whereDoesntHave('agent'),
+            default => null,
+        };
+        match ($data['result'] ?? null) {
+            'verified' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::APPROVED)),
+            'pending' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::PENDING_REVIEW)),
+            'sent_back' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::SENT_BACK)),
+            'none' => $q->whereDoesntHave('currentResult'),
+            default => null,
+        };
+        match ($data['irev'] ?? null) {
+            'differs' => $q->whereExists($openAlert('irev_mismatch')),
+            'missing' => $q->whereExists($openAlert('irev_missing')),
+            'match' => $q->whereHas('irevEntries')->whereNotExists($openAlert('irev_mismatch'))->whereNotExists($openAlert('irev_missing')),
+            'unchecked' => $q->whereDoesntHave('irevEntries'),
+            default => null,
+        };
+        if ($data['channel'] ?? null) {
+            $q->whereHas('currentResult', fn ($r) => $r->where('channel', $data['channel']));
+        }
     }
 }

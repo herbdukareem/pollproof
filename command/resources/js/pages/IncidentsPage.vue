@@ -5,6 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
@@ -92,7 +93,8 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
 
     <LoadState :loading="incidents.loading.value" :error="incidents.error.value" :empty="!rows.length" :empty-text="search || type || severity ? 'No incidents match these filters.' : `No ${status} incidents.`">
         <div class="grid items-start gap-5 lg:grid-cols-[380px_1fr]">
-            <section class="card flex max-h-[calc(100dvh-230px)] flex-col overflow-hidden" aria-label="Incident list">
+            <section class="card relative flex max-h-[calc(100dvh-230px)] flex-col overflow-hidden" aria-label="Incident list">
+                <TableBusy :busy="incidents.busy.value" />
               <div class="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
                 <button v-for="i in rows" :key="i.id" class="flex gap-3 rounded-xl border-2 px-3.5 py-3 text-left transition" :class="selected?.id === i.id ? 'border-navy bg-white shadow-sm' : 'border-transparent hover:bg-mist'" @click="selectedId = i.id">
                     <span class="w-1 shrink-0 rounded-full" :class="{ high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' }[i.severity]"></span>

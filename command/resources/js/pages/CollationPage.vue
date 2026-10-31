@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, useSortState } from '../lib/useSort';
@@ -144,7 +145,8 @@ async function submit() {
                 <button v-if="statusFilter || search" class="text-[13px] font-bold text-navy hover:underline" @click="() => { statusFilter = ''; search = ''; }">Clear filters</button>
             </div>
             <LoadState :loading="entries.loading.value" :error="entries.error.value" :empty="!paged.rows.value.length" :empty-text="rows.length ? 'No collation points match.' : 'No collation sheets entered yet.'">
-                <div class="overflow-x-auto">
+                <div class="relative overflow-x-auto">
+                    <TableBusy :busy="entries.busy.value" />
                     <table class="w-full min-w-[720px] text-sm">
                         <thead><tr><SortTh :sort="sort" k="scope">Collation point</SortTh><SortTh :sort="sort" k="ours" cls="text-right">Our units</SortTh><SortTh :sort="sort" k="declared" cls="text-right">Declared</SortTh><SortTh :sort="sort" k="diff">Difference</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                         <tbody>

@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { useSortState } from '../lib/useSort';
@@ -18,11 +19,26 @@ import { num, time } from '../lib/format';
 
 const route = useRoute();
 const router = useRouter();
-const filters = reactive({ status: route.query.status ?? '', lga_id: route.query.lga_id ? Number(route.query.lga_id) : '', search: route.query.search ?? '', page: 1, per_page: 50 });
-// Keep the filters in the address, so cards elsewhere can link straight to a filtered list.
-watch(() => [filters.status, filters.lga_id, filters.search], ([status, lga, search]) => {
-    router.replace({ query: { ...(status ? { status } : {}), ...(lga ? { lga_id: lga } : {}), ...(search ? { search } : {}) } });
+const q = route.query;
+const filters = reactive({
+    status: q.status ?? '', lga_id: q.lga_id ? Number(q.lga_id) : '', ward_id: q.ward_id ? Number(q.ward_id) : '', search: q.search ?? '',
+    agent: q.agent ?? '', result: q.result ?? '', irev: q.irev ?? '', channel: q.channel ?? '', page: 1, per_page: 50,
 });
+const extra = ['ward_id', 'agent', 'result', 'irev', 'channel'];
+// Keep the filters in the address, so cards elsewhere can link straight to a filtered list.
+watch(() => [filters.status, filters.lga_id, filters.search, ...extra.map((k) => filters[k])], () => {
+    router.replace({ query: Object.fromEntries(['status', 'lga_id', 'search', ...extra].filter((k) => filters[k] !== '' && filters[k] != null).map((k) => [k, filters[k]])) });
+});
+const filterSets = [
+    ['agent', 'Agent', [['present', 'Checked in'], ['absent', 'Not checked in'], ['none', 'No agent']]],
+    ['result', 'Result', [['verified', 'Verified'], ['pending', 'Waiting for verification'], ['sent_back', 'Sent back'], ['none', 'No result yet']]],
+    ['irev', 'IReV', [['match', 'Matches'], ['differs', 'Differs'], ['missing', 'Not on IReV'], ['unchecked', 'Not checked yet']]],
+    ['channel', 'Sent by', [['app', 'App'], ['sms', 'SMS'], ['ussd', 'USSD']]],
+];
+const anyFilter = computed(() => !!(filters.search || filters.lga_id || extra.some((k) => filters[k])));
+function clearFilters() {
+    Object.assign(filters, { search: '', lga_id: '', ward_id: '', agent: '', result: '', irev: '', channel: '' });
+}
 const structure = useResource(() => api.get('structure'));
 const tally = useResource(() => api.get('tally'), { refreshMs: 60000 });
 // Latest result first; the server sorts, so a header click reloads page 1.
@@ -36,7 +52,14 @@ const units = useResource(() => api.get('units', { ...filters, ...sort.params })
 watch(() => [sort.key, sort.dir], () => { filters.page = 1; units.load(); });
 
 let debounce;
-watch(() => [filters.status, filters.lga_id], () => { filters.page = 1; units.load(); });
+watch(() => [filters.status, filters.lga_id, ...extra.map((k) => filters[k])], () => { filters.page = 1; units.load(); });
+// A ward from another LGA no longer applies once the LGA changes.
+watch(() => filters.lga_id, () => {
+    if (filters.ward_id && !wardOptions.value.some((w) => w.value === filters.ward_id)) filters.ward_id = '';
+});
+const wardOptions = computed(() => (structure.data.value?.lgas ?? [])
+    .filter((l) => !filters.lga_id || l.id === Number(filters.lga_id))
+    .flatMap((l) => l.wards.map((w) => ({ value: w.id, label: filters.lga_id ? w.name : `${w.name} · ${l.name}`, hint: `${w.units} units` }))));
 watch(() => filters.search, () => { clearTimeout(debounce); debounce = setTimeout(() => { filters.page = 1; units.load(); }, 300); });
 
 const rows = computed(() => units.data.value?.data ?? []);
@@ -161,14 +184,30 @@ function go(page) {
         </section>
 
         <section class="card min-w-0 overflow-hidden">
-            <div class="flex flex-wrap gap-3 border-b border-[#eef0f3] p-4">
-                <label class="sr-only" for="unit-search">Search units</label>
-                <input id="unit-search" v-model="filters.search" class="field max-w-xs flex-1" placeholder="Search unit code or name" />
-                <label class="sr-only" for="lga">LGA</label>
-                <SearchSelect id="lga" v-model="filters.lga_id" class="w-full sm:w-[220px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
+            <div class="flex flex-col gap-3 border-b border-[#eef0f3] p-4">
+                <div class="flex flex-wrap gap-3">
+                    <label class="sr-only" for="unit-search">Search units</label>
+                    <input id="unit-search" v-model="filters.search" class="field max-w-xs flex-1" placeholder="Search unit code or name" />
+                    <label class="sr-only" for="lga">LGA</label>
+                    <SearchSelect id="lga" v-model="filters.lga_id" class="w-full sm:w-[200px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
+                    <label class="sr-only" for="ward">Ward</label>
+                    <SearchSelect id="ward" v-model="filters.ward_id" class="w-full sm:w-[220px]" all-label="All wards" noun="wards" :options="wardOptions" />
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <label v-for="[key, label, opts] in filterSets" :key="key" class="relative">
+                        <span class="sr-only">{{ label }}</span>
+                        <select v-model="filters[key]" class="field h-9 w-auto pr-8 text-[13px]" :class="filters[key] ? 'border-navy bg-[#f4f6fb] font-semibold text-navy' : 'text-ink-2'">
+                            <option value="">{{ label }}: any</option>
+                            <option v-for="[v, text] in opts" :key="v" :value="v">{{ label }}: {{ text }}</option>
+                        </select>
+                    </label>
+                    <span class="ml-auto text-[13px] text-ink-2">{{ num(meta?.total ?? 0) }} {{ (meta?.total ?? 0) === 1 ? 'unit' : 'units' }}</span>
+                    <button v-if="anyFilter" class="text-[13px] font-bold text-navy hover:underline" @click="clearFilters">Clear filters</button>
+                </div>
             </div>
-            <LoadState :loading="units.loading.value" :error="units.error.value" :empty="!rows.length" empty-text="No units match.">
-                <div class="overflow-x-auto">
+            <LoadState :loading="units.loading.value" :error="units.error.value" :empty="!rows.length" empty-text="No units match these filters.">
+                <div class="relative overflow-x-auto">
+                    <TableBusy :busy="units.busy.value" />
                     <table class="w-full min-w-[820px] text-sm">
                         <thead><tr><SortTh :sort="sort" k="code">Unit</SortTh><SortTh :sort="sort" k="agent">Agent</SortTh><SortTh :sort="sort" k="result">Our result</SortTh><th class="th">IReV</th><SortTh :sort="sort" k="flags">Flag</SortTh><th class="th"></th></tr></thead>
                         <tbody>
