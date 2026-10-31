@@ -12,7 +12,17 @@ import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { num, timeOrDate } from '../lib/format';
 
-const stipends = useResource(() => api.get('stipends'));
+// Latest first: the most recent check-in or result at the top.
+const sort = useSortState({
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.checked_in_at) ?? 0, ts(a.result_at) ?? 0) || null },
+    code: { label: 'Agent', dir: 'asc', value: (a) => a.agent_code },
+    unit: { label: 'Unit', dir: 'asc', value: (a) => a.polling_unit },
+    checked: { label: 'Checked in', dir: 'desc', value: (a) => ts(a.checked_in_at) },
+    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result_at) },
+    status: { label: 'Status', dir: 'asc', value: (a) => (a.eligible ? 'Eligible' : a.reason) },
+}, undefined, { onChange: () => stipends.load() });
+
+const stipends = useResource(() => api.get('stipends', sort.params));
 const d = computed(() => stipends.data.value);
 const show = ref('hold');
 const search = ref('');
@@ -22,15 +32,6 @@ const matches = computed(() => (d.value?.agents ?? []).filter((a) =>
     (show.value === 'all' || (show.value === 'hold' ? !a.eligible : a.eligible))
     && (!reason.value || a.reason === reason.value)
     && (!search.value || `${a.agent_code} ${a.name} ${a.polling_unit}`.toLowerCase().includes(search.value.toLowerCase()))));
-// Latest first: the most recent check-in or result at the top.
-const sort = useSortState({
-    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.checked_in_at) ?? 0, ts(a.result_at) ?? 0) || null },
-    code: { label: 'Agent', dir: 'asc', value: (a) => a.agent_code },
-    unit: { label: 'Unit', dir: 'asc', value: (a) => a.polling_unit },
-    checked: { label: 'Checked in', dir: 'desc', value: (a) => ts(a.checked_in_at) },
-    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result_at) },
-    status: { label: 'Status', dir: 'asc', value: (a) => (a.eligible ? 'Eligible' : a.reason) },
-});
 const sorted = computed(() => sortRows(matches.value, sort));
 const paged = usePaged(sorted, { perPage: 25, resetOn: () => [show.value, search.value, reason.value, sort.key, sort.dir] });
 const rows = paged.rows;

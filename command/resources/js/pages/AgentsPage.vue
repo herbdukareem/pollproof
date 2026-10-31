@@ -22,7 +22,16 @@ const router = useRouter();
 const filter = ref(route.query.status ?? '');
 const search = ref(route.query.search ?? '');
 const lgaId = ref(route.query.lga_id ? Number(route.query.lga_id) : '');
-const agents = useResource(() => api.get('agents', { search: search.value, lga_id: lgaId.value, status: filter.value === 'deactivated' ? 'deactivated' : '' }), { refreshMs: 30000 });
+// Latest first: the most recent check-in or result at the top; agents with neither go last.
+const statusRank = { absent: 0, outside_area: 1, present: 2, reserve: 3, deactivated: 4 };
+const sort = useSortState({
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.check_in?.at) ?? 0, ts(a.result?.at) ?? 0) || null },
+    code: { label: 'Agent', dir: 'asc', value: (a) => a.code },
+    unit: { label: 'Polling unit', dir: 'asc', value: (a) => a.polling_unit?.code },
+    status: { label: 'Status', dir: 'asc', value: (a) => statusRank[a.status] },
+    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result?.at) },
+}, undefined, { onChange: () => agents.load() });
+const agents = useResource(() => api.get('agents', { search: search.value, lga_id: lgaId.value, status: filter.value === 'deactivated' ? 'deactivated' : '', ...sort.params }), { refreshMs: 30000 });
 const pending = useResource(() => api.get('check-ins'), { refreshMs: 15000 });
 
 // Newest first; a card that arrived since the last look glows briefly so it is noticed.
@@ -68,15 +77,6 @@ const summary = computed(() => agents.data.value?.summary ?? {});
 const matching = computed(() => agents.data.value?.matching ?? {});
 const all = computed(() => (agents.data.value?.data ?? []).filter((a) => (filter.value ? a.status === filter.value : a.status !== 'deactivated')));
 const reserves = computed(() => (agents.data.value?.data ?? []).filter((a) => a.status === 'reserve'));
-// Latest first: the most recent check-in or result at the top; agents with neither go last.
-const statusRank = { absent: 0, outside_area: 1, present: 2, reserve: 3, deactivated: 4 };
-const sort = useSortState({
-    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.check_in?.at) ?? 0, ts(a.result?.at) ?? 0) || null },
-    code: { label: 'Agent', dir: 'asc', value: (a) => a.code },
-    unit: { label: 'Polling unit', dir: 'asc', value: (a) => a.polling_unit?.code },
-    status: { label: 'Status', dir: 'asc', value: (a) => statusRank[a.status] },
-    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result?.at) },
-});
 const sortedAll = computed(() => sortRows(all.value, sort));
 const paged = usePaged(sortedAll, { perPage: 25, resetOn: () => [filter.value, search.value, lgaId.value, sort.key, sort.dir] });
 const rows = paged.rows;

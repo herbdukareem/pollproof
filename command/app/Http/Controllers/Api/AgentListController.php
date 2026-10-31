@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class AgentListController extends Controller
             'status' => ['nullable', 'in:present,absent,outside_area,reserve,deactivated'],
             'lga_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:60'],
-        ]);
+        ] + ListSort::rules(self::sorts()));
 
         $agents = User::where('campaign_id', $user->campaign_id)
             ->where('role', Role::Agent)
@@ -66,6 +67,7 @@ class AgentListController extends Controller
         $list = $rows
             ->when($data['lga_id'] ?? null, fn ($c, $l) => $c->where('lga_id', (int) $l))
             ->when($search !== '', fn ($c) => $c->filter(fn ($r) => str_contains(strtolower("{$r['code']} {$r['name']} {$r['phone']} ".($r['polling_unit']['code'] ?? '').' '.($r['polling_unit']['ward'] ?? '')), $search)));
+        $list = ListSort::apply($list, $data, self::sorts());
 
         return response()->json([
             'summary' => $rows->countBy('status'),
@@ -73,5 +75,19 @@ class AgentListController extends Controller
             'can_edit' => $user->hasRole(Role::SituationRoom, Role::Dg),
             'data' => ($data['status'] ?? null) ? $list->where('status', $data['status'])->values() : $list->where('status', '!=', 'deactivated')->values(),
         ]);
+    }
+
+    /** Sortable columns; latest check-in or result first by default. */
+    private static function sorts(): array
+    {
+        $at = fn ($v) => $v ? strtotime((string) $v) : 0;
+
+        return [
+            'latest' => [fn ($r) => max($at($r['check_in']['at'] ?? null), $at($r['result']['at'] ?? null)) ?: null, 'desc'],
+            'code' => [fn ($r) => $r['code'], 'asc'],
+            'unit' => [fn ($r) => $r['polling_unit']['code'] ?? null, 'asc'],
+            'status' => [fn ($r) => ['absent' => 0, 'outside_area' => 1, 'present' => 2, 'reserve' => 3, 'deactivated' => 4][$r['status']], 'asc'],
+            'result' => [fn ($r) => $r['result']['at'] ?? null, 'desc'],
+        ];
     }
 }

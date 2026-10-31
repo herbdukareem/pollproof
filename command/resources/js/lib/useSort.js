@@ -1,4 +1,12 @@
-import { computed, reactive } from 'vue';
+import { computed, reactive, watch } from 'vue';
+
+/**
+ * Where tables sort: 'server' (the default) asks the API for ?sort=…&dir=… and reloads;
+ * 'client' sorts the rows already loaded in the browser. Set VITE_SORT_MODE=client when building
+ * to sort in the browser everywhere, or pass { mode } to one table. Tables paged by the server
+ * (Units, Audit log, Roster) always sort on the server.
+ */
+export const SORT_MODE = import.meta.env.VITE_SORT_MODE === 'client' ? 'client' : 'server';
 
 /**
  * Click-to-sort for table headers. `columns` maps a key to { label, dir, value(row) }:
@@ -8,8 +16,9 @@ import { computed, reactive } from 'vue';
  * Clicking a header sorts by it; again flips the direction; a third time goes back to the default.
  * Rows without a value always go last. Equal rows keep their order.
  */
-export function useSortState(columns, initial = { key: 'latest', dir: 'desc' }) {
+export function useSortState(columns, initial = { key: 'latest', dir: 'desc' }, { mode = SORT_MODE, onChange = null } = {}) {
     const state = reactive({
+        server: mode === 'server',
         key: initial.key,
         dir: initial.dir,
         columns,
@@ -31,15 +40,18 @@ export function useSortState(columns, initial = { key: 'latest', dir: 'desc' }) 
             state.key = initial.key;
             state.dir = initial.dir;
         },
-        /** For lists sorted by the server: ?sort=…&dir=… */
-        params: computed(() => ({ sort: state.key, dir: state.dir })),
+        /** Query parameters for the API: ?sort=…&dir=… when the server sorts, nothing otherwise. */
+        params: computed(() => (state.server ? { sort: state.key, dir: state.dir } : {})),
     });
+    // When the server sorts, a header click reloads the list (onChange), already sorted.
+    if (onChange) watch(() => [state.key, state.dir], () => state.server && onChange());
     return state;
 }
 
 const text = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 
 export function sortRows(rows, state) {
+    if (state.server) return rows; // already in order from the API
     const col = state.columns[state.key];
     if (!col?.value) return rows;
     const sign = state.dir === 'asc' ? 1 : -1;
@@ -55,8 +67,8 @@ export function sortRows(rows, state) {
 }
 
 /** Sort state plus the sorted rows, for a list loaded in one go. */
-export function useSort(source, columns, initial) {
-    const state = useSortState(columns, initial);
+export function useSort(source, columns, initial, options) {
+    const state = useSortState(columns, initial, options);
     const sorted = computed(() => sortRows((typeof source === 'function' ? source() : source.value) ?? [], state));
     return { sort: state, sorted };
 }

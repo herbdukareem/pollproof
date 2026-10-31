@@ -7,6 +7,7 @@ use App\Jobs\SendSms;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ReadinessService;
+use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,20 @@ class ReadinessController extends Controller
 {
     public function index(Request $request, ReadinessService $readiness): JsonResponse
     {
-        return response()->json($readiness->report($request->user()->campaign));
+        $sorts = [
+            'default' => [null, 'asc'],
+            'name' => [fn ($l) => $l['name'], 'asc'],
+            'units' => [fn ($l) => $l['units'], 'desc'],
+            'tested' => [fn ($l) => $l['tested'], 'desc'],
+            'trained' => [fn ($l) => $l['trained'], 'desc'],
+            'confirmed' => [fn ($l) => $l['confirmed'], 'desc'],
+            'status' => [fn ($l) => ['not_ready' => 0, 'at_risk' => 1, 'ready' => 2][$l['status']] ?? 1, 'asc'],
+        ];
+        $data = $request->validate(ListSort::rules($sorts));
+        $report = $readiness->report($request->user()->campaign);
+        $report['lgas'] = ListSort::apply(collect($report['lgas']), $data, $sorts)->all();
+
+        return response()->json($report);
     }
 
     /** Text a group of agents to close a readiness gap. Agents reply YES or NO to the confirmation message. */

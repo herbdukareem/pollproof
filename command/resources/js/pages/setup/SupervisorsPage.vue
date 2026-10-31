@@ -12,8 +12,6 @@ import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
 
 const lgaId = ref(null);
-const sup = useResource(() => api.get('setup/supervisors', { lga_id: lgaId.value }));
-const d = computed(() => sup.data.value);
 const sort = useSortState({
     default: { label: 'default order', dir: 'asc' },
     name: { label: 'LGA', dir: 'asc', value: (l) => l.name },
@@ -21,7 +19,9 @@ const sort = useSortState({
     backup: { label: 'Backup', dir: 'asc', value: (l) => l.backup?.name },
     wards: { label: 'Wards covered', dir: 'asc', value: (l) => (l.wards ? l.wards_covered / l.wards : 1) },
     agents: { label: 'Agents', dir: 'desc', value: (l) => l.agents },
-}, { key: 'default', dir: 'asc' });
+}, { key: 'default', dir: 'asc' }, { onChange: () => sup.load() });
+const sup = useResource(() => api.get('setup/supervisors', { lga_id: lgaId.value, ...sort.params }));
+const d = computed(() => sup.data.value);
 const lgaRows = computed(() => sortRows(d.value?.lgas ?? [], sort));
 const openWards = computed(() => d.value?.selected?.wards.filter((w) => !w.supervisor).length ?? 0);
 const totalOpen = computed(() => (d.value ? d.value.levels.wards - d.value.levels.ward_supervisors : 0));

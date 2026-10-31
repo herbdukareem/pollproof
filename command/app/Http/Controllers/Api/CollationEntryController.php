@@ -9,6 +9,7 @@ use App\Models\Lga;
 use App\Models\Ward;
 use App\Services\AuditLogger;
 use App\Services\Reconciler;
+use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -71,7 +72,16 @@ class CollationEntryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $campaignId = $request->user()->campaign_id;
-        $data = $request->validate(['level' => ['nullable', 'in:ward,lga,state']]);
+        $rank = fn (array $c) => $c['differences'] ? ($c['coverage_complete'] ? 0 : 1) : ($c['coverage_complete'] ? 3 : 2);
+        $sorts = [
+            'latest' => [fn ($r) => $r['announced_at'], 'desc'],
+            'scope' => [fn ($r) => $r['comparison']['scope'], 'asc'],
+            'ours' => [fn ($r) => $r['comparison']['our_total_cast'], 'desc'],
+            'declared' => [fn ($r) => $r['comparison']['declared_total_cast'], 'desc'],
+            'diff' => [fn ($r) => array_sum(array_map('abs', $r['comparison']['differences'])), 'desc'],
+            'status' => [fn ($r) => $rank($r['comparison']), 'asc'],
+        ];
+        $data = $request->validate(['level' => ['nullable', 'in:ward,lga,state']] + ListSort::rules($sorts));
         $entries = CollationEntry::where('campaign_id', $campaignId)
             ->when($data['level'] ?? null, fn ($q, $l) => $q->where('level', $l))
             ->latest('announced_at')
@@ -80,10 +90,10 @@ class CollationEntryController extends Controller
         // Only the latest entry per scope is checked; earlier ones are history.
         $latest = $entries->unique(fn ($e) => $e->level.':'.$e->scope_id)->values();
 
-        return response()->json(['data' => $latest->map(fn ($e) => [
+        return response()->json(['data' => ListSort::apply($latest->map(fn ($e) => [
             'id' => $e->id,
             'announced_at' => $e->announced_at,
             'comparison' => $this->reconciler->compareCollation($e),
-        ])]);
+        ]), $data, $sorts)]);
     }
 }
