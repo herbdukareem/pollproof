@@ -8,6 +8,7 @@ use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\CheckInReview;
 use App\Services\IncidentReporter;
 use App\Services\ResultRecorder;
 use Illuminate\Support\Collection;
@@ -72,6 +73,7 @@ final class UssdMenu
         private readonly ResultRecorder $recorder,
         private readonly AuditLogger $audit,
         private readonly IncidentReporter $incidents,
+        private readonly CheckInReview $reviews,
     ) {}
 
     /** @return string the reply, starting with "CON " (wait for an answer) or "END " (close the session) */
@@ -315,9 +317,12 @@ final class UssdMenu
 
     private function startCheckIn(): array
     {
-        $latest = CheckIn::where('user_id', $this->agent->id)->where('polling_unit_id', $this->unit->id)->latest('id')->first();
+        // One check-in per working day: yesterday's doesn't count today, and a rejected one can be redone.
+        $latest = CheckIn::where('user_id', $this->agent->id)->where('polling_unit_id', $this->unit->id)
+            ->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED, CheckIn::PENDING_REVIEW])
+            ->today()->latest('id')->first();
         if ($latest?->counts()) {
-            return ['end' => "You are checked in at {$this->unit->code} since ".$latest->captured_at->timezone(config('pollproof.timezone'))->format('g:i a').'.'];
+            return ['end' => "You are already checked in at {$this->unit->code} today, since ".$latest->captured_at->timezone(config('pollproof.timezone'))->format('g:i a').'. Nothing more to do.'];
         }
         if ($latest?->status === CheckIn::PENDING_REVIEW) {
             return ['end' => 'Your check-in is waiting for your supervisor to confirm. They may call you.'];
@@ -337,6 +342,7 @@ final class UssdMenu
             'captured_at' => now(),
         ]);
         $this->audit->log($this->agent, 'checkin.created', $checkIn, ['status' => $checkIn->status, 'channel' => 'ussd'], $this->ip);
+        $this->reviews->waiting($checkIn);
 
         return "Check-in sent for {$this->unit->code}.\nUSSD has no GPS, so your supervisor will confirm it. They may call you.";
     }

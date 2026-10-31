@@ -10,6 +10,9 @@ use App\Support\Phone;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Africa's Talking USSD callback. AT posts sessionId, serviceCode, phoneNumber, networkCode and text
@@ -38,8 +41,16 @@ class UssdController extends Controller
         // retried request from the network harmless after a result has been sent.
         $reply = Cache::get($key = 'ussd:reply:'.sha1($sessionId.'|'.$text));
         if ($reply === null) {
-            $reply = $this->answer($menu, $sessionId, $phone, $text, (string) $request->ip());
-            Cache::put($key, $reply, now()->addMinutes(10));
+            try {
+                $reply = $this->answer($menu, $sessionId, $phone, $text, (string) $request->ip());
+                Cache::put($key, $reply, now()->addMinutes(10));
+            } catch (Throwable $e) {
+                // A server error would reach the phone as the network's "technical problems" box,
+                // which reads as a network fault. Say it is ours, and leave a reference for the log.
+                $ref = strtoupper(Str::random(6));
+                Log::error("USSD error {$ref}", ['exception' => $e, 'session' => $sessionId, 'text' => $text, 'phone' => $phone]);
+                $reply = "END Sorry, PollProof could not finish this (ref {$ref}). Dial again in a minute to check, or call your supervisor.";
+            }
         }
 
         return $this->reply($reply);

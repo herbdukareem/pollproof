@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
@@ -11,7 +11,7 @@ import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { usePaged } from '../lib/usePaged';
 import { hasRole } from '../lib/session';
-import { dateTime, num, time } from '../lib/format';
+import { ago, dateTime, minutesSince, num, time, timeOrDate } from '../lib/format';
 
 const route = useRoute();
 const router = useRouter();
@@ -19,7 +19,39 @@ const filter = ref(route.query.status ?? '');
 const search = ref(route.query.search ?? '');
 const lgaId = ref(route.query.lga_id ? Number(route.query.lga_id) : '');
 const agents = useResource(() => api.get('agents', { search: search.value, lga_id: lgaId.value, status: filter.value === 'deactivated' ? 'deactivated' : '' }), { refreshMs: 30000 });
-const pending = useResource(() => api.get('check-ins'), { refreshMs: 30000 });
+const pending = useResource(() => api.get('check-ins'), { refreshMs: 15000 });
+
+// Newest first; a card that arrived since the last look glows briefly so it is noticed.
+const seen = ref(null);
+const fresh = ref(new Set());
+const queue = computed(() => [...(pending.data.value?.data ?? [])].sort((a, b) => b.id - a.id));
+watch(queue, (list) => {
+    const ids = list.map((c) => c.id);
+    if (seen.value) {
+        const arrived = ids.filter((id) => !seen.value.has(id));
+        if (arrived.length) {
+            fresh.value = new Set([...fresh.value, ...arrived]);
+            setTimeout(() => (fresh.value = new Set([...fresh.value].filter((id) => !arrived.includes(id)))), 6000);
+        }
+    }
+    seen.value = new Set(ids);
+});
+const clock = ref(Date.now());
+const sameDay = (v) => new Date(v).toDateString() === new Date(clock.value).toDateString();
+const waited = (v) => {
+    const m = minutesSince(v, clock.value);
+    return m == null ? dateTime(v) : m < 1 ? 'just now' : `${ago(v, clock.value)} ago`;
+};
+let tick;
+const onNew = () => pending.load();
+onMounted(() => {
+    tick = setInterval(() => (clock.value = Date.now()), 30000);
+    window.addEventListener('pp:checkins', onNew);
+});
+onBeforeUnmount(() => {
+    clearInterval(tick);
+    window.removeEventListener('pp:checkins', onNew);
+});
 const structure = useResource(() => api.get('structure'));
 
 let t;
@@ -66,6 +98,7 @@ async function review(c, decision) {
         await Promise.all([pending.load(), agents.load()]);
     } catch (e) {
         error.value = e.firstError();
+        pending.load();
     } finally {
         busy.value = null;
     }
@@ -129,7 +162,7 @@ async function send(agent) {
                                 <td class="td"><template v-if="a.polling_unit"><div class="font-semibold">{{ a.polling_unit.code }}</div><div class="text-xs text-ink-2">{{ a.polling_unit.ward }} · {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
                                 <td class="td">
                                     <Badge :tone="tone[a.status]">{{ label[a.status] }}</Badge>
-                                    <div v-if="a.check_in" class="mt-1 text-xs whitespace-nowrap text-ink-2">In {{ time(a.check_in.at) }}<template v-if="a.check_in.distance_m != null"> · {{ a.check_in.distance_m }} m</template></div>
+                                    <div v-if="a.check_in" class="mt-1 text-xs whitespace-nowrap text-ink-2">{{ sameDay(a.check_in.at) ? 'In' : 'Last in' }} {{ timeOrDate(a.check_in.at) }}<template v-if="a.check_in.distance_m != null"> · {{ a.check_in.distance_m }} m</template></div>
                                 </td>
                                 <td class="td whitespace-nowrap text-ink-2">{{ a.result ? `Sent ${time(a.result.at)}` : '–' }}</td>
                                 <td class="td">
@@ -153,21 +186,32 @@ async function send(agent) {
             <Pagination :meta="paged.meta.value" noun="agents" :per-page-options="[25, 50, 100]" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
 
-        <section class="card self-start p-5">
-            <h2 class="card-title ">Check-ins to confirm</h2>
-            <p class="mt-1 mb-3 text-[13px] text-ink-2">Agents who checked in outside the unit area and say they're there.</p>
-            <LoadState :loading="pending.loading.value" :error="pending.error.value" :empty="!(pending.data.value?.data ?? []).length" empty-text="Nothing to confirm.">
-                <ul class="flex flex-col gap-2">
-                    <li v-for="c in pending.data.value.data" :key="c.id" class="rounded-xl bg-mist p-3.5">
-                        <div class="flex justify-between gap-2 text-sm"><b>{{ c.polling_unit.code }}</b><span class="text-xs text-ink-2">{{ dateTime(c.captured_at) }}</span></div>
-                        <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }}{{ c.agent.name ? ` · ${c.agent.name}` : '' }} · <b class="text-ink">by USSD, no GPS</b>. Call the agent to confirm they are at the unit.</p>
-                        <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }} · {{ c.distance_m != null ? `${c.distance_m} m away` : 'unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
+        <section id="checkins" class="card scroll-mt-4 self-start p-5">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="card-title">Check-ins to confirm</h2>
+                <span v-if="queue.length" class="rounded-full bg-action px-2.5 py-0.5 text-xs font-bold text-white">{{ queue.length }}</span>
+            </div>
+            <p class="mt-1 mb-3 text-[13px] text-ink-2">Agents who checked in outside the unit area, or by USSD with no GPS. New ones appear at the top.</p>
+            <LoadState :loading="pending.loading.value" :error="pending.error.value" :empty="!queue.length" empty-text="Nothing to confirm.">
+                <TransitionGroup name="alert" tag="ul" class="relative flex flex-col gap-2">
+                    <li v-for="c in queue" :key="c.id" class="rounded-xl border p-3.5 transition-colors" :class="fresh.has(c.id) ? 'checkin-new border-[#1c6fc2]/40 bg-[#eef5fc]' : 'border-transparent bg-mist'">
+                        <div class="flex items-start justify-between gap-2 text-sm">
+                            <span class="flex flex-wrap items-center gap-1.5">
+                                <b>{{ c.polling_unit.code }}</b>
+                                <span v-if="fresh.has(c.id)" class="rounded-full bg-[#1c6fc2] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-white uppercase">New</span>
+                                <span class="rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase" :class="c.channel === 'ussd' ? 'bg-[#fff1d6] text-[#8a5a00]' : 'bg-white text-ink-2'">{{ c.channel === 'ussd' ? 'USSD' : 'App' }}</span>
+                            </span>
+                            <span class="shrink-0 text-right text-xs text-ink-2" :title="dateTime(c.captured_at)">{{ waited(c.captured_at) }}</span>
+                        </div>
+                        <p class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }}{{ c.agent.name ? ` · ${c.agent.name}` : '' }}</p>
+                        <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2"><b class="text-ink">No GPS.</b> Call the agent to confirm they are at the unit.</p>
+                        <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.distance_m != null ? `${c.distance_m} m away` : 'Unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
                         <div class="mt-2.5 flex gap-2">
                             <button class="btn-good h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'approve')">Approve</button>
                             <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'reject')">Reject</button>
                         </div>
                     </li>
-                </ul>
+                </TransitionGroup>
             </LoadState>
         </section>
     </div>

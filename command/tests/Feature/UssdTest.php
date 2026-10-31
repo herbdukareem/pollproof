@@ -183,4 +183,28 @@ class UssdTest extends TestCase
         $this->campaign->update(['declared_at' => now()]);
         $this->assertScreen($this->dial('', 'S6'), 'END', 'declared');
     }
+
+    public function test_check_in_is_daily_and_a_rejected_one_can_be_redone(): void
+    {
+        $this->dial('3*1');
+        $this->assertSame(1, Alert::where('type', 'checkin_review')->where('status', 'open')->count(), 'supervisors are told');
+
+        CheckIn::sole()->update(['status' => CheckIn::REJECTED]);
+        $this->assertScreen($this->dial('3', 'S2'), 'CON', 'Confirm you are at PU1');
+        $this->dial('3*1', 'S2');
+        $this->assertSame(2, CheckIn::count());
+
+        CheckIn::latest('id')->first()->update(['status' => CheckIn::APPROVED]);
+        $this->assertScreen($this->dial('3', 'S3'), 'END', 'already checked in at PU1 today');
+
+        $this->travel(1)->days();
+        $this->assertScreen($this->dial('3', 'S4'), 'CON', 'Confirm you are at PU1');
+    }
+
+    public function test_a_server_error_says_so_instead_of_a_network_fault(): void
+    {
+        CheckIn::creating(fn () => throw new \RuntimeException('database refused the row'));
+        $this->assertScreen($this->dial('3*1', 'S7'), 'END', 'PollProof could not finish this (ref ');
+        CheckIn::flushEventListeners();
+    }
 }

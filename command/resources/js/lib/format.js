@@ -14,6 +14,12 @@ export function dateTime(v) {
     return new Date(v).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
+/** The time if it was today, otherwise the date and time: "8:05 am" or "6 Feb, 8:05 am". */
+export function timeOrDate(v, now = new Date()) {
+    if (!v) return '–';
+    return new Date(v).toDateString() === now.toDateString() ? time(v) : dateTime(v);
+}
+
 /**
  * How long ago, for queues: "just now", "12 min", "1 h 05 min", "3 d".
  * A time ahead of this device's clock (a wrong clock, or demo data dated election day) shows the date and time instead of a false "0 min".

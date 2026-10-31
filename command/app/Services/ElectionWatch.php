@@ -60,7 +60,8 @@ final class ElectionWatch
             return 0;
         }
 
-        $present = CheckIn::where('campaign_id', $campaign->id)->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED])->pluck('polling_unit_id')->unique();
+        $present = CheckIn::where('campaign_id', $campaign->id)->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED])
+            ->onDay($deadline)->pluck('polling_unit_id')->unique();
         $agents = User::where('campaign_id', $campaign->id)->where('role', Role::Agent)->whereNotNull('polling_unit_id')->pluck('code', 'polling_unit_id');
         $missing = PollingUnit::where('campaign_id', $campaign->id)->whereNotIn('id', $present)->get();
         $time = $deadline->format('g:i a');

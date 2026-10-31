@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\CheckIn;
 use App\Models\Incident;
 use App\Models\ResultSubmission;
 use App\Models\User;
@@ -150,7 +151,8 @@ class AuthController extends Controller
     /** What the agent has done today, so a reinstalled app picks up where it left off. */
     private function agentToday(User $user): array
     {
-        $checkIn = $user->checkIns()->latest('id')->first();
+        // Today's check-in only: agents check in afresh each working day.
+        $checkIn = $user->checkIns()->where('status', '!=', CheckIn::REPLACED)->today()->latest('id')->first();
         $result = ResultSubmission::where('user_id', $user->id)->where('polling_unit_id', $user->polling_unit_id)->where('is_current', true)->first();
 
         return [

@@ -232,6 +232,34 @@
         left: 0;
         right: 0;
     }
+    .toast-enter-active,
+    .toast-leave-active,
+    .toast-move {
+        transition: all 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .toast-enter-from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+    }
+    .toast-leave-to {
+        opacity: 0;
+        transform: translateX(32px);
+    }
+    /* A check-in that has just arrived glows briefly in the confirm panel. */
+    .checkin-new {
+        animation: checkin-glow 2.4s ease-out 2;
+    }
+    @keyframes checkin-glow {
+        0% {
+            box-shadow: 0 0 0 0 rgba(28, 111, 194, 0.55);
+        }
+        70% {
+            box-shadow: 0 0 0 8px rgba(28, 111, 194, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(28, 111, 194, 0);
+        }
+    }
 }
 
 @utility pager-btn {

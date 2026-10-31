@@ -16,7 +16,7 @@ export const NAV = [
     { name: 'collation', label: 'Collation checks', path: '/collation', icon: 'layers', roles: READ, section: 'election', count: 'collation' },
     { name: 'irev', label: 'IReV entry', path: '/irev', icon: 'edit', roles: ['data_officer', 'situation_room', 'dg'], section: 'election' },
     { name: 'incidents', label: 'Incidents', path: '/incidents', icon: 'alert', roles: READ, section: 'election', count: 'incidents' },
-    { name: 'agents', label: 'Agents', path: '/agents', icon: 'users', roles: ['ward_supervisor', 'lga_supervisor', 'situation_room', 'dg'], section: 'election' },
+    { name: 'agents', label: 'Agents', path: '/agents', icon: 'users', roles: ['ward_supervisor', 'lga_supervisor', 'situation_room', 'dg'], section: 'election', count: 'checkins' },
     { name: 'closeout', label: 'Close-out', path: '/after/closeout', icon: 'archive', roles: ['dg', 'legal', 'situation_room'], section: 'after' },
     { name: 'tribunal', label: 'Tribunal workspace', path: '/after/tribunal', icon: 'gavel', roles: ['legal', 'dg'], section: 'after' },
     { name: 'users', label: 'Users and roles', path: '/admin/users', icon: 'key', roles: ['dg'], section: 'admin' },

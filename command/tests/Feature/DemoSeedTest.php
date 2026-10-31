@@ -21,7 +21,7 @@ class DemoSeedTest extends TestCase
         $this->assertSame(8, ResultSubmission::where('is_current', true)->count());
         $this->assertTrue(ResultSubmission::where('channel', 'app')->get()->every->signature_valid);
         $this->assertEqualsCanonicalizing(
-            ['incident', 'collation_mismatch', 'overvote', 'irev_mismatch', 'irev_missing'],
+            ['incident', 'collation_mismatch', 'overvote', 'irev_mismatch', 'irev_missing', 'checkin_review'],
             Alert::where('status', 'open')->pluck('type')->unique()->values()->all(),
         );
         $this->artisan('pollproof:verify-audit', ['campaign' => 1])->assertSuccessful();
