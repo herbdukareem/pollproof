@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Models\IrevEntry;
 use App\Models\PollingUnit;
 use App\Models\ResultFlag;
+use App\Models\ResultSubmission;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EvidenceBuilder;
 use App\Services\Reconciler;
@@ -25,7 +28,11 @@ class UnitController extends Controller
             'status' => ['nullable', 'in:reported,awaiting,no_agent,flagged,review_flagged'],
             'search' => ['nullable', 'string', 'max:50'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
+            'sort' => ['nullable', 'in:result,code,agent,flags'],
+            'dir' => ['nullable', 'in:asc,desc'],
         ]);
+        $sort = $data['sort'] ?? 'result';
+        $dir = $data['dir'] ?? (in_array($sort, ['result', 'flags'], true) ? 'desc' : 'asc');
 
         // Counts for the status chips, within the chosen LGA or ward but across every status.
         $scope = fn () => PollingUnit::where('polling_units.campaign_id', $user->campaign_id)
@@ -50,8 +57,17 @@ class UnitController extends Controller
             ->when(($data['status'] ?? null) === 'no_agent', fn ($q) => $q->whereDoesntHave('agent'))
             ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote')))
             ->when(($data['status'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
+            ->select('polling_units.*')
+            ->addSelect([
+                'result_at' => ResultSubmission::select('captured_at')->whereColumn('polling_unit_id', 'polling_units.id')->where('is_current', true)->limit(1),
+                'agent_code' => User::select('code')->whereColumn('polling_unit_id', 'polling_units.id')->where('role', Role::Agent)->whereNull('deactivated_at')->limit(1),
+            ])
             ->withCount(['resultFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
-            ->orderBy('code')
+            // Latest result first unless a column header asks otherwise; blanks always go last.
+            ->when($sort === 'result', fn ($q) => $q->orderByRaw('result_at is null')->orderBy('result_at', $dir))
+            ->when($sort === 'agent', fn ($q) => $q->orderByRaw('agent_code is null')->orderBy('agent_code', $dir))
+            ->when($sort === 'flags', fn ($q) => $q->orderBy('open_flags', $dir))
+            ->orderBy('code', $sort === 'code' ? $dir : 'asc')
             ->paginate((int) ($data['per_page'] ?? 50));
 
         $checkedIn = CheckIn::where('campaign_id', $user->campaign_id)

@@ -5,6 +5,8 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import SortTh from '../components/SortTh.vue';
+import { useSortState } from '../lib/useSort';
 import Modal from '../components/Modal.vue';
 import ResultFlags from '../components/ResultFlags.vue';
 import Icon from '../components/Icon.vue';
@@ -22,7 +24,15 @@ watch(() => [filters.status, filters.lga_id, filters.search], ([status, lga, sea
 });
 const structure = useResource(() => api.get('structure'));
 const tally = useResource(() => api.get('tally'), { refreshMs: 60000 });
-const units = useResource(() => api.get('units', filters), { refreshMs: 60000 });
+// Latest result first; the server sorts, so a header click reloads page 1.
+const sort = useSortState({
+    result: { label: 'Our result', dir: 'desc' },
+    code: { label: 'Unit', dir: 'asc' },
+    agent: { label: 'Agent', dir: 'asc' },
+    flags: { label: 'Flag', dir: 'desc' },
+}, { key: 'result', dir: 'desc' });
+const units = useResource(() => api.get('units', { ...filters, ...sort.params }), { refreshMs: 60000 });
+watch(() => [sort.key, sort.dir], () => { filters.page = 1; units.load(); });
 
 let debounce;
 watch(() => [filters.status, filters.lga_id], () => { filters.page = 1; units.load(); });
@@ -122,7 +132,7 @@ function go(page) {
             <LoadState :loading="units.loading.value" :error="units.error.value" :empty="!rows.length" empty-text="No units match.">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[820px] text-sm">
-                        <thead><tr><th class="th">Unit</th><th class="th">Agent</th><th class="th">Our result</th><th class="th">IReV</th><th class="th">Flag</th><th class="th"></th></tr></thead>
+                        <thead><tr><SortTh :sort="sort" k="code">Unit</SortTh><SortTh :sort="sort" k="agent">Agent</SortTh><SortTh :sort="sort" k="result">Our result</SortTh><th class="th">IReV</th><SortTh :sort="sort" k="flags">Flag</SortTh><th class="th"></th></tr></thead>
                         <tbody>
                             <tr v-for="u in rows" :key="u.id">
                                 <td class="td"><div class="font-bold">{{ u.code }}</div><div class="text-xs text-ink-2">{{ u.name }} · {{ u.ward }} · {{ u.lga }}</div></td>
@@ -148,7 +158,7 @@ function go(page) {
                         </tbody>
                     </table>
                 </div>
-                <Pagination :meta="meta" noun="units" :per-page-options="[25, 50, 100, 200]" :loading="units.loading.value" @page="go" @per-page="(n) => { filters.per_page = n; go(1); }" />
+                <Pagination :meta="meta" :sort="sort" noun="units" :per-page-options="[25, 50, 100, 200]" :loading="units.loading.value" @page="go" @per-page="(n) => { filters.per_page = n; go(1); }" />
             </LoadState>
         </section>
     </div>

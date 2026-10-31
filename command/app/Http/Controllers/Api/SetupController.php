@@ -65,6 +65,8 @@ class SetupController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
             'lga_id' => ['nullable', 'integer'],
+            'sort' => ['nullable', 'in:latest,code,phone,unit,step'],
+            'dir' => ['nullable', 'in:asc,desc'],
         ]);
 
         $agents = User::where('campaign_id', $user->campaign_id)->where('role', Role::Agent)->whereNull('deactivated_at')
@@ -73,6 +75,8 @@ class SetupController extends Controller
         $assigned = $agents->whereNotNull('polling_unit_id');
 
         $search = strtolower(trim($data['search'] ?? ''));
+        $sort = $data['sort'] ?? 'latest';
+        $descending = ($data['dir'] ?? ($sort === 'latest' ? 'desc' : 'asc')) === 'desc';
         $filtered = $agents
             ->filter(fn ($a) => match ($data['filter'] ?? 'all') {
                 'incomplete' => $a->polling_unit_id && $a->step < 5,
@@ -83,7 +87,15 @@ class SetupController extends Controller
             })
             ->filter(fn ($a) => empty($data['lga_id']) || (int) (($a->pollingUnit?->ward ?? $a->ward)?->lga_id ?? $a->lga_id) === (int) $data['lga_id'])
             ->filter(fn ($a) => $search === '' || str_contains(strtolower("{$a->code} {$a->name} {$a->phone} {$a->pollingUnit?->code}"), $search))
-            ->sortBy(fn ($a) => [$a->polling_unit_id ? 0 : 1, $a->step, $a->code])
+            // Newest agents first unless a column header asks otherwise; blanks always go last.
+            ->sortBy(fn ($a) => match ($sort) {
+                'code' => $a->code,
+                'phone' => $a->phone,
+                'unit' => $a->pollingUnit?->code,
+                'step' => $a->step,
+                default => $a->id,
+            }, SORT_NATURAL, $descending)
+            ->sortBy(fn ($a) => $sort === 'unit' && ! $a->polling_unit_id ? 1 : 0)
             ->values();
 
         $page = $data['page'] ?? 1;

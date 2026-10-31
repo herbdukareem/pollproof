@@ -6,7 +6,11 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import SortTh from '../components/SortTh.vue';
+import { sortRows, ts, useSortState } from '../lib/useSort';
 import AgentActions from '../components/AgentActions.vue';
+import CallButton from '../components/CallButton.vue';
+import { callOrCopy } from '../lib/call';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { usePaged } from '../lib/usePaged';
@@ -64,7 +68,17 @@ const summary = computed(() => agents.data.value?.summary ?? {});
 const matching = computed(() => agents.data.value?.matching ?? {});
 const all = computed(() => (agents.data.value?.data ?? []).filter((a) => (filter.value ? a.status === filter.value : a.status !== 'deactivated')));
 const reserves = computed(() => (agents.data.value?.data ?? []).filter((a) => a.status === 'reserve'));
-const paged = usePaged(all, { perPage: 25, resetOn: () => [filter.value, search.value, lgaId.value] });
+// Latest first: the most recent check-in or result at the top; agents with neither go last.
+const statusRank = { absent: 0, outside_area: 1, present: 2, reserve: 3, deactivated: 4 };
+const sort = useSortState({
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.check_in?.at) ?? 0, ts(a.result?.at) ?? 0) || null },
+    code: { label: 'Agent', dir: 'asc', value: (a) => a.code },
+    unit: { label: 'Polling unit', dir: 'asc', value: (a) => a.polling_unit?.code },
+    status: { label: 'Status', dir: 'asc', value: (a) => statusRank[a.status] },
+    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result?.at) },
+});
+const sortedAll = computed(() => sortRows(all.value, sort));
+const paged = usePaged(sortedAll, { perPage: 25, resetOn: () => [filter.value, search.value, lgaId.value, sort.key, sort.dir] });
 const rows = paged.rows;
 const canEdit = computed(() => agents.data.value?.can_edit ?? false);
 const filtered = computed(() => !!(search.value || lgaId.value));
@@ -155,10 +169,10 @@ async function send(agent) {
             <LoadState :loading="agents.loading.value" :error="agents.error.value" :empty="!rows.length" :empty-text="filtered || filter ? 'No agents match these filters.' : 'No agents yet.'">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[680px] text-sm">
-                        <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Polling unit</th><th class="th">Status</th><th class="th">Result</th><th class="th text-right">Actions</th></tr></thead>
+                        <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
                         <tbody>
                             <tr v-for="a in rows" :key="a.id" :class="a.active === false ? 'opacity-60' : ''">
-                                <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div><div v-if="a.phone" class="text-xs text-ink-3">{{ a.phone }}</div></td>
+                                <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div><div v-if="a.phone"><a :href="`tel:${a.phone}`" class="text-xs text-ink-3 hover:text-navy hover:underline" title="Call (copies the number on a computer)" @click="callOrCopy($event, a.phone, a.name || a.code)">{{ a.phone }}</a></div></td>
                                 <td class="td"><template v-if="a.polling_unit"><div class="font-semibold">{{ a.polling_unit.code }}</div><div class="text-xs text-ink-2">{{ a.polling_unit.ward }} · {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
                                 <td class="td">
                                     <Badge :tone="tone[a.status]">{{ label[a.status] }}</Badge>
@@ -183,7 +197,7 @@ async function send(agent) {
                     </table>
                 </div>
             </LoadState>
-            <Pagination :meta="paged.meta.value" noun="agents" :per-page-options="[25, 50, 100]" @page="paged.setPage" @per-page="paged.setPerPage" />
+            <Pagination :meta="paged.meta.value" :sort="sort" noun="agents" :per-page-options="[25, 50, 100]" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
 
         <section id="checkins" class="card scroll-mt-4 self-start p-5">
@@ -206,9 +220,10 @@ async function send(agent) {
                         <p class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }}{{ c.agent.name ? ` · ${c.agent.name}` : '' }}</p>
                         <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2"><b class="text-ink">No GPS.</b> Call the agent to confirm they are at the unit.</p>
                         <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.distance_m != null ? `${c.distance_m} m away` : 'Unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
-                        <div class="mt-2.5 flex gap-2">
+                        <div class="mt-2.5 flex flex-wrap gap-2">
                             <button class="btn-good h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'approve')">Approve</button>
                             <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'reject')">Reject</button>
+                            <CallButton v-if="c.agent.phone" :phone="c.agent.phone" :who="c.agent.name || c.agent.code" small class="ml-auto" />
                         </div>
                     </li>
                 </TransitionGroup>

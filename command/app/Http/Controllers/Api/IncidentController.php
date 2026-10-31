@@ -53,6 +53,7 @@ class IncidentController extends Controller
             'severity' => ['nullable', 'in:high,medium,low'],
             'search' => ['nullable', 'string', 'max:60'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'sort' => ['nullable', 'in:latest,severity'],
         ]);
         $scope = fn (array $skip = []) => Incident::where('campaign_id', $request->user()->campaign_id)
             ->when(! in_array('status', $skip) ? $data['status'] ?? null : null, fn ($q, $s) => $q->where('status', $s))
@@ -62,8 +63,8 @@ class IncidentController extends Controller
                 ->orWhereHas('pollingUnit', fn ($u) => $u->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%"))));
         $incidents = $scope()
             ->with(['pollingUnit:id,code,name', 'user:id,name,code'])
-            ->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END")
-            ->latest('occurred_at')
+            ->when(($data['sort'] ?? 'latest') === 'severity', fn ($q) => $q->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"))
+            ->latest('occurred_at')->latest('id')
             ->paginate((int) ($data['per_page'] ?? 25));
 
         // Counts for the filter chips: each counted with the other filters applied.

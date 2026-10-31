@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,10 @@ class AuditController extends Controller
             'user_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:60'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
+            'sort' => ['nullable', 'in:time,user,action,ip'],
+            'dir' => ['nullable', 'in:asc,desc'],
         ]);
+        $dir = $data['dir'] ?? (($data['sort'] ?? 'time') === 'time' ? 'desc' : 'asc');
 
         return response()->json(AuditLog::where('campaign_id', $request->user()->campaign_id)
             ->when($data['action'] ?? null, fn ($q, $a) => $q->where('action', 'like', $a.'%'))
@@ -25,7 +29,10 @@ class AuditController extends Controller
             ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereLike('action', "%{$s}%")->orWhere('ip', $s)
                 ->orWhereHas('user', fn ($u) => $u->whereLike('name', "%{$s}%")->orWhereLike('code', "%{$s}%"))))
             ->with('user:id,name,code,role')
-            ->orderByDesc('id')
+            // Latest first unless a column header asks otherwise.
+            ->when(($data['sort'] ?? 'time') === 'user', fn ($q) => $q->orderBy(User::select('name')->whereColumn('users.id', 'audit_logs.user_id'), $dir))
+            ->when(in_array($data['sort'] ?? 'time', ['action', 'ip'], true), fn ($q) => $q->orderBy($data['sort'], $dir))
+            ->orderBy('id', ($data['sort'] ?? 'time') === 'time' ? $dir : 'desc')
             ->paginate((int) ($data['per_page'] ?? 50)));
     }
 
