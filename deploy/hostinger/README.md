@@ -109,6 +109,21 @@ Push to `main` (with `HOSTINGER_AUTO_DEPLOY=true`), or press **Run workflow** wi
 
 Don't deploy on election day unless something is broken.
 
+## The agent app download
+
+Every change to the agent app is built by GitHub Actions (workflow **Agent app**) and published to the
+repository's `agent-app` release as `pollproof-agent.apk`, pointed at `https://app.pollproof.online`
+(override with the Actions variable `POLLPROOF_API_URL`). The server copies the latest build into
+`storage/app/agent-app` on every deploy and hourly after that; the DG or situation room can also click
+**Agent app → Get latest build now** in the command room, or run:
+
+```
+php artisan pollproof:fetch-agent-app
+```
+
+Signed-in staff download it from **Agent app** in the top bar, or scan its QR code with a phone (the link works
+for an hour). To build without a code change, open GitHub → Actions → Agent app → Run workflow.
+
 ## Rolling back
 
 Over SSH:

@@ -27,6 +27,12 @@ return [
     // Link sent to agents in the invite SMS.
     'app_download_url' => env('POLLPROOF_APP_URL', 'https://pollproof.ng/app'),
 
+    // Where GitHub Actions publishes each agent-app build (pollproof-agent.apk and version.json).
+    // `php artisan pollproof:fetch-agent-app`, or "Get latest build" in the command room, copies it here.
+    'agent_app' => [
+        'release_url' => env('POLLPROOF_AGENT_APP_RELEASE', 'https://github.com/herbdukareem/pollproof/releases/download/agent-app'),
+    ],
+
     // Agents pass training with this many correct answers out of the quiz.
     'quiz_pass_mark' => 8,
 

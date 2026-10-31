@@ -6,6 +6,8 @@ on:
     paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-tests.yml']
   pull_request:
     paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-tests.yml']
+  # Build and publish the APK on demand (Actions → Agent app → Run workflow).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,6 +34,9 @@ jobs:
   apk:
     needs: test
     runs-on: ubuntu-latest
+    # Publishing the build to the "agent-app" release needs write access to the repository.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile
@@ -45,8 +50,27 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: flutter build apk --release --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://command.pollproof.ng' }}
+      # The build number goes up every run, so a new APK installs over the old one.
+      - run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://app.pollproof.online' }}
       - uses: actions/upload-artifact@v4
         with:
           name: pollproof-agent-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
+      # The command room's "Agent app" button downloads from here (the server keeps a copy).
+      - name: Publish to the agent-app release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk pollproof-agent.apk
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          SHA=$(sha256sum pollproof-agent.apk | cut -d' ' -f1)
+          SIZE=$(stat -c%s pollproof-agent.apk)
+          printf '{"version":"%s","build":%s,"built_at":"%s","size":%s,"sha256":"%s","commit":"%s"}\n' \
+            "$VERSION" "${{ github.run_number }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIZE" "$SHA" "${GITHUB_SHA::7}" > version.json
+          cat version.json
+          gh release view agent-app >/dev/null 2>&1 || gh release create agent-app --target "$GITHUB_SHA" --latest=false \
+            --title "PollProof agent app" --notes "Latest Android build of the agent app. Replaced on every build."
+          gh release upload agent-app pollproof-agent.apk version.json --clobber
+          gh release edit agent-app --notes "Latest Android build of the agent app: version $VERSION, build ${{ github.run_number }}, commit ${GITHUB_SHA::7}. Replaced on every build. Server: https://app.pollproof.online"
+

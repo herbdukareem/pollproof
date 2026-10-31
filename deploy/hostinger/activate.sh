@@ -60,6 +60,10 @@ say "Caches"
 "$PHP" artisan view:cache
 "$PHP" artisan event:cache
 
+say "Agent app"
+# Copy the latest published Android build here; if GitHub can't be reached, the hourly schedule retries.
+"$PHP" artisan pollproof:fetch-agent-app || echo "  Agent app not fetched now; the scheduler retries hourly."
+
 say "Going live"
 ln -sfn "releases/$REL" "$APP/current.next"
 mv -Tf "$APP/current.next" "$APP/current"

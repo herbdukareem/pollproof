@@ -3,6 +3,7 @@
 use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\User;
+use App\Services\AgentAppBuild;
 use App\Services\AuditLogger;
 use App\Services\ElectionWatch;
 use App\Services\StructureImporter;
@@ -60,7 +61,14 @@ Artisan::command('pollproof:create-campaign {--name=} {--state=} {--election-dat
 })->purpose('Create a campaign and its DG account on a fresh install');
 
 // Run with `php artisan schedule:work`, or a cron job calling `schedule:run` every minute.
+Artisan::command('pollproof:fetch-agent-app', function (AgentAppBuild $build) {
+    $meta = $build->fetch();
+    $this->info("Agent app {$meta['version']} (build {$meta['build']}) is on this server: ".$build->apkPath());
+})->purpose('Copy the latest agent-app build from GitHub to this server');
+
 Schedule::command('pollproof:watch')->everyMinute()->withoutOverlapping();
+// A new agent-app build reaches this server within the hour of GitHub publishing it.
+Schedule::command('pollproof:fetch-agent-app')->hourly()->withoutOverlapping();
 
 // Shared hosting can't keep a queue worker running, so the scheduler starts one each minute
 // that stops when the queue is empty (or after 50 seconds, before the next run starts).
