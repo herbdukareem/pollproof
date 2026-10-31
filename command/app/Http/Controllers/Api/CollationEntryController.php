@@ -74,7 +74,7 @@ class CollationEntryController extends Controller
         $campaignId = $request->user()->campaign_id;
         $rank = fn (array $c) => $c['differences'] ? ($c['coverage_complete'] ? 0 : 1) : ($c['coverage_complete'] ? 3 : 2);
         $sorts = [
-            'latest' => [fn ($r) => $r['announced_at'], 'desc'],
+            'latest' => [fn ($r) => $r['id'], 'desc'], // latest entered
             'scope' => [fn ($r) => $r['comparison']['scope'], 'asc'],
             'ours' => [fn ($r) => $r['comparison']['our_total_cast'], 'desc'],
             'declared' => [fn ($r) => $r['comparison']['declared_total_cast'], 'desc'],

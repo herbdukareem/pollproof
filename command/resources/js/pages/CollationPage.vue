@@ -5,7 +5,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
 import SortTh from '../components/SortTh.vue';
-import { sortRows, ts, useSortState } from '../lib/useSort';
+import { sortRows, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
@@ -16,7 +16,7 @@ import Icon from '../components/Icon.vue';
 const level = ref('');
 // Latest announced first; the Status header puts problems first.
 const sort = useSortState({
-    latest: { label: 'latest announced', dir: 'desc', value: (e) => ts(e.announced_at) },
+    latest: { label: 'latest entered', dir: 'desc', value: (e) => e.id },
     scope: { label: 'Collation point', dir: 'asc', value: (e) => e.comparison.scope },
     ours: { label: 'Our units', dir: 'desc', value: (e) => e.comparison.our_total_cast },
     declared: { label: 'Declared', dir: 'desc', value: (e) => e.comparison.declared_total_cast },

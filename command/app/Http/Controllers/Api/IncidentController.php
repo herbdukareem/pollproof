@@ -64,7 +64,7 @@ class IncidentController extends Controller
         $incidents = $scope()
             ->with(['pollingUnit:id,code,name', 'user:id,name,code'])
             ->when(($data['sort'] ?? 'latest') === 'severity', fn ($q) => $q->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"))
-            ->latest('occurred_at')->latest('id')
+            ->latest('id') // latest reported first
             ->paginate((int) ($data['per_page'] ?? 25));
 
         // Counts for the filter chips: each counted with the other filters applied.

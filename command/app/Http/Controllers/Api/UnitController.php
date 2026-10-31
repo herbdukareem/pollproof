@@ -59,12 +59,13 @@ class UnitController extends Controller
             ->when(($data['status'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
             ->select('polling_units.*')
             ->addSelect([
-                'result_at' => ResultSubmission::select('captured_at')->whereColumn('polling_unit_id', 'polling_units.id')->where('is_current', true)->limit(1),
+                // The newest result received, by its id: phones' clocks can't reorder it.
+                'result_seq' => ResultSubmission::select('id')->whereColumn('polling_unit_id', 'polling_units.id')->where('is_current', true)->limit(1),
                 'agent_code' => User::select('code')->whereColumn('polling_unit_id', 'polling_units.id')->where('role', Role::Agent)->whereNull('deactivated_at')->limit(1),
             ])
             ->withCount(['resultFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
             // Latest result first unless a column header asks otherwise; blanks always go last.
-            ->when($sort === 'result', fn ($q) => $q->orderByRaw('result_at is null')->orderBy('result_at', $dir))
+            ->when($sort === 'result', fn ($q) => $q->orderByRaw('result_seq is null')->orderBy('result_seq', $dir))
             ->when($sort === 'agent', fn ($q) => $q->orderByRaw('agent_code is null')->orderBy('agent_code', $dir))
             ->when($sort === 'flags', fn ($q) => $q->orderBy('open_flags', $dir))
             ->orderBy('code', $sort === 'code' ? $dir : 'asc')

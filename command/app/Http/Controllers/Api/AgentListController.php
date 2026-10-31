@@ -7,12 +7,15 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Services\AgentActivity;
 use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AgentListController extends Controller
 {
+    public function __construct(private readonly AgentActivity $activity) {}
+
     /** Polling-unit agents and reserves with their election-day status. */
     public function __invoke(Request $request): JsonResponse
     {
@@ -36,8 +39,9 @@ class AgentListController extends Controller
         $results = ResultSubmission::where('campaign_id', $user->campaign_id)->where('is_current', true)
             ->whereIn('user_id', $agents->pluck('id'))->get()->keyBy('user_id');
         $showPhones = $user->role->canSeePhones();
+        $activity = $this->activity->sequence($user->campaign_id);
 
-        $rows = $agents->map(function (User $a) use ($checkIns, $results, $showPhones) {
+        $rows = $agents->map(function (User $a) use ($checkIns, $results, $showPhones, $activity) {
             $c = $checkIns->get($a->id);
             $status = match (true) {
                 ! $a->isActive() => 'deactivated',
@@ -59,6 +63,7 @@ class AgentListController extends Controller
                 'polling_unit' => $a->pollingUnit ? ['id' => $a->pollingUnit->id, 'code' => $a->pollingUnit->code, 'ward' => $a->pollingUnit->ward->name, 'lga' => $a->pollingUnit->ward->lga->name] : null,
                 'check_in' => $c ? ['id' => $c->id, 'status' => $c->status, 'distance_m' => $c->distance_m, 'at' => $c->captured_at] : null,
                 'result' => ($r = $results->get($a->id)) ? ['id' => $r->id, 'status' => $r->status, 'at' => $r->captured_at] : null,
+                'activity' => $activity->get($a->id),
             ];
         });
 
@@ -80,10 +85,9 @@ class AgentListController extends Controller
     /** Sortable columns; latest check-in or result first by default. */
     private static function sorts(): array
     {
-        $at = fn ($v) => $v ? strtotime((string) $v) : 0;
-
         return [
-            'latest' => [fn ($r) => max($at($r['check_in']['at'] ?? null), $at($r['result']['at'] ?? null)) ?: null, 'desc'],
+            // The latest action first, in the order the server recorded it (approvals included).
+            'latest' => [fn ($r) => $r['activity'], 'desc'],
             'code' => [fn ($r) => $r['code'], 'asc'],
             'unit' => [fn ($r) => $r['polling_unit']['code'] ?? null, 'asc'],
             'status' => [fn ($r) => ['absent' => 0, 'outside_area' => 1, 'present' => 2, 'reserve' => 3, 'deactivated' => 4][$r['status']], 'asc'],
