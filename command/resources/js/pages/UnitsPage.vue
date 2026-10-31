@@ -50,7 +50,28 @@ const tabs = [
     { value: 'review_flagged', key: 'review_flagged', label: 'Reviewer flags', dot: 'bg-[#b4470a]' },
 ];
 const counts = computed(() => meta.value?.counts ?? {});
-const lgaTiles = computed(() => (tally.data.value?.lgas ?? []).map((l) => ({ ...l, pct: l.units ? Math.round((l.units_reported / l.units) * 100) : 0 })));
+const band = (p) => (p >= 90 ? 'high' : p >= 75 ? 'mid' : 'low');
+const allTiles = computed(() => (tally.data.value?.lgas ?? []).map((l) => ({ ...l, pct: l.units ? Math.round((l.units_reported / l.units) * 100) : 0 })));
+// The tiles can be ordered by name or by share reported, and each colour band shown or hidden from its legend.
+const tileOrder = ref('name');
+const tileOrders = [['name', 'A–Z'], ['low', 'Lowest first'], ['high', 'Highest first']];
+const bands = [
+    { key: 'high', label: '90% or more', swatch: 'bg-navy' },
+    { key: 'mid', label: '75 to 89%', swatch: 'bg-[#6b7fa3]' },
+    { key: 'low', label: 'Below 75%, chase now', swatch: 'bg-[#f6c9ae] ring-1 ring-[#e8a07a]' },
+];
+const hiddenBands = ref(new Set());
+const toggleBand = (k) => {
+    const next = new Set(hiddenBands.value);
+    next.has(k) ? next.delete(k) : next.add(k);
+    hiddenBands.value = next;
+};
+const bandCount = computed(() => allTiles.value.reduce((c, l) => ({ ...c, [band(l.pct)]: (c[band(l.pct)] ?? 0) + 1 }), {}));
+const lgaTiles = computed(() => {
+    const shown = allTiles.value.filter((l) => !hiddenBands.value.has(band(l.pct)));
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    return [...shown].sort(tileOrder.value === 'name' ? byName : (a, b) => (tileOrder.value === 'low' ? a.pct - b.pct : b.pct - a.pct) || byName(a, b));
+});
 const tileClass = (p) => (p >= 90 ? 'border-navy bg-navy text-white' : p >= 75 ? 'border-[#6b7fa3] bg-[#6b7fa3] text-white' : 'border-[#e8a07a] bg-[#f6c9ae] text-[#5c2206]');
 const irev = {
     match: ['text-good', 'Matches'],
@@ -79,7 +100,7 @@ function go(page) {
 </script>
 
 <template>
-    <PageHeader title="Units" :subtitle="counts.all != null ? `${num(counts.all)} polling units across ${lgaTiles.length} LGAs` : ''" :updated-at="units.updatedAt.value" :loading="units.loading.value" @refresh="units.load(); tally.load()" />
+    <PageHeader title="Units" :subtitle="counts.all != null ? `${num(counts.all)} polling units across ${allTiles.length} LGAs` : ''" :updated-at="units.updatedAt.value" :loading="units.loading.value" @refresh="units.load(); tally.load()" />
 
     <div class="mb-5 flex flex-wrap gap-2.5" role="group" aria-label="Status">
         <button
@@ -98,9 +119,17 @@ function go(page) {
 
     <div class="grid items-start gap-5 2xl:grid-cols-[380px_1fr]">
         <section class="card p-5">
-            <h2 class="card-title">Reporting by LGA</h2>
-            <p class="card-sub mb-4">Share of units with a signed result. Select an LGA to filter the list.</p>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="card-title">Reporting by LGA</h2>
+                    <p class="card-sub">Share of units with a signed result. Select an LGA to filter the list.</p>
+                </div>
+                <div class="inline-flex rounded-xl bg-mist p-1 text-[12.5px] font-semibold" role="group" aria-label="Order LGAs">
+                    <button v-for="[k, label] in tileOrders" :key="k" type="button" class="rounded-lg px-2.5 py-1 transition" :class="tileOrder === k ? 'bg-white text-ink shadow-sm' : 'text-ink-2 hover:text-ink'" :aria-pressed="tileOrder === k" @click="tileOrder = k">{{ label }}</button>
+                </div>
+            </div>
+            <p v-if="!lgaTiles.length" class="mt-4 rounded-xl bg-mist px-4 py-6 text-center text-sm text-ink-2">No LGAs in the bands you've chosen. <button class="font-bold text-navy hover:underline" @click="hiddenBands = new Set()">Show all</button></p>
+            <TransitionGroup tag="div" name="tile" class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
                 <button
                     v-for="l in lgaTiles"
                     :key="l.id"
@@ -112,11 +141,22 @@ function go(page) {
                     <span class="w-full truncate text-[13px] font-semibold">{{ l.name }}</span>
                     <span class="text-xl font-extrabold">{{ l.pct }}%</span>
                 </button>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-4 text-[12.5px] text-ink-2">
-                <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-[3px] bg-navy"></span>90% or more</span>
-                <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-[3px] bg-[#6b7fa3]"></span>75 to 89%</span>
-                <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-[3px] bg-[#f6c9ae]"></span>Below 75%, chase now</span>
+            </TransitionGroup>
+            <!-- The legend is also the filter: click a band to hide or show its LGAs. -->
+            <div class="mt-4 flex flex-wrap items-center gap-2 text-[12.5px]">
+                <button
+                    v-for="b in bands"
+                    :key="b.key"
+                    type="button"
+                    class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold transition"
+                    :class="hiddenBands.has(b.key) ? 'border-dashed border-line text-ink-3 line-through' : 'border-line bg-white text-ink-2 hover:border-navy hover:text-ink'"
+                    :aria-pressed="!hiddenBands.has(b.key)"
+                    :title="hiddenBands.has(b.key) ? 'Show these LGAs' : 'Hide these LGAs'"
+                    @click="toggleBand(b.key)"
+                >
+                    <span class="h-3 w-3 rounded-[3px]" :class="[b.swatch, hiddenBands.has(b.key) ? 'opacity-40' : '']"></span>{{ b.label }} <b class="no-underline">{{ bandCount[b.key] ?? 0 }}</b>
+                </button>
+                <button v-if="hiddenBands.size" type="button" class="ml-1 font-bold text-navy hover:underline" @click="hiddenBands = new Set()">Show all</button>
             </div>
         </section>
 

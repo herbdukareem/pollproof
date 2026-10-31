@@ -245,6 +245,20 @@
         opacity: 0;
         transform: translateX(32px);
     }
+    /* LGA tiles slide to their new place when reordered or filtered. */
+    .tile-move {
+        transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .tile-enter-active {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .tile-enter-from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    .tile-leave-active {
+        display: none;
+    }
     /* A check-in that has just arrived glows briefly in the confirm panel. */
     .checkin-new {
         animation: checkin-glow 2.4s ease-out 2;
