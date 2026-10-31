@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
@@ -227,10 +228,7 @@ async function submit() {
             </div>
             <div v-if="form.level !== 'state'" class="mt-3">
                 <label class="label" for="c-scope">Collation centre</label>
-                <select id="c-scope" v-model="form.scope_id" class="field" required>
-                    <option value="" disabled>Choose…</option>
-                    <option v-for="s in scopes" :key="s.id" :value="s.id">{{ s.label }}</option>
-                </select>
+                <SearchSelect id="c-scope" v-model="form.scope_id" :options="scopes.map((s) => ({ value: s.id, label: s.label }))" :placeholder="form.level === 'ward' ? 'Type a ward or LGA…' : 'Type an LGA…'" :noun="form.level === 'ward' ? 'wards' : 'LGAs'" required />
             </div>
             <div class="mt-4 overflow-hidden rounded-xl border border-line">
                 <div v-for="p in parties" :key="p.code" class="flex items-center justify-between gap-3 border-b border-[#eef0f3] px-3 py-2">

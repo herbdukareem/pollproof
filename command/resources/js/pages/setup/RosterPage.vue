@@ -9,6 +9,7 @@ import CsvUpload from '../../components/CsvUpload.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
+import SearchSelect from '../../components/SearchSelect.vue';
 import SortTh from '../../components/SortTh.vue';
 import { useSortState } from '../../lib/useSort';
 import AgentActions from '../../components/AgentActions.vue';
@@ -121,10 +122,7 @@ function changed(text) {
                         <option value="unavailable">Said they can't make it</option>
                     </select>
                     <label class="sr-only" for="roster-lga">LGA</label>
-                    <select id="roster-lga" v-model="lgaId" class="field h-10 w-auto">
-                        <option value="">All LGAs</option>
-                        <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
-                    </select>
+                    <SearchSelect id="roster-lga" v-model="lgaId" class="w-full sm:w-[200px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
                     <span class="self-center text-sm text-ink-2">{{ num(d.total) }} match</span>
                 </div>
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">

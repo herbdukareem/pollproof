@@ -6,6 +6,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../lib/useSort';
 import AgentActions from '../components/AgentActions.vue';
@@ -156,10 +157,7 @@ async function send(agent) {
                     <input id="agent-search" v-model="search" class="field w-full pl-9" placeholder="Agent ID, name, phone or unit" />
                 </div>
                 <label class="sr-only" for="agent-lga">LGA</label>
-                <select id="agent-lga" v-model="lgaId" class="field max-w-[200px]">
-                    <option value="">All LGAs</option>
-                    <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
-                </select>
+                <SearchSelect id="agent-lga" v-model="lgaId" class="w-full sm:w-[200px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
                 <label class="sr-only" for="agent-status">Status</label>
                 <select id="agent-status" v-model="filter" class="field max-w-[180px]">
                     <option v-for="[v, text] in statuses" :key="v" :value="v">{{ text }}{{ v && v !== 'deactivated' ? ` (${num(matching[v] ?? 0)})` : '' }}</option>
@@ -183,10 +181,7 @@ async function send(agent) {
                                     <div class="flex items-center justify-end gap-2">
                                         <template v-if="a.status === 'absent' && reserves.length">
                                             <label class="sr-only" :for="`r-${a.id}`">Reserve for {{ a.polling_unit?.code }}</label>
-                                            <select :id="`r-${a.id}`" v-model="dispatch[a.id]" class="field h-8 w-36 text-xs">
-                                                <option :value="undefined">Send a reserve</option>
-                                                <option v-for="r in reserves" :key="r.id" :value="r.id">{{ r.code }} · {{ r.name }}</option>
-                                            </select>
+                                            <SearchSelect :id="`r-${a.id}`" v-model="dispatch[a.id]" class="w-40" size="xs" placeholder="Send a reserve" noun="reserves" :options="reserves.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}`, hint: r.area }))" />
                                             <button class="btn-primary h-8 px-3 text-xs" :disabled="!dispatch[a.id] || busy === `a${a.id}`" @click="send(a)">Send</button>
                                         </template>
                                         <AgentActions :agent="a" :can-edit="canEdit" can-assign @done="done" />

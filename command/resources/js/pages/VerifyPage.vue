@@ -7,6 +7,7 @@ import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
 import ResultFlags from '../components/ResultFlags.vue';
 import { api } from '../lib/api';
+import SearchSelect from '../components/SearchSelect.vue';
 import { useResource } from '../lib/useResource';
 import { session } from '../lib/session';
 import { ago, dateTime, minutesSince, num, time } from '../lib/format';
@@ -78,10 +79,7 @@ const ageClass = (r) => {
     <div class="mb-4 flex flex-wrap items-center gap-2">
         <button v-for="[v, text, n] in [['', 'All waiting', counts.all], ['flagged', 'Votes exceed accreditation', counts.flagged], ['corrections', 'Corrections', counts.corrections], ['review_flagged', 'Flagged by reviewers', counts.review_flagged]]" :key="v" class="chip h-9" :class="kind === v ? 'chip-on' : ''" :aria-pressed="kind === v" @click="kind = v">{{ text }} <b>{{ num(n ?? 0) }}</b></button>
         <div class="ml-auto flex w-full flex-wrap gap-2 sm:w-auto">
-            <select v-model="lgaId" class="field h-9 w-auto text-sm" aria-label="LGA">
-                <option value="">All LGAs</option>
-                <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
-            </select>
+            <SearchSelect v-model="lgaId" class="w-full sm:w-[190px]" size="sm" all-label="All LGAs" noun="LGAs" aria-label="LGA" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
             <div class="relative min-w-[200px] flex-1">
                 <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
                 <input v-model="search" class="field h-9 w-full pl-9 text-sm" placeholder="Unit code, name or agent ID" aria-label="Search the queue" />
