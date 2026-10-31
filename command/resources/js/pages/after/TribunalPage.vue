@@ -92,7 +92,7 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
 </script>
 
 <template>
-    <PageHeader title="Tribunal workspace" :subtitle="c ? `${c.case.title} · we are the ${c.case.our_role}` : 'Petitions, our answers and the reply bundle for counsel.'">
+    <PageHeader :back="route.params.id ? '/after/tribunal' : ''" title="Tribunal workspace" :subtitle="c ? `${c.case.title} · we are the ${c.case.our_role}` : 'Petitions, our answers and the reply bundle for counsel.'">
         <template #actions>
             <select v-if="cases.data.value?.length > 1" class="field h-10 w-56" aria-label="Case" :value="route.params.id" @change="router.push({ name: 'tribunal-case', params: { id: $event.target.value } })">
                 <option v-for="k in cases.data.value" :key="k.id" :value="k.id">{{ k.title }}{{ k.status === 'closed' ? ' (closed)' : '' }}</option>

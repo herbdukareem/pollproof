@@ -30,7 +30,7 @@ async function submit() {
 </script>
 
 <template>
-    <PageHeader title="Change password" :subtitle="forced ? 'You signed in with a temporary password. Choose your own before you continue.' : 'Other devices signed in as you will be signed out.'" />
+    <PageHeader :back="forced ? '' : '/'" title="Change password" :subtitle="forced ? 'You signed in with a temporary password. Choose your own before you continue.' : 'Other devices signed in as you will be signed out.'" />
     <form class="card flex max-w-md flex-col gap-4 p-6" @submit.prevent="submit">
         <p v-if="done" role="status" class="rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">Password changed.</p>
         <div>
