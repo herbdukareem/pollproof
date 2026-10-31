@@ -24,6 +24,7 @@ const s = computed(() => props.supervisor);
 const items = computed(() => [
     { label: 'Replace', icon: 'users', hint: 'Choose someone else for this post', run: () => emit('replace') },
     { label: 'Make agent', icon: 'move', hint: 'At a polling unit, or as a reserve', run: open },
+    { label: 'Print ID tag', icon: 'download', hint: 'With a QR code to verify them', run: () => window.open(`/id-tags?ids=${s.value.id}`, '_blank') },
     { label: 'Remove from post', icon: 'undo', danger: true, hint: 'Stays registered, without a post', run: () => { error.value = ''; dialog.value = 'remove'; } },
 ]);
 const wardOptions = computed(() => lgas.value.flatMap((l) => l.wards.map((w) => ({ value: w.id, label: `${w.name} · ${l.name}` }))));

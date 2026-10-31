@@ -7,8 +7,10 @@ import { api } from '../lib/api';
 import { hasRole } from '../lib/session';
 import { dateTime } from '../lib/format';
 
-/** "Agent app" in the top bar: download the Android app, or scan a QR code with a phone. */
-const allowed = hasRole('dg', 'situation_room', 'verifier', 'data_officer', 'legal', 'lga_supervisor', 'ward_supervisor');
+/** "Agent app" in the top bar (or a card, with `card`): download the Android app, or scan a QR code with a phone. */
+defineProps({ card: Boolean });
+// Computed, not read once: the top bar is drawn before the signed-in user has loaded.
+const allowed = computed(() => hasRole('dg', 'situation_room', 'verifier', 'data_officer', 'legal', 'lga_supervisor', 'ward_supervisor'));
 const open = ref(false);
 const info = ref(null);
 const qr = ref('');
@@ -51,7 +53,12 @@ async function update() {
 
 <template>
     <template v-if="allowed">
-        <button class="btn-outline h-10 gap-2 px-3" title="Download the agent app" aria-label="Agent app" @click="show">
+        <section v-if="card" class="card p-5">
+            <h2 class="flex items-center gap-2 text-[15px] font-bold"><Icon name="phone" :size="17" /> Agent app</h2>
+            <p class="mt-1 text-[13px] text-ink-2">The Android app agents check in and send results with. Download it here, or show the QR code to an agent to scan.</p>
+            <button class="btn-navy mt-3 w-full" @click="show"><Icon name="download" :size="16" /> Download or show QR code</button>
+        </section>
+        <button v-else class="btn-outline h-10 gap-2 px-3" title="Download the agent app" aria-label="Agent app" @click="show">
             <Icon name="phone" :size="17" /><span class="hidden text-sm font-semibold xl:inline">Agent app</span>
         </button>
         <Modal :open="open" title="PollProof agent app" subtitle="For Android phones. Agents sign in with their registered number." width="max-w-xl" :busy="busy" @close="open = false">

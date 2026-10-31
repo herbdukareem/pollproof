@@ -58,6 +58,7 @@ class AgentListController extends Controller
                 'phone' => $showPhones ? $a->phone : null,
                 'status' => $status,
                 'active' => $a->isActive(),
+                'has_photo' => $a->photo_path !== null,
                 'lga_id' => $a->pollingUnit?->ward->lga_id ?? $a->ward?->lga_id ?? $a->lga_id,
                 'area' => $a->pollingUnit ? null : (trim(($a->ward?->name ?? '').($a->ward?->lga ? ' · '.$a->ward->lga->name : ''), ' ·') ?: null),
                 'polling_unit' => $a->pollingUnit ? ['id' => $a->pollingUnit->id, 'code' => $a->pollingUnit->code, 'ward' => $a->pollingUnit->ward->name, 'lga' => $a->pollingUnit->ward->lga->name] : null,

@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\PollingUnit;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\IdTags;
 use App\Services\PeopleMover;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /** Field people (agents, reserves, ward and LGA supervisors): find them and move them between posts. */
 class PeopleController extends Controller
@@ -46,6 +49,40 @@ class PeopleController extends Controller
             'unit' => $p->pollingUnit?->code,
             'has_result' => PeopleMover::hasResult($p),
         ])]);
+    }
+
+    /** Add one agent: at a polling unit (whoever is there becomes a reserve) or as a reserve in a ward. */
+    public function storeAgent(Request $request, IdTags $tags): JsonResponse
+    {
+        $campaign = $request->user()->campaign;
+        $campaign->abortIfFrozen();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'phone' => ['required', 'string', 'max:20'],
+            'polling_unit_id' => ['required_without:ward_id', 'nullable', 'integer'],
+            'ward_id' => ['required_without:polling_unit_id', 'nullable', 'integer'],
+            'photo' => ['nullable', 'image', 'max:5120'],
+        ]);
+        $phone = Phone::normalize($data['phone']);
+        abort_unless($phone, 422, 'That is not a valid Nigerian mobile number.');
+        if ($existing = User::where('phone', $phone)->first()) {
+            abort(422, $existing->campaign_id !== $campaign->id
+                ? 'This phone is registered to another campaign.'
+                : "This phone already belongs to {$existing->name} ({$existing->code}, ".PeopleMover::post($existing).'). Use their menu to move them instead.');
+        }
+        $unit = ($data['polling_unit_id'] ?? null) ? PollingUnit::where('campaign_id', $campaign->id)->with('ward')->findOrFail($data['polling_unit_id']) : null;
+        $ward = $unit ? null : $campaign->wards()->findOrFail($data['ward_id']);
+
+        $result = DB::transaction(fn () => $this->mover->toAgent($campaign, $this->mover->create($campaign, trim($data['name']), $phone, Role::Agent), $unit, $ward));
+        if ($request->hasFile('photo')) {
+            $tags->savePhoto($result['user'], $request->file('photo'));
+        }
+        $this->audit->log($request->user(), 'agent.added', $result['user'], ['polling_unit' => $unit?->code, 'reserve' => ! $unit, 'replaced_agent_id' => $result['replaced']?->id], $request->ip());
+
+        return response()->json([
+            'id' => $result['user']->id, 'code' => $result['user']->code, 'name' => $result['user']->name, 'post' => PeopleMover::post($result['user']),
+            'replaced' => $result['replaced'] ? ['code' => $result['replaced']->code, 'name' => $result['replaced']->name] : null,
+        ], 201);
     }
 
     /** A supervisor or agent becomes an agent at a unit, or a reserve in a ward. */

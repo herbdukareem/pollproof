@@ -28,6 +28,7 @@ const lgaRows = computed(() => sortRows(d.value?.lgas ?? [], sort));
 const openWards = computed(() => d.value?.selected?.wards.filter((w) => !w.supervisor).length ?? 0);
 const totalOpen = computed(() => (d.value ? d.value.levels.wards - d.value.levels.ward_supervisors : 0));
 const uploading = ref(false);
+const openTags = () => window.open('/id-tags?role=supervisors', '_blank');
 // The assign window: { post, holder } to fill or replace a post, or {} to add a supervisor anywhere.
 const assigning = ref(null);
 const message = ref('');
@@ -74,6 +75,7 @@ function imported(summary) {
     <PageHeader title="Supervisors" subtitle="Who each agent calls on election day, and who that person calls." :updated-at="sup.updatedAt.value" :loading="sup.loading.value" @refresh="sup.load">
         <template #actions>
             <button class="btn-outline" :disabled="d?.frozen" @click="assigning = {}"><Icon name="plus" :size="16" /> Add supervisor</button>
+            <button class="btn-outline" title="ID tags for every supervisor" @click="openTags"><Icon name="download" :size="16" /> Print ID tags</button>
             <button class="btn-primary" :disabled="d?.frozen" @click="uploading = true"><Icon name="upload" :size="16" /> Upload supervisor list</button>
         </template>
     </PageHeader>

@@ -6,6 +6,8 @@ import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
 import ImportModal from '../../components/ImportModal.vue';
+import AddAgentModal from '../../components/AddAgentModal.vue';
+import AgentAppButton from '../../components/AgentAppButton.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
@@ -37,6 +39,8 @@ const d = computed(() => roster.data.value);
 const notInstalled = computed(() => (d.value ? d.value.counts.assigned - d.value.stages[1].value : 0));
 const report = ref(null);
 const uploading = ref(false);
+const adding = ref(false);
+const printTags = () => window.open(`/id-tags${lgaId.value ? `?lga_id=${lgaId.value}` : ''}`, '_blank');
 const rosterColumns = [
     ['name', 'Agent’s full name', true],
     ['phone', 'Their mobile number, e.g. 0803 123 4567', true],
@@ -97,7 +101,9 @@ function changed(text) {
 <template>
     <PageHeader title="Agent roster" :subtitle="d ? `${num(d.counts.assigned)} assigned · ${num(d.counts.reserves)} reserves${d.counts.unassigned ? ` · ${num(d.counts.unassigned)} waiting for a unit` : ''}` : 'Polling-unit agents and reserves'" :updated-at="roster.updatedAt.value" :loading="roster.loading.value" @refresh="roster.load">
         <template #actions>
+            <button class="btn-outline" :disabled="d?.frozen" @click="adding = true"><Icon name="plus" :size="16" /> Add agent</button>
             <button class="btn-outline" :disabled="d?.frozen" @click="uploading = true"><Icon name="upload" :size="16" /> Upload agent list</button>
+            <button class="btn-outline" :title="lgaId ? 'ID tags for agents in this LGA' : 'ID tags for every agent'" @click="printTags"><Icon name="download" :size="16" /> Print ID tags</button>
             <button class="btn-primary" :disabled="!notInstalled || busy === 'invite'" @click="inviteAll"><Icon name="send" :size="16" /> Send invites to {{ num(notInstalled) }}</button>
         </template>
     </PageHeader>
@@ -168,6 +174,7 @@ function changed(text) {
 
             <div class="flex flex-col gap-5">
                 <ImportReport :report="report" :counts="[['Rows in file', 'rows', ''], ['Assigned to a unit', 'assigned', ''], ['Kept as reserves', 'reserves', 'text-good'], ['Waiting for a unit', 'unassigned', ''], ['New people', 'created', ''], ['Updated', 'updated', '']]" />
+                <AgentAppButton card />
                 <section class="card p-5">
                     <h2 class="text-[15px] font-bold">Auto-assign</h2>
                     <p class="mt-1 text-[13px] text-ink-2">Match agents waiting for a unit to free units in the ward they registered in. Reserves are kept back for election-day gaps.</p>
@@ -200,4 +207,5 @@ function changed(text) {
         @close="uploading = false"
         @done="imported"
     />
+    <AddAgentModal :open="adding" @close="adding = false" @done="(m) => { message = m; roster.load(); }" />
 </template>

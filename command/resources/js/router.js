@@ -7,6 +7,10 @@ const roles = (name) => NAV.find((n) => n.name === name)?.roles;
 
 const routes = [
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: { public: true } },
+    // The page an ID tag's QR code opens: anyone, no sign-in.
+    { path: '/tag/:token', name: 'tag-check', component: () => import('./pages/TagCheckPage.vue'), meta: { public: true, title: 'ID tag check' } },
+    // Printable ID tags: full page, no menu.
+    { path: '/id-tags', name: 'id-tags', component: () => import('./pages/IdTagsPage.vue'), meta: { bare: true, roles: ['dg', 'situation_room'] } },
     { path: '/', name: 'home', redirect: () => homeFor(session.user?.role) },
     { path: '/overview', name: 'overview', component: () => import('./pages/OverviewPage.vue'), meta: { roles: roles('overview') } },
     { path: '/alerts', name: 'alerts', component: () => import('./pages/AlertsPage.vue'), meta: { roles: roles('alerts') } },

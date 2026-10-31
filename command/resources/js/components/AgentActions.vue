@@ -33,9 +33,13 @@ const asPerson = computed(() => ({
 }));
 const items = computed(() => {
     const list = [];
-    if (props.canEdit) list.push({ label: 'Edit details', icon: 'edit', hint: 'Name and phone number', run: () => openDialog('edit') });
+    if (props.canEdit) list.push({ label: 'Edit details', icon: 'edit', hint: 'Name, phone and photo', run: () => openDialog('edit') });
     if (props.canAssign && a.value.active !== false) list.push({ label: a.value.polling_unit ? 'Move to another unit' : 'Assign to a unit', icon: 'move', run: () => openDialog('move') });
     if (props.canEdit && a.value.polling_unit && a.value.active !== false) list.push({ label: 'Release to reserves', icon: 'undo', hint: `Frees ${a.value.polling_unit.code}`, run: () => openDialog('release') });
+    if (props.canEdit && a.value.active !== false) {
+        list.push({ label: 'Print ID tag', icon: 'download', hint: 'With a QR code to verify them', run: printTag });
+        list.push({ label: 'Reissue ID tag', icon: 'refresh', hint: 'For a lost tag: old tags stop verifying', run: () => (dialog.value = 'reissue') });
+    }
     if (props.canEdit && a.value.active !== false) list.push({ label: 'Make supervisor', icon: 'users', hint: 'Ward or LGA supervisor', run: () => (dialog.value = 'supervisor') });
     if (props.canEdit) {
         list.push(a.value.active === false
@@ -50,6 +54,8 @@ function openDialog(kind) {
     form.name = a.value.name;
     form.phone = a.value.phone ?? '';
     unitSearch.value = '';
+    photo.value = null;
+    photoPreview.value = '';
     units.value = [];
     target.value = null;
     dialog.value = kind;
@@ -87,13 +93,28 @@ async function save(fn, message) {
     }
 }
 
+const photo = ref(null);
+const photoPreview = ref('');
+function pickPhoto(e) {
+    photo.value = e.target.files?.[0] ?? null;
+    photoPreview.value = photo.value ? URL.createObjectURL(photo.value) : '';
+}
 const saveEdit = () => {
     const body = {};
     if (form.name.trim() !== a.value.name) body.name = form.name.trim();
     if (a.value.phone != null && form.phone.trim() !== a.value.phone) body.phone = form.phone.trim();
-    if (!Object.keys(body).length) return (dialog.value = '');
-    save(() => api.patch(`agents/${a.value.id}`, body), `Saved ${a.value.code}.`);
+    if (!Object.keys(body).length && !photo.value) return (dialog.value = '');
+    save(async () => {
+        if (Object.keys(body).length) await api.patch(`agents/${a.value.id}`, body);
+        if (photo.value) {
+            const fd = new FormData();
+            fd.append('photo', photo.value);
+            await api.post(`people/${a.value.id}/photo`, fd);
+        }
+    }, `Saved ${a.value.code}.`);
 };
+const printTag = () => window.open(`/id-tags?ids=${a.value.id}`, '_blank');
+const reissue = () => save(() => api.post(`people/${a.value.id}/reissue-tag`), `New ID tag code for ${a.value.code}. Tags printed before no longer verify; print a new one.`);
 const saveMove = () => save(() => api.post(`agents/${a.value.id}/assign`, { polling_unit_id: target.value.id }), `${a.value.code} is now the agent for ${target.value.code}.`);
 const saveRelease = () => save(() => api.patch(`agents/${a.value.id}`, { release: true }), `${a.value.code} released to the reserves; ${a.value.polling_unit.code} has no agent now.`);
 const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { active }), active ? `${a.value.code} reactivated as a reserve.` : `${a.value.code} deactivated and signed out.`);
@@ -110,6 +131,15 @@ const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { ac
                 Phone number <input v-model="form.phone" class="field" required inputmode="tel" />
                 <span class="text-xs font-normal text-ink-2">Changing the number signs them out; they sign in again with the new number.</span>
             </label>
+            <div class="flex items-center gap-3">
+                <img v-if="photoPreview || agent.has_photo" :src="photoPreview || `/api/v1/people/${agent.id}/photo`" alt="" class="h-16 w-14 rounded-lg border border-line object-cover" />
+                <div v-else class="flex h-16 w-14 items-center justify-center rounded-lg bg-mist text-xs text-ink-3">No photo</div>
+                <label class="flex flex-col gap-1 text-sm font-semibold">
+                    Photo for their ID tag
+                    <input type="file" accept="image/*" capture="user" class="text-xs font-normal" @change="pickPhoto" />
+                    <span class="text-xs font-normal text-ink-2">A clear face, like a passport photo. Up to 5 MB.</span>
+                </label>
+            </div>
             <p v-if="error" role="alert" class="rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
         </form>
         <template #footer>
@@ -169,6 +199,14 @@ const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { ac
         <template #footer>
             <button class="btn-ghost" :disabled="busy" @click="dialog = ''">Cancel</button>
             <button class="btn-navy" :disabled="busy" @click="saveActive(true)">{{ busy ? 'Saving…' : 'Reactivate' }}</button>
+        </template>
+    </Modal>
+    <Modal :open="dialog === 'reissue'" :title="`Reissue ${agent.code}'s ID tag?`" subtitle="For a lost or stolen tag." :busy="busy" @close="dialog = ''">
+        <p class="text-sm text-ink-2">Every tag printed for {{ agent.name }} so far will show <b class="text-action">NOT VALID</b> when scanned. Print a new tag after this.</p>
+        <p v-if="error" role="alert" class="mt-3 rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
+        <template #footer>
+            <button class="btn-ghost" :disabled="busy" @click="dialog = ''">Cancel</button>
+            <button class="btn-primary" :disabled="busy" @click="reissue">{{ busy ? 'Reissuing…' : 'Reissue tag' }}</button>
         </template>
     </Modal>
 </template>
