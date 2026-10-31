@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AgentAppController;
 use App\Http\Controllers\Api\AgentController;
 use App\Http\Controllers\Api\AgentListController;
 use App\Http\Controllers\Api\AlertController;
@@ -45,6 +46,9 @@ Route::prefix('v1')->group(function () {
     // Africa's Talking USSD callback; the secret is in the URL because AT can't send a header
     Route::post('ussd/africastalking/{token}', UssdController::class)->middleware('throttle:1200,1');
 
+    // The agent app from a QR code: a signed link that works for an hour without signing in.
+    Route::get('agent-app/phone', [AgentAppController::class, 'phone'])->middleware(['signed', 'throttle:30,1'])->name('agent-app.phone');
+
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -86,6 +90,13 @@ Route::prefix('v1')->group(function () {
             Route::middleware('role:situation_room,dg')->patch('agents/{agent}', [AgentController::class, 'update']);
             Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);
         });
+
+        // The agent app, for every command-room role to download and pass on
+        Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
+            Route::get('agent-app', [AgentAppController::class, 'show']);
+            Route::get('agent-app/download', [AgentAppController::class, 'download']);
+        });
+        Route::middleware('role:dg,situation_room')->post('agent-app/update', [AgentAppController::class, 'update']);
 
         // Command room: read
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {

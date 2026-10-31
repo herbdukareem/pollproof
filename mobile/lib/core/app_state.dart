@@ -20,7 +20,7 @@ class AppState extends ChangeNotifier {
 
   static const defaultApiUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'https://command.pollproof.ng',
+    defaultValue: 'https://app.pollproof.online',
   );
 
   final Store store;
