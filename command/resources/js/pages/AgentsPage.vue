@@ -6,6 +6,7 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import TableBusy from '../components/TableBusy.vue';
 import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../lib/useSort';
@@ -165,7 +166,8 @@ async function send(agent) {
                 <button v-if="filter || filtered" class="text-[13px] font-bold text-navy hover:underline" @click="() => { filter = ''; search = ''; lgaId = ''; }">Clear filters</button>
             </div>
             <LoadState :loading="agents.loading.value" :error="agents.error.value" :empty="!rows.length" :empty-text="filtered || filter ? 'No agents match these filters.' : 'No agents yet.'">
-                <div class="overflow-x-auto">
+                <div class="relative overflow-x-auto">
+                    <TableBusy :busy="agents.busy.value" />
                     <table class="w-full min-w-[680px] text-sm">
                         <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
                         <tbody>

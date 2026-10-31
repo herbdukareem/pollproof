@@ -31,6 +31,16 @@ class PollingUnit extends Model
         return $this->hasMany(ResultSubmission::class);
     }
 
+    public function checkIns(): HasMany
+    {
+        return $this->hasMany(CheckIn::class);
+    }
+
+    public function irevEntries(): HasMany
+    {
+        return $this->hasMany(IrevEntry::class);
+    }
+
     public function currentResult(): HasOne
     {
         return $this->hasOne(ResultSubmission::class)->where('is_current', true);

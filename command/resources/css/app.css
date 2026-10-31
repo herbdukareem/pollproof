@@ -245,6 +245,26 @@
         opacity: 0;
         transform: translateX(32px);
     }
+    /* The table loader's bar runs left to right while a page, sort or filter loads. */
+    .table-busy-bar {
+        animation: table-busy 1.1s ease-in-out infinite;
+    }
+    @keyframes table-busy {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(300%);
+        }
+    }
+    .fade-quick-enter-active,
+    .fade-quick-leave-active {
+        transition: opacity 0.15s ease;
+    }
+    .fade-quick-enter-from,
+    .fade-quick-leave-to {
+        opacity: 0;
+    }
     /* LGA tiles slide to their new place when reordered or filtered. */
     .tile-move {
         transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
