@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import PinLogo from './PinLogo.vue';
 import Icon from './Icon.vue';
 import NoticeBell from './NoticeBell.vue';
+import Toaster from './Toaster.vue';
+import { toast } from '../lib/toast';
 import { session, signOut } from '../lib/session';
 import { itemForPath, sectionsFor } from '../lib/nav';
 import { page } from '../lib/page';
@@ -53,9 +55,34 @@ const footer = computed(() => {
     }
 });
 
+// The newest check-in waiting to be confirmed when we last looked; a newer one pops up a notice.
+let seenCheckIn = null;
+let seenCount = 0;
+function announceCheckIns(c) {
+    if (!('checkins' in c)) return;
+    const newest = c.checkins_newest;
+    if (seenCheckIn !== null && newest && newest.id > seenCheckIn) {
+        const how = newest.channel === 'ussd' ? 'by USSD, no GPS' : newest.distance_m != null ? `${newest.distance_m} m from the unit` : 'unit has no GPS point';
+        const more = c.checkins - seenCount > 1 ? ` (+${c.checkins - seenCount - 1} more)` : '';
+        toast({
+            icon: 'users',
+            tone: 'info',
+            title: `New check-in to confirm${more}`,
+            body: `${newest.agent}${newest.name ? ` · ${newest.name}` : ''} at ${newest.unit}, ${how}.`,
+            ...(route.path === '/agents'
+                ? { action: 'Show', run: () => document.getElementById('checkins')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+                : { action: 'Review on Agents', to: '/agents' }),
+        });
+        window.dispatchEvent(new CustomEvent('pp:checkins'));
+    }
+    seenCheckIn = Math.max(seenCheckIn ?? 0, newest?.id ?? 0);
+    seenCount = c.checkins;
+}
+
 async function loadCounts() {
     try {
         counts.value = await api.get('nav-counts');
+        announceCheckIns(counts.value);
     } catch {
         counts.value = {};
     }
@@ -63,7 +90,7 @@ async function loadCounts() {
 let timer;
 onMounted(() => {
     loadCounts();
-    timer = setInterval(loadCounts, 60000);
+    timer = setInterval(loadCounts, 15000);
 });
 onBeforeUnmount(() => clearInterval(timer));
 
@@ -167,6 +194,7 @@ async function logout() {
             <main id="pp-main" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-6 sm:px-7 print:overflow-visible">
                 <slot />
             </main>
+            <Toaster />
         </div>
     </div>
 </template>

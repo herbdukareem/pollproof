@@ -16,6 +16,9 @@ their result's status by dialling a USSD code. Africa's Talking (AT) connects th
   second-person verification like every other result. When the agent later sends the same unit
   from the app (with the EC8A photo), the app copy supersedes the USSD one automatically.
 - A check-in by USSD has no GPS, so it waits for the supervisor to confirm (Agents → Check-ins to confirm).
+- Check-in is daily. An agent already confirmed today is told so; a rejected check-in, or a new day, lets them check in again.
+- A new check-in to confirm pops up in the command room for the DG, situation room and supervisors, adds to the count beside Agents, and notifies the ward supervisor and situation room (rule "Agent check-in needs confirming").
+- If the server fails mid-session the phone shows "PollProof could not finish this (ref ABC123)" instead of the network's "technical problems" box. Search `storage/logs/laravel.log` for "USSD error ABC123" to see why.
 - A half-typed result is kept for 30 minutes. If the network drops the session, the agent dials
   again and chooses **1. Continue result**.
 - Screens stay under 182 characters, the limit on most Nigerian networks. Sessions time out after

@@ -19,6 +19,7 @@ class NotificationRule extends Model
         'irev_missing' => ['Result not on IReV', ['data_officer'], ['app'], 60, ['situation_room']],
         'result_flagged' => ['A reviewer flagged a result', ['legal', 'situation_room'], ['app'], 15, ['dg']],
         'verify_backlog' => ['More than 20 results waiting to be verified', ['verifier'], ['app'], 15, ['situation_room']],
+        'checkin_review' => ['Agent check-in needs confirming', ['ward_supervisor', 'situation_room'], ['app'], 15, ['lga_supervisor']],
         'failed_logins' => ['Repeated failed sign-ins', ['dg'], ['app', 'sms', 'email'], null, []],
     ];
 

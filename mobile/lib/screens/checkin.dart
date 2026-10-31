@@ -324,6 +324,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     final review =
         res?['status'] == 'pending_review' ||
         (pending && saved!.fields['request_review'] == true);
+    final already = res?['already'] == true;
     return [
       const SizedBox(height: 30),
       Icon(
@@ -337,6 +338,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
             ? 'Check-in saved'
             : review
             ? 'Sent to your supervisor'
+            : already
+            ? 'Already checked in today'
             : "You're checked in",
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
@@ -347,6 +350,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
             ? 'No connection right now. It sends by itself as soon as there is network.'
             : review
             ? 'Your supervisor will confirm it. You can carry on.'
+            : already
+            ? '${res?['message'] ?? 'You are already checked in at your unit today.'} Nothing more to do.'
             : 'Verified at ${hhmm(DateTime.now())}. Your supervisor can see you are at the unit.',
         textAlign: TextAlign.center,
         style: const TextStyle(color: C.ink2, fontSize: 15),

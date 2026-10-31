@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Services\AlertService;
 use App\Services\AuditLogger;
+use App\Services\CheckInReview;
 use App\Services\Geo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CheckInController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly AlertService $alerts, private readonly CheckInReview $reviews) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -38,6 +39,17 @@ class CheckInController extends Controller
         }
 
         $campaign = $user->campaign;
+        // Agents check in once per working day. Already in today: say so, don't add another.
+        $sameDay = CheckIn::where('user_id', $user->id)->where('polling_unit_id', $unit->id)
+            ->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED, CheckIn::PENDING_REVIEW])
+            ->onDay($data['captured_at'])->latest('id')->first();
+        if ($sameDay?->counts()) {
+            return response()->json([
+                'id' => $sameDay->id, 'status' => $sameDay->status, 'distance_m' => $sameDay->distance_m, 'already' => true,
+                'message' => "You are already checked in at {$unit->code} today.",
+            ]);
+        }
+
         $distance = ($unit->latitude !== null && $unit->longitude !== null)
             ? Geo::distanceMeters($data['latitude'], $data['longitude'], $unit->latitude, $unit->longitude)
             : null;
@@ -71,9 +83,17 @@ class CheckInController extends Controller
             'captured_at' => $data['captured_at'],
             'client_ref' => $data['client_ref'] ?? null,
         ]);
-        $this->audit->log($user, 'checkin.created', $checkIn, ['status' => $checkIn->status, 'distance_m' => $distance], $request->ip());
+        // Checking in again while the first one waits for review replaces it, so the supervisor
+        // sees one card per agent: the newest location, or none if the agent is now inside.
+        if ($sameDay) {
+            $sameDay->update(['status' => CheckIn::REPLACED]);
+        }
+        $this->audit->log($user, 'checkin.created', $checkIn, ['status' => $checkIn->status, 'distance_m' => $distance, 'replaces' => $sameDay?->id], $request->ip());
         if ($checkIn->counts()) {
             $this->alerts->clear($campaign->id, "agent_absent:{$unit->id}");
+            $this->reviews->settled($checkIn);
+        } else {
+            $this->reviews->waiting($checkIn);
         }
 
         return response()->json(['id' => $checkIn->id, 'status' => $checkIn->status, 'distance_m' => $distance], 201);
@@ -114,12 +134,16 @@ class CheckInController extends Controller
         abort_if($user->hasRole(Role::LgaSupervisor) && $unit->ward->lga_id !== $user->lga_id, 403, 'This unit is not in your LGA.');
 
         $data = $request->validate(['decision' => ['required', 'in:approve,reject']]);
+        abort_unless($checkIn->status === CheckIn::PENDING_REVIEW, 422, $checkIn->status === CheckIn::REPLACED
+            ? 'The agent checked in again since. Refresh to see the new check-in.'
+            : 'This check-in has already been reviewed.');
         $checkIn->update([
             'status' => $data['decision'] === 'approve' ? CheckIn::APPROVED : CheckIn::REJECTED,
             'reviewed_by' => $user->id,
             'reviewed_at' => now(),
         ]);
         $this->audit->log($user, 'checkin.'.$data['decision'], $checkIn, [], $request->ip());
+        $this->reviews->settled($checkIn);
         if ($checkIn->counts()) {
             $this->alerts->clear($checkIn->campaign_id, "agent_absent:{$unit->id}");
         }

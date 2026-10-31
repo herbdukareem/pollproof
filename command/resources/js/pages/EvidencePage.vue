@@ -164,7 +164,7 @@ const headline = computed(() => {
                 <ul>
                     <li v-for="c in d.check_ins" :key="c.id" class="flex justify-between gap-2 border-t border-[#eef0f3] py-2 text-sm first:border-0">
                         <span>{{ dateTime(c.captured_at) }} · {{ c.distance_m != null ? `${c.distance_m} m from unit` : 'no unit GPS' }} · ±{{ c.accuracy_m }} m</span>
-                        <Badge :tone="c.status === 'verified' || c.status === 'approved' ? 'good' : c.status === 'rejected' ? 'bad' : 'warn'">{{ titleCase(c.status) }}</Badge>
+                        <Badge :tone="c.status === 'verified' || c.status === 'approved' ? 'good' : c.status === 'rejected' ? 'bad' : c.status === 'replaced' ? 'neutral' : 'warn'">{{ c.status === 'replaced' ? 'Replaced by a later check-in' : titleCase(c.status) }}</Badge>
                     </li>
                 </ul>
             </section>

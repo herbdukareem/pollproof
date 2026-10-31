@@ -30,7 +30,7 @@ class AgentListController extends Controller
             ->orderBy('code')
             ->get();
 
-        $checkIns = CheckIn::where('campaign_id', $user->campaign_id)->whereIn('user_id', $agents->pluck('id'))
+        $checkIns = CheckIn::where('campaign_id', $user->campaign_id)->whereIn('user_id', $agents->pluck('id'))->where('status', '!=', CheckIn::REPLACED)
             ->orderBy('id')->get()->groupBy('user_id')->map->last();
         $results = ResultSubmission::where('campaign_id', $user->campaign_id)->where('is_current', true)
             ->whereIn('user_id', $agents->pluck('id'))->get()->keyBy('user_id');

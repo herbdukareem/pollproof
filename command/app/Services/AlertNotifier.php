@@ -124,7 +124,7 @@ final class AlertNotifier
             'collation_mismatch' => '/collation',
             'overvote' => $alert->subject instanceof PollingUnit ? "/units/{$alert->subject_id}/evidence" : '/collation',
             'incident' => '/incidents',
-            'agent_absent', 'agent_unavailable' => '/agents',
+            'agent_absent', 'agent_unavailable', 'checkin_review' => '/agents',
             'irev_mismatch', 'irev_missing' => '/irev',
             'result_flagged' => $alert->subject instanceof ResultSubmission ? '/units?search='.$alert->subject->pollingUnit?->code : '/verify',
             'verify_backlog' => '/verify',

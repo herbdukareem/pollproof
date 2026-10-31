@@ -47,8 +47,16 @@ class _AgentHomeState extends State<AgentHome> {
     MaterialPageRoute(builder: (_) => screen),
   ).then((_) => _refresh());
 
-  OutboxItem? _latest(String kind) {
-    final items = app.outbox.items.where((i) => i.kind == kind).toList();
+  OutboxItem? _latest(String kind, {bool todayOnly = false}) {
+    final now = DateTime.now();
+    bool today(DateTime d) {
+      final l = d.toLocal();
+      return l.year == now.year && l.month == now.month && l.day == now.day;
+    }
+
+    final items = app.outbox.items
+        .where((i) => i.kind == kind && (!todayOnly || today(i.createdAt)))
+        .toList();
     return items.isEmpty ? null : items.last;
   }
 
@@ -60,7 +68,8 @@ class _AgentHomeState extends State<AgentHome> {
       final today = app.today;
       final checkIn = today['check_in'] as Map?;
       final result = today['result'] as Map?;
-      final pendingCheckIn = _latest('check_in');
+      // Agents check in every working day, so only today's check-in counts.
+      final pendingCheckIn = _latest('check_in', todayOnly: true);
       final pendingResult = _latest('result');
       final pendingPhoto = _latest('photo');
       final waiting = app.outbox.waiting.length;
