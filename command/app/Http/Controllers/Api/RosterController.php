@@ -8,8 +8,8 @@ use App\Jobs\SendSms;
 use App\Models\PollingUnit;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\PeopleMover;
 use App\Services\RosterImporter;
-use App\Services\SupervisorAssigner;
 use App\Services\SupervisorImporter;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
@@ -109,29 +109,51 @@ class RosterController extends Controller
     }
 
     /** Fill one supervisor post, e.g. a ward that has nobody. */
-    public function storeSupervisor(Request $request, SupervisorAssigner $assigner): JsonResponse
+    public function storeSupervisor(Request $request, PeopleMover $mover): JsonResponse
     {
         $campaign = $request->user()->campaign;
         $campaign->abortIfFrozen();
+        // Either someone already registered (user_id: an agent, reserve or supervisor moving post)
+        // or a new person (name and phone).
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
-            'phone' => ['required', 'string', 'max:20'],
+            'user_id' => ['nullable', 'integer'],
+            'name' => ['required_without:user_id', 'nullable', 'string', 'max:120'],
+            'phone' => ['required_without:user_id', 'nullable', 'string', 'max:20'],
             'level' => ['required', 'in:lga,ward'],
             'lga_id' => ['required_if:level,lga', 'nullable', 'integer'],
             'ward_id' => ['required_if:level,ward', 'nullable', 'integer'],
             'is_backup' => ['sometimes', 'boolean'],
+            'previous' => ['nullable', 'in:unassigned,reserve'],
         ]);
-        $phone = Phone::normalize($data['phone']);
-        abort_unless($phone, 422, 'Not a valid Nigerian mobile number.');
         $ward = $data['level'] === 'ward' ? $campaign->wards()->with('lga')->findOrFail($data['ward_id']) : null;
         $lga = $ward?->lga ?? $campaign->lgas()->findOrFail($data['lga_id']);
+        $backup = (bool) ($data['is_backup'] ?? false);
+        $previous = $data['previous'] ?? 'unassigned';
 
-        $result = $assigner->assign($campaign, $data['name'], $phone, $data['level'], $lga, $ward, (bool) ($data['is_backup'] ?? false));
-        if (is_string($result)) {
-            abort(422, $result);
+        if ($data['user_id'] ?? null) {
+            $person = User::where('campaign_id', $campaign->id)->findOrFail($data['user_id']);
+        } else {
+            $phone = Phone::normalize($data['phone']);
+            abort_unless($phone, 422, 'Not a valid Nigerian mobile number.');
+            $person = User::where('phone', $phone)->first();
+            abort_if($person && $person->campaign_id !== $campaign->id, 422, 'This phone is registered to another campaign.');
         }
-        $this->audit->log($request->user(), 'supervisor.assigned', $result['user'], ['level' => $data['level'], 'lga' => $lga->code, 'ward' => $ward?->code, 'replaced_id' => $result['replaced']?->id], $request->ip());
+        $from = $person ? PeopleMover::post($person) : 'new';
+        $result = DB::transaction(function () use ($campaign, $mover, $person, $data, $lga, $ward, $backup, $previous) {
+            $person ??= $mover->create($campaign, trim($data['name']), Phone::normalize($data['phone']), $data['level'] === 'lga' ? Role::LgaSupervisor : Role::WardSupervisor);
 
-        return response()->json(['id' => $result['user']->id, 'code' => $result['user']->code, 'replaced' => $result['replaced']?->code], 201);
+            return $mover->toSupervisor($campaign, $person, $data['level'], $lga, $ward, $backup, $previous);
+        });
+
+        $this->audit->log($request->user(), 'supervisor.assigned', $result['user'], [
+            'level' => $data['level'], 'lga' => $lga->code, 'ward' => $ward?->code, 'from' => $from,
+            'replaced_id' => $result['replaced']?->id, 'previous_to' => $result['replaced'] ? $previous : null, 'freed_unit' => ($result['freed_unit'] ?? null)?->code,
+        ], $request->ip());
+
+        return response()->json([
+            'id' => $result['user']->id, 'code' => $result['user']->code, 'name' => $result['user']->name,
+            'replaced' => $result['replaced']?->code, 'previous_to' => $result['replaced'] ? $previous : null,
+            'freed_unit' => ($result['freed_unit'] ?? null)?->code,
+        ], 201);
     }
 }

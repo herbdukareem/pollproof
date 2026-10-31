@@ -5,7 +5,7 @@ import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
-import CsvUpload from '../../components/CsvUpload.vue';
+import ImportModal from '../../components/ImportModal.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
@@ -36,6 +36,15 @@ const structure = useResource(() => api.get('structure'));
 const d = computed(() => roster.data.value);
 const notInstalled = computed(() => (d.value ? d.value.counts.assigned - d.value.stages[1].value : 0));
 const report = ref(null);
+const uploading = ref(false);
+const rosterColumns = [
+    ['name', 'Agent’s full name', true],
+    ['phone', 'Their mobile number, e.g. 0803 123 4567', true],
+    ['pu_code', 'Already filled: the unit they cover. Clear it to keep them in the ward without a unit', false],
+    ['reserve', 'yes for a reserve agent (keep lga_code and ward_code)', false],
+    ['code', 'Leave empty for new agents; we give them an AG- code', false],
+    ['lga_*, ward_*, pu_name', 'Already filled; leave as they are', false],
+];
 const preview = ref(null);
 const busy = ref('');
 const message = ref('');
@@ -88,7 +97,7 @@ function changed(text) {
 <template>
     <PageHeader title="Agent roster" :subtitle="d ? `${num(d.counts.assigned)} assigned · ${num(d.counts.reserves)} reserves${d.counts.unassigned ? ` · ${num(d.counts.unassigned)} waiting for a unit` : ''}` : 'Polling-unit agents and reserves'" :updated-at="roster.updatedAt.value" :loading="roster.loading.value" @refresh="roster.load">
         <template #actions>
-            <CsvUpload endpoint="roster/import" label="Upload agent list" tone="outline" columns="name, phone, pu_code, lga_code, ward_code, reserve, code" :disabled="d?.frozen" @done="imported" />
+            <button class="btn-outline" :disabled="d?.frozen" @click="uploading = true"><Icon name="upload" :size="16" /> Upload agent list</button>
             <button class="btn-primary" :disabled="!notInstalled || busy === 'invite'" @click="inviteAll"><Icon name="send" :size="16" /> Send invites to {{ num(notInstalled) }}</button>
         </template>
     </PageHeader>
@@ -178,4 +187,17 @@ function changed(text) {
             </div>
         </div>
     </LoadState>
+    <ImportModal
+        :open="uploading"
+        title="Upload agent list"
+        subtitle="One row per polling unit. Add or change agents, then upload."
+        endpoint="roster/import"
+        template="setup/templates/agents"
+        template-name="agent-roster-template.csv"
+        :columns="rosterColumns"
+        :tips="['Rows you leave without a name and phone are skipped.', 'Agents are matched by phone, so uploading a corrected file updates them instead of adding them twice.', 'To add reserves, add rows at the bottom with lga_code, ward_code and reserve = yes.']"
+        :counts="[['Assigned to a unit', 'assigned'], ['Reserves', 'reserves'], ['Waiting for a unit', 'unassigned'], ['New people', 'created'], ['Updated', 'updated']]"
+        @close="uploading = false"
+        @done="imported"
+    />
 </template>
