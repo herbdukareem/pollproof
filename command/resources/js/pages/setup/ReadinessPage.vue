@@ -5,6 +5,8 @@ import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
+import SortTh from '../../components/SortTh.vue';
+import { sortRows, useSortState } from '../../lib/useSort';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
@@ -12,7 +14,19 @@ import { num } from '../../lib/format';
 const report = useResource(() => api.get('readiness'));
 const r = computed(() => report.data.value);
 const showAll = ref(false);
-const lgas = computed(() => (showAll.value ? r.value?.lgas : r.value?.lgas.slice(0, 8)) ?? []);
+const sort = useSortState({
+    default: { label: 'default order', dir: 'asc' },
+    name: { label: 'LGA', dir: 'asc', value: (l) => l.name },
+    units: { label: 'Units', dir: 'desc', value: (l) => l.units },
+    tested: { label: 'Practice', dir: 'desc', value: (l) => l.tested },
+    trained: { label: 'Trained', dir: 'desc', value: (l) => l.trained },
+    confirmed: { label: 'Confirmed', dir: 'desc', value: (l) => l.confirmed },
+    status: { label: 'Status', dir: 'asc', value: (l) => ({ not_ready: 0, at_risk: 1, ready: 2 })[l.status] ?? 1 },
+}, { key: 'default', dir: 'asc' });
+const lgas = computed(() => {
+    const all = sortRows(r.value?.lgas ?? [], sort);
+    return showAll.value ? all : all.slice(0, 8);
+});
 const busy = ref('');
 const message = ref('');
 const error = ref('');
@@ -84,7 +98,7 @@ async function remind(group) {
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[560px] text-sm">
-                        <thead class="bg-mist"><tr><th class="th">LGA</th><th class="th text-right">Units</th><th class="th text-right">Practice</th><th class="th text-right">Trained</th><th class="th text-right">Confirmed</th><th class="th">Status</th></tr></thead>
+                        <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="units" cls="text-right">Units</SortTh><SortTh :sort="sort" k="tested" cls="text-right">Practice</SortTh><SortTh :sort="sort" k="trained" cls="text-right">Trained</SortTh><SortTh :sort="sort" k="confirmed" cls="text-right">Confirmed</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                         <tbody>
                             <tr v-for="l in lgas" :key="l.id">
                                 <td class="td font-bold">{{ l.name }}</td>

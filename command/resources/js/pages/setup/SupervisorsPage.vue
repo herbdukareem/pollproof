@@ -5,6 +5,8 @@ import LoadState from '../../components/LoadState.vue';
 import CsvUpload from '../../components/CsvUpload.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
+import SortTh from '../../components/SortTh.vue';
+import { sortRows, useSortState } from '../../lib/useSort';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
@@ -12,6 +14,15 @@ import { num } from '../../lib/format';
 const lgaId = ref(null);
 const sup = useResource(() => api.get('setup/supervisors', { lga_id: lgaId.value }));
 const d = computed(() => sup.data.value);
+const sort = useSortState({
+    default: { label: 'default order', dir: 'asc' },
+    name: { label: 'LGA', dir: 'asc', value: (l) => l.name },
+    supervisor: { label: 'Supervisor', dir: 'asc', value: (l) => l.supervisor?.name },
+    backup: { label: 'Backup', dir: 'asc', value: (l) => l.backup?.name },
+    wards: { label: 'Wards covered', dir: 'asc', value: (l) => (l.wards ? l.wards_covered / l.wards : 1) },
+    agents: { label: 'Agents', dir: 'desc', value: (l) => l.agents },
+}, { key: 'default', dir: 'asc' });
+const lgaRows = computed(() => sortRows(d.value?.lgas ?? [], sort));
 const openWards = computed(() => d.value?.selected?.wards.filter((w) => !w.supervisor).length ?? 0);
 const totalOpen = computed(() => (d.value ? d.value.levels.wards - d.value.levels.ward_supervisors : 0));
 const report = ref(null);
@@ -88,9 +99,9 @@ function imported(summary) {
                 <h2 class="card-title px-5 pt-5 pb-3">LGA supervisors</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[620px] text-sm">
-                        <thead class="bg-mist"><tr><th class="th">LGA</th><th class="th">Supervisor</th><th class="th">Backup</th><th class="th">Wards covered</th><th class="th text-right">Agents</th></tr></thead>
+                        <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="supervisor">Supervisor</SortTh><SortTh :sort="sort" k="backup">Backup</SortTh><SortTh :sort="sort" k="wards">Wards covered</SortTh><SortTh :sort="sort" k="agents" cls="text-right">Agents</SortTh></tr></thead>
                         <tbody>
-                            <tr v-for="l in d.lgas" :key="l.id" class="cursor-pointer" :class="[d.selected?.id === l.id ? 'bg-mist' : 'hover:bg-mist/60', !l.supervisor || l.wards_covered < l.wards ? 'bg-[#fff8f4]' : '']" @click="select(l.id)">
+                            <tr v-for="l in lgaRows" :key="l.id" class="cursor-pointer" :class="[d.selected?.id === l.id ? 'bg-mist' : 'hover:bg-mist/60', !l.supervisor || l.wards_covered < l.wards ? 'bg-[#fff8f4]' : '']" @click="select(l.id)">
                                 <td class="td font-bold whitespace-nowrap"><button class="text-left" @click.stop="select(l.id)">{{ l.name }}</button></td>
                                 <td class="td"><template v-if="l.supervisor"><div class="font-semibold">{{ l.supervisor.code }} · {{ l.supervisor.name }}</div><div class="text-xs text-ink-2">{{ l.supervisor.phone }}</div></template><span v-else class="font-semibold text-action">None</span></td>
                                 <td class="td text-ink-2">{{ l.backup ? `${l.backup.code} · ${l.backup.name}` : '–' }}</td>

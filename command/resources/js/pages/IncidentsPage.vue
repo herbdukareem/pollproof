@@ -16,8 +16,9 @@ const severity = ref('');
 const search = ref('');
 const page = ref(1);
 const perPage = ref(25);
-const incidents = useResource(() => api.get('incidents', { status: status.value, type: type.value, severity: severity.value, search: search.value, page: page.value, per_page: perPage.value }), { refreshMs: 30000 });
-watch([status, type, severity], () => { page.value = 1; incidents.load(); });
+const order = ref('latest');
+const incidents = useResource(() => api.get('incidents', { status: status.value, type: type.value, severity: severity.value, search: search.value, page: page.value, per_page: perPage.value, sort: order.value }), { refreshMs: 30000 });
+watch([status, type, severity, order], () => { page.value = 1; incidents.load(); });
 let t;
 watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; incidents.load(); }, 300); });
 const go = (p) => { page.value = p; incidents.load(); };
@@ -75,6 +76,11 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
+            </select>
+            <label class="sr-only" for="inc-order">Order</label>
+            <select id="inc-order" v-model="order" class="field h-9 w-auto text-sm">
+                <option value="latest">Newest first</option>
+                <option value="severity">High priority first</option>
             </select>
             <div class="relative min-w-[260px] flex-1">
                 <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />

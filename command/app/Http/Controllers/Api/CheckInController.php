@@ -107,13 +107,15 @@ class CheckInController extends Controller
             ->where('status', CheckIn::PENDING_REVIEW)
             ->when($user->hasRole(Role::WardSupervisor), fn ($q) => $q->whereHas('pollingUnit', fn ($u) => $u->where('ward_id', $user->ward_id)))
             ->when($user->hasRole(Role::LgaSupervisor), fn ($q) => $q->whereHas('pollingUnit.ward', fn ($w) => $w->where('lga_id', $user->lga_id)))
-            ->with(['pollingUnit:id,code,name,ward_id', 'user:id,name,code'])
+            ->with(['pollingUnit:id,code,name,ward_id', 'user:id,name,code,phone'])
             ->oldest('captured_at')
             ->get();
 
+        $showPhones = $user->role->canSeePhones();
+
         return response()->json(['data' => $items->map(fn ($c) => [
             'id' => $c->id,
-            'agent' => $c->user->only(['id', 'name', 'code']),
+            'agent' => $c->user->only(['id', 'name', 'code']) + ['phone' => $showPhones ? $c->user->phone : null],
             'polling_unit' => $c->pollingUnit->only(['id', 'code', 'name']),
             'channel' => $c->channel,
             'distance_m' => $c->distance_m,

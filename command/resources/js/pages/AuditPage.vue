@@ -5,6 +5,8 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import SortTh from '../components/SortTh.vue';
+import { useSortState } from '../lib/useSort';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { dateTime, titleCase } from '../lib/format';
@@ -13,7 +15,14 @@ const action = ref('');
 const page = ref(1);
 const perPage = ref(50);
 const search = ref('');
-const logs = useResource(() => api.get('audit-logs', { action: action.value, search: search.value, page: page.value, per_page: perPage.value }));
+const sort = useSortState({
+    time: { label: 'Time', dir: 'desc' },
+    user: { label: 'User', dir: 'asc' },
+    action: { label: 'Action', dir: 'asc' },
+    ip: { label: 'IP', dir: 'asc' },
+}, { key: 'time', dir: 'desc' });
+const logs = useResource(() => api.get('audit-logs', { action: action.value, search: search.value, page: page.value, per_page: perPage.value, ...sort.params }));
+watch(() => [sort.key, sort.dir], () => { page.value = 1; logs.load(); });
 let t;
 watch(search, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; logs.load(); }, 300); });
 const check = useResource(() => api.get('audit-logs/verify'));
@@ -54,7 +63,7 @@ function go(p) {
         <LoadState :loading="logs.loading.value" :error="logs.error.value" :empty="!rows.length" empty-text="No entries.">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[760px] text-sm">
-                    <thead class="bg-mist"><tr><th class="th">Time</th><th class="th">User</th><th class="th">Action</th><th class="th">Detail</th><th class="th">IP</th></tr></thead>
+                    <thead class="bg-mist"><tr><SortTh :sort="sort" k="time">Time</SortTh><SortTh :sort="sort" k="user">User</SortTh><SortTh :sort="sort" k="action">Action</SortTh><th class="th">Detail</th><SortTh :sort="sort" k="ip">IP</SortTh></tr></thead>
                     <tbody>
                         <tr v-for="r in rows" :key="r.id">
                             <td class="td whitespace-nowrap text-ink-2">{{ dateTime(r.created_at) }}</td>
@@ -66,7 +75,7 @@ function go(p) {
                     </tbody>
                 </table>
             </div>
-            <Pagination :meta="meta" noun="entries" :per-page-options="[50, 100, 200]" :loading="logs.loading.value" @page="go" @per-page="(n) => { perPage = n; go(1); }" />
+            <Pagination :meta="meta" :sort="sort" noun="entries" :per-page-options="[50, 100, 200]" :loading="logs.loading.value" @page="go" @per-page="(n) => { perPage = n; go(1); }" />
         </LoadState>
     </section>
 </template>

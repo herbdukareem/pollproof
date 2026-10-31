@@ -26,17 +26,17 @@ final class StipendService
 
         $checkedIn = CheckIn::where('campaign_id', $campaign->id)
             ->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED])
-            ->get(['user_id', 'polling_unit_id'])
-            ->map(fn ($c) => $c->user_id.':'.$c->polling_unit_id)
-            ->flip();
+            ->orderBy('captured_at')
+            ->get(['user_id', 'polling_unit_id', 'captured_at'])
+            ->mapWithKeys(fn ($c) => [$c->user_id.':'.$c->polling_unit_id => $c->captured_at]); // the latest wins
         $outside = CheckIn::where('campaign_id', $campaign->id)
             ->whereIn('status', [CheckIn::PENDING_REVIEW, CheckIn::REJECTED])
             ->pluck('user_id')->flip();
         $signed = ResultSubmission::where('campaign_id', $campaign->id)
             ->where('status', '!=', ResultSubmission::SENT_BACK)
-            ->get(['user_id', 'polling_unit_id'])
-            ->map(fn ($r) => $r->user_id.':'.$r->polling_unit_id)
-            ->flip();
+            ->orderBy('id')
+            ->get(['user_id', 'polling_unit_id', 'captured_at'])
+            ->mapWithKeys(fn ($r) => [$r->user_id.':'.$r->polling_unit_id => $r->captured_at]);
 
         return $agents->map(function (User $a) use ($checkedIn, $outside, $signed) {
             $key = $a->id.':'.$a->polling_unit_id;
@@ -56,6 +56,8 @@ final class StipendService
                 'polling_unit' => $a->pollingUnit?->code,
                 'checked_in' => $hasCheckIn,
                 'signed_result' => $hasResult,
+                'checked_in_at' => $checkedIn->get($key),
+                'result_at' => $signed->get($key),
                 'eligible' => $reason === null,
                 'reason' => $reason,
             ];

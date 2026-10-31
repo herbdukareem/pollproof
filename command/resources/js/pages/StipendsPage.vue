@@ -5,10 +5,12 @@ import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
 import Pagination from '../components/Pagination.vue';
+import SortTh from '../components/SortTh.vue';
+import { sortRows, ts, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
-import { num } from '../lib/format';
+import { num, timeOrDate } from '../lib/format';
 
 const stipends = useResource(() => api.get('stipends'));
 const d = computed(() => stipends.data.value);
@@ -20,7 +22,17 @@ const matches = computed(() => (d.value?.agents ?? []).filter((a) =>
     (show.value === 'all' || (show.value === 'hold' ? !a.eligible : a.eligible))
     && (!reason.value || a.reason === reason.value)
     && (!search.value || `${a.agent_code} ${a.name} ${a.polling_unit}`.toLowerCase().includes(search.value.toLowerCase()))));
-const paged = usePaged(matches, { perPage: 25, resetOn: () => [show.value, search.value, reason.value] });
+// Latest first: the most recent check-in or result at the top.
+const sort = useSortState({
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.checked_in_at) ?? 0, ts(a.result_at) ?? 0) || null },
+    code: { label: 'Agent', dir: 'asc', value: (a) => a.agent_code },
+    unit: { label: 'Unit', dir: 'asc', value: (a) => a.polling_unit },
+    checked: { label: 'Checked in', dir: 'desc', value: (a) => ts(a.checked_in_at) },
+    result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result_at) },
+    status: { label: 'Status', dir: 'asc', value: (a) => (a.eligible ? 'Eligible' : a.reason) },
+});
+const sorted = computed(() => sortRows(matches.value, sort));
+const paged = usePaged(sorted, { perPage: 25, resetOn: () => [show.value, search.value, reason.value, sort.key, sort.dir] });
 const rows = paged.rows;
 const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0));
 </script>
@@ -67,20 +79,20 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
                 <LoadState :empty="!rows.length" :empty-text="search || reason ? 'No agents match.' : 'Nobody in this list.'">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[560px] text-sm">
-                            <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Unit</th><th class="th">Checked in</th><th class="th">Result</th><th class="th">Status</th></tr></thead>
+                            <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="checked">Checked in</SortTh><SortTh :sort="sort" k="result">Result</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                             <tbody>
                                 <tr v-for="a in rows" :key="a.agent_id">
                                     <td class="td"><b>{{ a.agent_code }}</b> <span class="text-ink-2">· {{ a.name }}</span></td>
                                     <td class="td">{{ a.polling_unit }}</td>
-                                    <td class="td">{{ a.checked_in ? 'Yes' : 'No' }}</td>
-                                    <td class="td">{{ a.signed_result ? 'Yes' : 'No' }}</td>
+                                    <td class="td whitespace-nowrap">{{ a.checked_in ? (a.checked_in_at ? timeOrDate(a.checked_in_at) : 'Yes') : 'No' }}</td>
+                                    <td class="td whitespace-nowrap">{{ a.signed_result ? (a.result_at ? timeOrDate(a.result_at) : 'Yes') : 'No' }}</td>
                                     <td class="td"><Badge :tone="a.eligible ? 'good' : 'bad'">{{ a.eligible ? 'Eligible' : a.reason }}</Badge></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </LoadState>
-                <Pagination :meta="paged.meta.value" noun="agents" @page="paged.setPage" @per-page="paged.setPerPage" />
+                <Pagination :meta="paged.meta.value" :sort="sort" noun="agents" @page="paged.setPage" @per-page="paged.setPerPage" />
             </section>
         </div>
     </LoadState>

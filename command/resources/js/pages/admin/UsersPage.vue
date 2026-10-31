@@ -5,6 +5,8 @@ import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
 import Pagination from '../../components/Pagination.vue';
+import SortTh from '../../components/SortTh.vue';
+import { sortRows, ts, useSortState } from '../../lib/useSort';
 import ActionMenu from '../../components/ActionMenu.vue';
 import Modal from '../../components/Modal.vue';
 import { usePaged } from '../../lib/usePaged';
@@ -22,7 +24,17 @@ const matches = computed(() => (d.value?.data ?? []).filter((u) =>
     (!search.value || `${u.name} ${u.email} ${u.role_label}`.toLowerCase().includes(search.value.toLowerCase()))
     && (!roleFilter.value || u.role === roleFilter.value)
     && statusTests[statusFilter.value](u)));
-const paged = usePaged(matches, { perPage: 25, resetOn: () => [search.value, roleFilter.value, statusFilter.value] });
+// Latest first: the newest account at the top.
+const sort = useSortState({
+    latest: { label: 'newest', dir: 'desc', value: (u) => u.id },
+    name: { label: 'User', dir: 'asc', value: (u) => u.name },
+    role: { label: 'Role', dir: 'asc', value: (u) => u.role_label },
+    status: { label: 'Status', dir: 'asc', value: (u) => (u.active ? (u.must_change_password ? 1 : 0) : 2) },
+    twofa: { label: 'Two-step', dir: 'asc', value: (u) => (u.two_factor ? 1 : 0) },
+    active: { label: 'Last active', dir: 'desc', value: (u) => ts(u.last_active_at) },
+});
+const sorted = computed(() => sortRows(matches.value, sort));
+const paged = usePaged(sorted, { perPage: 25, resetOn: () => [search.value, roleFilter.value, statusFilter.value, sort.key, sort.dir] });
 const rows = paged.rows;
 const confirm = ref(null);
 const editing = reactive({ user: null, name: '' });
@@ -164,7 +176,7 @@ async function copy() {
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[920px] text-sm">
-                    <thead class="bg-mist"><tr><th class="th">User</th><th class="th">Role</th><th class="th">Status</th><th class="th">Two-step</th><th class="th">Last active</th><th class="th text-right">Actions</th></tr></thead>
+                    <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">User</SortTh><SortTh :sort="sort" k="role">Role</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="twofa">Two-step</SortTh><SortTh :sort="sort" k="active">Last active</SortTh><th class="th text-right">Actions</th></tr></thead>
                     <tbody>
                         <tr v-for="u in rows" :key="u.id" :class="u.active ? '' : 'opacity-60'">
                             <td class="td">
@@ -194,7 +206,7 @@ async function copy() {
                 </table>
                 <p v-if="!rows.length" class="px-4 py-10 text-center text-sm text-ink-2">No users match these filters.</p>
             </div>
-            <Pagination :meta="paged.meta.value" noun="users" @page="paged.setPage" @per-page="paged.setPerPage" />
+            <Pagination :meta="paged.meta.value" :sort="sort" noun="users" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
     </LoadState>
 

@@ -4,6 +4,8 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import SortTh from '../components/SortTh.vue';
+import { sortRows, ts, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
@@ -17,13 +19,23 @@ const structure = useResource(() => api.get('structure'));
 watch(level, () => entries.load());
 
 const rank = { bad: 0, warn: 1, neutral: 2, good: 3 };
-const rows = computed(() => [...(entries.data.value?.data ?? [])].sort((a, b) => rank[status(a.comparison)[0]] - rank[status(b.comparison)[0]]));
+const rows = computed(() => entries.data.value?.data ?? []);
 const statusFilter = ref('');
 const search = ref('');
 const matches = computed(() => rows.value.filter((e) =>
     (!statusFilter.value || status(e.comparison)[0] === statusFilter.value)
     && (!search.value || e.comparison.scope.toLowerCase().includes(search.value.toLowerCase()))));
-const paged = usePaged(matches, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value] });
+// Latest announced first; the Status header puts problems first.
+const sort = useSortState({
+    latest: { label: 'latest announced', dir: 'desc', value: (e) => ts(e.announced_at) },
+    scope: { label: 'Collation point', dir: 'asc', value: (e) => e.comparison.scope },
+    ours: { label: 'Our units', dir: 'desc', value: (e) => e.comparison.our_total_cast },
+    declared: { label: 'Declared', dir: 'desc', value: (e) => e.comparison.declared_total_cast },
+    diff: { label: 'Difference', dir: 'desc', value: (e) => Object.values(e.comparison.differences ?? {}).reduce((t, d) => t + Math.abs(d), 0) },
+    status: { label: 'Status', dir: 'asc', value: (e) => rank[status(e.comparison)[0]] },
+});
+const sorted = computed(() => sortRows(matches.value, sort));
+const paged = usePaged(sorted, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value, sort.key, sort.dir] });
 const levelLabel = { ward: 'Ward · EC8B', lga: 'LGA · EC8C', state: 'State · EC8D' };
 const parties = computed(() => structure.data.value?.parties ?? []);
 const canEnter = hasRole('data_officer', 'situation_room', 'dg');
@@ -133,7 +145,7 @@ async function submit() {
             <LoadState :loading="entries.loading.value" :error="entries.error.value" :empty="!paged.rows.value.length" :empty-text="rows.length ? 'No collation points match.' : 'No collation sheets entered yet.'">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[720px] text-sm">
-                        <thead><tr><th class="th">Collation point</th><th class="th text-right">Our units</th><th class="th text-right">Declared</th><th class="th">Difference</th><th class="th">Status</th></tr></thead>
+                        <thead><tr><SortTh :sort="sort" k="scope">Collation point</SortTh><SortTh :sort="sort" k="ours" cls="text-right">Our units</SortTh><SortTh :sort="sort" k="declared" cls="text-right">Declared</SortTh><SortTh :sort="sort" k="diff">Difference</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                         <tbody>
                             <tr
                                 v-for="e in paged.rows.value"
@@ -144,7 +156,7 @@ async function submit() {
                                 @click="pick(e)"
                                 @keydown.enter="pick(e)"
                             >
-                                <td class="td"><div class="font-bold">{{ e.comparison.scope }}</div><div class="text-xs text-ink-2">{{ levelLabel[e.comparison.level] }} · {{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported</div></td>
+                                <td class="td"><div class="font-bold">{{ e.comparison.scope }}</div><div class="text-xs text-ink-2">{{ levelLabel[e.comparison.level] }} · {{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported<template v-if="e.announced_at"> · announced {{ dateTime(e.announced_at) }}</template></div></td>
                                 <td class="td text-right font-semibold">{{ num(e.comparison.our_total_cast) }}</td>
                                 <td class="td text-right font-semibold">{{ num(e.comparison.declared_total_cast) }}</td>
                                 <td class="td">
@@ -156,7 +168,7 @@ async function submit() {
                         </tbody>
                     </table>
                 </div>
-                <Pagination :meta="paged.meta.value" noun="collation points" @page="paged.setPage" @per-page="paged.setPerPage" />
+                <Pagination :meta="paged.meta.value" :sort="sort" noun="collation points" @page="paged.setPage" @per-page="paged.setPerPage" />
                 <div class="border-t border-[#eef0f3] px-4 py-2.5 text-[12.5px] text-ink-3">Figures are total votes cast. Select a row to see it party by party.</div>
             </LoadState>
         </section>

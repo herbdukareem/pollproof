@@ -9,6 +9,8 @@ import CsvUpload from '../../components/CsvUpload.vue';
 import ImportReport from '../../components/ImportReport.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import Pagination from '../../components/Pagination.vue';
+import SortTh from '../../components/SortTh.vue';
+import { useSortState } from '../../lib/useSort';
 import AgentActions from '../../components/AgentActions.vue';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
@@ -19,7 +21,16 @@ const filter = ref(['incomplete', 'all', 'reserves', 'unassigned', 'unavailable'
 const page = ref(1);
 const perPage = ref(50);
 const lgaId = ref('');
-const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, page: page.value, per_page: perPage.value }));
+// Newest agents first; the server sorts, so a header click reloads page 1.
+const sort = useSortState({
+    latest: { label: 'newest', dir: 'desc' },
+    code: { label: 'Agent', dir: 'asc' },
+    phone: { label: 'Phone', dir: 'asc' },
+    unit: { label: 'Unit', dir: 'asc' },
+    step: { label: 'Onboarding', dir: 'asc' },
+});
+const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, page: page.value, per_page: perPage.value, ...sort.params }));
+watch(() => [sort.key, sort.dir], () => { page.value = 1; roster.load(); });
 const structure = useResource(() => api.get('structure'));
 const d = computed(() => roster.data.value);
 const notInstalled = computed(() => (d.value ? d.value.counts.assigned - d.value.stages[1].value : 0));
@@ -119,7 +130,7 @@ function changed(text) {
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[760px] text-sm">
-                            <thead class="bg-mist"><tr><th class="th">Agent</th><th class="th">Phone</th><th class="th">Unit</th><th class="th" title="Invited · installed · practice · trained · confirmed">Onboarding</th><th class="th text-right">Actions</th></tr></thead>
+                            <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
                             <tbody>
                                 <tr v-for="a in d.data" :key="a.id">
                                     <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div></td>
@@ -144,7 +155,7 @@ function changed(text) {
                             </tbody>
                         </table>
                     </div>
-                    <Pagination :meta="d" noun="agents" :per-page-options="[25, 50, 100, 200]" :loading="roster.loading.value" @page="go" @per-page="setPerPage" />
+                    <Pagination :meta="d" :sort="sort" noun="agents" :per-page-options="[25, 50, 100, 200]" :loading="roster.loading.value" @page="go" @per-page="setPerPage" />
                 </LoadState>
             </section>
 
