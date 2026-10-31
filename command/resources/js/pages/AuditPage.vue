@@ -20,7 +20,7 @@ const sort = useSortState({
     user: { label: 'User', dir: 'asc' },
     action: { label: 'Action', dir: 'asc' },
     ip: { label: 'IP', dir: 'asc' },
-}, { key: 'time', dir: 'desc' });
+}, { key: 'time', dir: 'desc' }, { mode: 'server' });
 const logs = useResource(() => api.get('audit-logs', { action: action.value, search: search.value, page: page.value, per_page: perPage.value, ...sort.params }));
 watch(() => [sort.key, sort.dir], () => { page.value = 1; logs.load(); });
 let t;

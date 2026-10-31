@@ -14,7 +14,17 @@ import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { dateTime } from '../../lib/format';
 
-const users = useResource(() => api.get('users'));
+// Latest first: the newest account at the top.
+const sort = useSortState({
+    latest: { label: 'newest', dir: 'desc', value: (u) => u.id },
+    name: { label: 'User', dir: 'asc', value: (u) => u.name },
+    role: { label: 'Role', dir: 'asc', value: (u) => u.role_label },
+    status: { label: 'Status', dir: 'asc', value: (u) => (u.active ? (u.must_change_password ? 1 : 0) : 2) },
+    twofa: { label: 'Two-step', dir: 'asc', value: (u) => (u.two_factor ? 1 : 0) },
+    active: { label: 'Last active', dir: 'desc', value: (u) => ts(u.last_active_at) },
+}, undefined, { onChange: () => users.load() });
+
+const users = useResource(() => api.get('users', sort.params));
 const d = computed(() => users.data.value);
 const search = ref('');
 const roleFilter = ref('');
@@ -24,15 +34,6 @@ const matches = computed(() => (d.value?.data ?? []).filter((u) =>
     (!search.value || `${u.name} ${u.email} ${u.role_label}`.toLowerCase().includes(search.value.toLowerCase()))
     && (!roleFilter.value || u.role === roleFilter.value)
     && statusTests[statusFilter.value](u)));
-// Latest first: the newest account at the top.
-const sort = useSortState({
-    latest: { label: 'newest', dir: 'desc', value: (u) => u.id },
-    name: { label: 'User', dir: 'asc', value: (u) => u.name },
-    role: { label: 'Role', dir: 'asc', value: (u) => u.role_label },
-    status: { label: 'Status', dir: 'asc', value: (u) => (u.active ? (u.must_change_password ? 1 : 0) : 2) },
-    twofa: { label: 'Two-step', dir: 'asc', value: (u) => (u.two_factor ? 1 : 0) },
-    active: { label: 'Last active', dir: 'desc', value: (u) => ts(u.last_active_at) },
-});
 const sorted = computed(() => sortRows(matches.value, sort));
 const paged = usePaged(sorted, { perPage: 25, resetOn: () => [search.value, roleFilter.value, statusFilter.value, sort.key, sort.dir] });
 const rows = paged.rows;

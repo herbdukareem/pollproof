@@ -11,9 +11,6 @@ import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
 
-const report = useResource(() => api.get('readiness'));
-const r = computed(() => report.data.value);
-const showAll = ref(false);
 const sort = useSortState({
     default: { label: 'default order', dir: 'asc' },
     name: { label: 'LGA', dir: 'asc', value: (l) => l.name },
@@ -22,7 +19,10 @@ const sort = useSortState({
     trained: { label: 'Trained', dir: 'desc', value: (l) => l.trained },
     confirmed: { label: 'Confirmed', dir: 'desc', value: (l) => l.confirmed },
     status: { label: 'Status', dir: 'asc', value: (l) => ({ not_ready: 0, at_risk: 1, ready: 2 })[l.status] ?? 1 },
-}, { key: 'default', dir: 'asc' });
+}, { key: 'default', dir: 'asc' }, { onChange: () => report.load() });
+const report = useResource(() => api.get('readiness', sort.params));
+const r = computed(() => report.data.value);
+const showAll = ref(false);
 const lgas = computed(() => {
     const all = sortRows(r.value?.lgas ?? [], sort);
     return showAll.value ? all : all.slice(0, 8);

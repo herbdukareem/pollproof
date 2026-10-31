@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\AuditLog;
 use App\Models\Incident;
 use App\Models\ResultSubmission;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsElection;
 use Tests\TestCase;
@@ -65,5 +66,32 @@ class SortingTest extends TestCase
         $new = Incident::create(['campaign_id' => $this->campaign->id, 'user_id' => $last->id, 'polling_unit_id' => $this->units['PU2']->id, 'type' => 'other', 'severity' => 'low', 'description' => 'New', 'occurred_at' => '2027-02-06 12:00:00', 'status' => 'open']);
         $this->getJson('/api/v1/incidents')->assertJsonPath('data.0.id', $new->id);
         $this->getJson('/api/v1/incidents?sort=severity')->assertJsonPath('data.0.id', $old->id);
+    }
+
+    public function test_lists_built_in_php_sort_on_the_server_too(): void
+    {
+        $this->signedResultFor('PU1', '2027-02-06T15:00:00Z');
+        $this->signedResultFor('PU2', '2027-02-06T16:30:00Z');
+        $this->agentFor('PU3');
+        $this->actingAsUser($this->staff(Role::Dg));
+
+        $agents = fn (string $q = '') => collect($this->getJson('/api/v1/agents'.$q)->assertOk()->json('data'))->pluck('code')->all();
+        $this->assertSame(['AG-PU2', 'AG-PU1', 'AG-PU3'], $agents(), 'latest activity first, none last');
+        $this->assertSame(['AG-PU1', 'AG-PU2', 'AG-PU3'], $agents('?sort=result&dir=asc'), 'no result still last');
+        $this->assertSame(['AG-PU3', 'AG-PU2', 'AG-PU1'], $agents('?sort=code&dir=desc'));
+        $this->getJson('/api/v1/agents?sort=phone')->assertJsonValidationErrors('sort');
+
+        $this->getJson('/api/v1/stipends')->assertJsonPath('agents.0.agent_code', 'AG-PU2');
+        $this->getJson('/api/v1/stipends?sort=code&dir=asc')->assertJsonPath('agents.0.agent_code', 'AG-PU1');
+
+        $names = collect($this->getJson('/api/v1/users?sort=name&dir=asc')->assertOk()->json('data'))->pluck('name')->all();
+        $this->assertSame(collect($names)->sort(fn ($a, $b) => strnatcasecmp($a, $b))->values()->all(), $names);
+        $this->getJson('/api/v1/users')->assertJsonPath('data.0.id', User::whereIn('role', ['dg'])->max('id'));
+
+        $lgas = collect($this->getJson('/api/v1/readiness?sort=name&dir=desc')->assertOk()->json('lgas'))->pluck('name')->all();
+        $this->assertSame(collect($lgas)->sortDesc()->values()->all(), $lgas);
+        $sup = collect($this->getJson('/api/v1/setup/supervisors?sort=name&dir=asc')->assertOk()->json('lgas'))->pluck('name')->all();
+        $this->assertSame(collect($sup)->sort()->values()->all(), $sup);
+        $this->getJson('/api/v1/collation-entries?sort=status&dir=asc')->assertOk();
     }
 }

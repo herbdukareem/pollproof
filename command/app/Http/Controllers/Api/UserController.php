@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\TwoFactor;
+use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,12 +25,21 @@ class UserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $sorts = [
+            'latest' => [fn ($u) => $u['id'], 'desc'],
+            'name' => [fn ($u) => $u['name'], 'asc'],
+            'role' => [fn ($u) => $u['role_label'], 'asc'],
+            'status' => [fn ($u) => $u['active'] ? ($u['must_change_password'] ? 1 : 0) : 2, 'asc'],
+            'twofa' => [fn ($u) => $u['two_factor'], 'asc'],
+            'active' => [fn ($u) => $u['last_active_at'], 'desc'],
+        ];
+        $data = $request->validate(ListSort::rules($sorts));
         $campaignId = $request->user()->campaign_id;
         $users = User::where('campaign_id', $campaignId)->whereIn('role', self::STAFF_ROLES)->orderBy('role')->orderBy('name')->get();
 
         return response()->json([
             'roles' => collect(self::STAFF_ROLES)->map(fn (Role $r) => ['value' => $r->value, 'label' => $r->label(), 'count' => $users->where('role', $r)->whereNull('deactivated_at')->count()]),
-            'data' => $users->map(fn (User $u) => [
+            'data' => ListSort::apply($users->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
@@ -40,7 +50,7 @@ class UserController extends Controller
                 'two_factor' => $u->hasTwoFactor(),
                 'last_active_at' => $u->last_active_at,
                 'is_me' => $u->id === $request->user()->id,
-            ]),
+            ]), $data, $sorts),
         ]);
     }
 

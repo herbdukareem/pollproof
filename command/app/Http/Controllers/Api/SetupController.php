@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\PollingUnit;
 use App\Models\User;
+use App\Support\ListSort;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -141,7 +142,15 @@ class SetupController extends Controller
     public function supervisors(Request $request): JsonResponse
     {
         $user = $request->user();
-        $data = $request->validate(['lga_id' => ['nullable', 'integer']]);
+        $sorts = [
+            'default' => [null, 'asc'], // gaps first, as the page has always shown them
+            'name' => [fn ($r) => $r['name'], 'asc'],
+            'supervisor' => [fn ($r) => $r['supervisor']['name'] ?? null, 'asc'],
+            'backup' => [fn ($r) => $r['backup']['name'] ?? null, 'asc'],
+            'wards' => [fn ($r) => $r['wards'] ? $r['wards_covered'] / $r['wards'] : 1, 'asc'],
+            'agents' => [fn ($r) => $r['agents'], 'desc'],
+        ];
+        $data = $request->validate(['lga_id' => ['nullable', 'integer']] + ListSort::rules($sorts));
         $campaign = $user->campaign;
         $showPhones = $user->role->canSeePhones();
         $person = fn (?User $u) => $u ? ['id' => $u->id, 'code' => $u->code, 'name' => $u->name, 'phone' => $showPhones ? $u->phone : Phone::masked($u->phone)] : null;
@@ -177,7 +186,7 @@ class SetupController extends Controller
                 'agents' => (int) $agentsByLga->sum(),
                 'reserves' => User::where('campaign_id', $campaign->id)->where('role', Role::Agent)->where('is_reserve', true)->count(),
             ],
-            'lgas' => $rows,
+            'lgas' => ListSort::apply($rows, $data, $sorts),
             'selected' => $selected ? [
                 'id' => $selected->id,
                 'name' => $selected->name,

@@ -14,7 +14,16 @@ import { dateTime, localInputValue, num, signed } from '../lib/format';
 import Icon from '../components/Icon.vue';
 
 const level = ref('');
-const entries = useResource(() => api.get('collation-entries', { level: level.value }), { refreshMs: 30000 });
+// Latest announced first; the Status header puts problems first.
+const sort = useSortState({
+    latest: { label: 'latest announced', dir: 'desc', value: (e) => ts(e.announced_at) },
+    scope: { label: 'Collation point', dir: 'asc', value: (e) => e.comparison.scope },
+    ours: { label: 'Our units', dir: 'desc', value: (e) => e.comparison.our_total_cast },
+    declared: { label: 'Declared', dir: 'desc', value: (e) => e.comparison.declared_total_cast },
+    diff: { label: 'Difference', dir: 'desc', value: (e) => Object.values(e.comparison.differences ?? {}).reduce((t, d) => t + Math.abs(d), 0) },
+    status: { label: 'Status', dir: 'asc', value: (e) => rank[status(e.comparison)[0]] },
+}, undefined, { onChange: () => entries.load() });
+const entries = useResource(() => api.get('collation-entries', { level: level.value, ...sort.params }), { refreshMs: 30000 });
 const structure = useResource(() => api.get('structure'));
 watch(level, () => entries.load());
 
@@ -25,15 +34,6 @@ const search = ref('');
 const matches = computed(() => rows.value.filter((e) =>
     (!statusFilter.value || status(e.comparison)[0] === statusFilter.value)
     && (!search.value || e.comparison.scope.toLowerCase().includes(search.value.toLowerCase()))));
-// Latest announced first; the Status header puts problems first.
-const sort = useSortState({
-    latest: { label: 'latest announced', dir: 'desc', value: (e) => ts(e.announced_at) },
-    scope: { label: 'Collation point', dir: 'asc', value: (e) => e.comparison.scope },
-    ours: { label: 'Our units', dir: 'desc', value: (e) => e.comparison.our_total_cast },
-    declared: { label: 'Declared', dir: 'desc', value: (e) => e.comparison.declared_total_cast },
-    diff: { label: 'Difference', dir: 'desc', value: (e) => Object.values(e.comparison.differences ?? {}).reduce((t, d) => t + Math.abs(d), 0) },
-    status: { label: 'Status', dir: 'asc', value: (e) => rank[status(e.comparison)[0]] },
-});
 const sorted = computed(() => sortRows(matches.value, sort));
 const paged = usePaged(sorted, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value, sort.key, sort.dir] });
 const levelLabel = { ward: 'Ward · EC8B', lga: 'LGA · EC8C', state: 'State · EC8D' };

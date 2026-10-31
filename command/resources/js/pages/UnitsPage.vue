@@ -30,7 +30,7 @@ const sort = useSortState({
     code: { label: 'Unit', dir: 'asc' },
     agent: { label: 'Agent', dir: 'asc' },
     flags: { label: 'Flag', dir: 'desc' },
-}, { key: 'result', dir: 'desc' });
+}, { key: 'result', dir: 'desc' }, { mode: 'server' });
 const units = useResource(() => api.get('units', { ...filters, ...sort.params }), { refreshMs: 60000 });
 watch(() => [sort.key, sort.dir], () => { filters.page = 1; units.load(); });
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
 use App\Services\StipendService;
+use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -13,13 +14,22 @@ class StipendController extends Controller
 {
     public function index(Request $request, StipendService $stipends): JsonResponse
     {
+        $sorts = [
+            'latest' => [fn ($r) => max($r['checked_in_at']?->getTimestamp() ?? 0, $r['result_at']?->getTimestamp() ?? 0) ?: null, 'desc'],
+            'code' => [fn ($r) => $r['agent_code'], 'asc'],
+            'unit' => [fn ($r) => $r['polling_unit'], 'asc'],
+            'checked' => [fn ($r) => $r['checked_in_at'], 'desc'],
+            'result' => [fn ($r) => $r['result_at'], 'desc'],
+            'status' => [fn ($r) => $r['eligible'] ? 'Eligible' : $r['reason'], 'asc'],
+        ];
+        $data = $request->validate(ListSort::rules($sorts));
         $rows = collect($stipends->eligibility($request->user()->campaign));
 
         return response()->json([
             'eligible' => $rows->where('eligible', true)->count(),
             'on_hold' => $rows->where('eligible', false)->count(),
             'hold_reasons' => $rows->where('eligible', false)->countBy('reason'),
-            'agents' => $rows->values(),
+            'agents' => ListSort::apply($rows, $data, $sorts),
         ]);
     }
 

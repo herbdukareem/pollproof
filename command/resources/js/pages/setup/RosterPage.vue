@@ -28,7 +28,7 @@ const sort = useSortState({
     phone: { label: 'Phone', dir: 'asc' },
     unit: { label: 'Unit', dir: 'asc' },
     step: { label: 'Onboarding', dir: 'asc' },
-});
+}, undefined, { mode: 'server' });
 const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, page: page.value, per_page: perPage.value, ...sort.params }));
 watch(() => [sort.key, sort.dir], () => { page.value = 1; roster.load(); });
 const structure = useResource(() => api.get('structure'));
