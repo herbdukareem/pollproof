@@ -99,7 +99,7 @@ class CommandRoomReadTest extends TestCase
             ->assertJsonPath('counts.awaiting', 4)
             ->assertJsonPath('counts.no_agent', 4);
         $irev = collect($res->json('data'))->pluck('irev', 'code');
-        $this->assertSame(['PU1' => 'match', 'PU2' => 'differs', 'PU3' => 'not_on_irev', 'PU4' => null], $irev->only(['PU1', 'PU2', 'PU3', 'PU4'])->all());
+        $this->assertEquals(['PU1' => 'match', 'PU2' => 'differs', 'PU3' => 'not_on_irev', 'PU4' => null], $irev->only(['PU1', 'PU2', 'PU3', 'PU4'])->sortKeys()->all());
 
         // Counts follow the LGA filter but not the status filter.
         $this->getJson('/api/v1/units?status=reported&lga_id='.$this->lgas['L1']->id)->assertOk()

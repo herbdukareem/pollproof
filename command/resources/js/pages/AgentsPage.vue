@@ -25,7 +25,7 @@ const lgaId = ref(route.query.lga_id ? Number(route.query.lga_id) : '');
 // Latest first: the most recent check-in or result at the top; agents with neither go last.
 const statusRank = { absent: 0, outside_area: 1, present: 2, reserve: 3, deactivated: 4 };
 const sort = useSortState({
-    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.check_in?.at) ?? 0, ts(a.result?.at) ?? 0) || null },
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => a.activity },
     code: { label: 'Agent', dir: 'asc', value: (a) => a.code },
     unit: { label: 'Polling unit', dir: 'asc', value: (a) => a.polling_unit?.code },
     status: { label: 'Status', dir: 'asc', value: (a) => statusRank[a.status] },

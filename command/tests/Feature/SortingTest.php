@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Incident;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsElection;
 use Tests\TestCase;
@@ -25,10 +26,11 @@ class SortingTest extends TestCase
     private function signedResultFor(string $unit, string $at): void
     {
         $agent = $this->agentFor($unit);
-        ResultSubmission::create([
+        $result = ResultSubmission::create([
             'campaign_id' => $this->campaign->id, 'polling_unit_id' => $agent->polling_unit_id, 'user_id' => $agent->id, 'is_current' => true,
             'accredited' => 300, 'rejected' => 2, 'total_valid' => 250, 'total_cast' => 252, 'captured_at' => $at, 'payload_hash' => str_repeat('a', 64),
         ]);
+        app(AuditLogger::class)->log($agent, 'result.submitted', $result);
     }
 
     public function test_units_open_with_the_latest_result_first_and_sort_by_column(): void
@@ -93,5 +95,29 @@ class SortingTest extends TestCase
         $sup = collect($this->getJson('/api/v1/setup/supervisors?sort=name&dir=asc')->assertOk()->json('lgas'))->pluck('name')->all();
         $this->assertSame(collect($sup)->sort()->values()->all(), $sup);
         $this->getJson('/api/v1/collation-entries?sort=status&dir=asc')->assertOk();
+    }
+
+    public function test_latest_means_the_latest_action_recorded_not_the_time_on_the_record(): void
+    {
+        // Election-day results dated in the future, as in the demo, then a check-in approved now.
+        $this->signedResultFor('PU1', '2027-02-06T21:29:00Z');
+        $agent = $this->agentFor('PU2');
+        $ws = $this->staff(Role::WardSupervisor, ['ward_id' => $agent->ward_id, 'lga_id' => $this->lgas['L1']->id]);
+
+        $this->actingAsUser($agent);
+        $u = $this->units['PU2'];
+        $id = $this->postJson('/api/v1/check-ins', ['latitude' => $u->latitude + 0.0037, 'longitude' => $u->longitude, 'accuracy_m' => 10, 'captured_at' => '2027-02-06T08:00:00Z', 'request_review' => true])->json('id');
+        $this->actingAsUser($this->staff(Role::Dg));
+        $this->getJson('/api/v1/agents')->assertJsonPath('data.0.code', 'AG-PU2');
+
+        // The result is checked again later: that agent moves back to the top.
+        app(AuditLogger::class)->log($ws, 'result.approved', ResultSubmission::sole());
+        $this->getJson('/api/v1/agents')->assertJsonPath('data.0.code', 'AG-PU1');
+
+        // Approving the check-in is the newest action now.
+        $this->actingAsUser($ws);
+        $this->postJson("/api/v1/check-ins/{$id}/review", ['decision' => 'approve'])->assertOk();
+        $this->actingAsUser($this->staff(Role::Dg));
+        $this->getJson('/api/v1/agents')->assertJsonPath('data.0.code', 'AG-PU2')->assertJsonPath('data.0.status', 'present');
     }
 }

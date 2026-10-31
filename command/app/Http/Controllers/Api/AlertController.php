@@ -42,7 +42,7 @@ class AlertController extends Controller
         $page = $filter()
             ->with(['subject', 'resolver:id,name'])
             ->when(($data['sort'] ?? 'latest') === 'severity', fn ($q) => $q->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"))
-            ->latest('updated_at')->latest('id')
+            ->latest('id')
             ->paginate((int) ($data['per_page'] ?? 25));
 
         $page->getCollection()->transform(fn (Alert $a) => [

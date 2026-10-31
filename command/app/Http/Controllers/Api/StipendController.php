@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AgentActivity;
 use App\Services\AuditLogger;
 use App\Services\StipendService;
 use App\Support\ListSort;
@@ -15,7 +16,7 @@ class StipendController extends Controller
     public function index(Request $request, StipendService $stipends): JsonResponse
     {
         $sorts = [
-            'latest' => [fn ($r) => max($r['checked_in_at']?->getTimestamp() ?? 0, $r['result_at']?->getTimestamp() ?? 0) ?: null, 'desc'],
+            'latest' => [fn ($r) => $r['activity'], 'desc'],
             'code' => [fn ($r) => $r['agent_code'], 'asc'],
             'unit' => [fn ($r) => $r['polling_unit'], 'asc'],
             'checked' => [fn ($r) => $r['checked_in_at'], 'desc'],
@@ -23,7 +24,8 @@ class StipendController extends Controller
             'status' => [fn ($r) => $r['eligible'] ? 'Eligible' : $r['reason'], 'asc'],
         ];
         $data = $request->validate(ListSort::rules($sorts));
-        $rows = collect($stipends->eligibility($request->user()->campaign));
+        $activity = app(AgentActivity::class)->sequence($request->user()->campaign_id);
+        $rows = collect($stipends->eligibility($request->user()->campaign))->map(fn ($r) => $r + ['activity' => $activity->get($r['agent_id'])]);
 
         return response()->json([
             'eligible' => $rows->where('eligible', true)->count(),

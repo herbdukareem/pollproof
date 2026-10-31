@@ -14,7 +14,7 @@ import { num, timeOrDate } from '../lib/format';
 
 // Latest first: the most recent check-in or result at the top.
 const sort = useSortState({
-    latest: { label: 'latest activity', dir: 'desc', value: (a) => Math.max(ts(a.checked_in_at) ?? 0, ts(a.result_at) ?? 0) || null },
+    latest: { label: 'latest activity', dir: 'desc', value: (a) => a.activity },
     code: { label: 'Agent', dir: 'asc', value: (a) => a.agent_code },
     unit: { label: 'Unit', dir: 'asc', value: (a) => a.polling_unit },
     checked: { label: 'Checked in', dir: 'desc', value: (a) => ts(a.checked_in_at) },
