@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CheckInController;
 use App\Http\Controllers\Api\CloseoutController;
 use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\IdTagController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
 use App\Http\Controllers\Api\NavCountsController;
@@ -47,6 +48,10 @@ Route::prefix('v1')->group(function () {
 
     // Africa's Talking USSD callback; the secret is in the URL because AT can't send a header
     Route::post('ussd/africastalking/{token}', UssdController::class)->middleware('throttle:1200,1');
+
+    // Public: the page an ID tag's QR code opens, and the photo it shows (signed, short-lived).
+    Route::get('id-tags/{token}', [IdTagController::class, 'verify'])->middleware('throttle:60,1');
+    Route::get('id-tags/{token}/photo', [IdTagController::class, 'publicPhoto'])->middleware(['signed', 'throttle:60,1'])->name('id-tag.photo');
 
     // The agent app from a QR code: a signed link that works for an hour without signing in.
     Route::get('agent-app/phone', [AgentAppController::class, 'phone'])->middleware(['signed', 'throttle:30,1'])->name('agent-app.phone');
@@ -96,6 +101,7 @@ Route::prefix('v1')->group(function () {
         // The agent app, for every command-room role to download and pass on
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
             Route::get('agent-app', [AgentAppController::class, 'show']);
+            Route::get('people/{person}/photo', [IdTagController::class, 'photo']);
             Route::get('agent-app/download', [AgentAppController::class, 'download']);
         });
         Route::middleware('role:dg,situation_room')->post('agent-app/update', [AgentAppController::class, 'update']);
@@ -183,6 +189,10 @@ Route::prefix('v1')->group(function () {
             Route::get('setup/templates/supervisors', [TemplateController::class, 'supervisors']);
             Route::get('setup/templates/agents', [TemplateController::class, 'agents']);
             Route::get('setup/people', [PeopleController::class, 'index']);
+            Route::post('roster/agents', [PeopleController::class, 'storeAgent']);
+            Route::get('id-tags', [IdTagController::class, 'print']);
+            Route::post('people/{person}/photo', [IdTagController::class, 'uploadPhoto']);
+            Route::post('people/{person}/reissue-tag', [IdTagController::class, 'reissue']);
             Route::post('people/{person}/make-agent', [PeopleController::class, 'makeAgent']);
             Route::post('people/{person}/unassign', [PeopleController::class, 'unassign']);
             Route::get('readiness', [ReadinessController::class, 'index']);

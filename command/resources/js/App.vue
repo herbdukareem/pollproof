@@ -5,7 +5,7 @@ import AppShell from './components/AppShell.vue';
 import { progress } from './lib/progress';
 
 const route = useRoute();
-const bare = computed(() => route.meta.public);
+const bare = computed(() => route.meta.public || route.meta.bare);
 
 // The page area scrolls on its own, so a new page starts at the top of it.
 const toTop = () => document.getElementById('pp-main')?.scrollTo(0, 0);

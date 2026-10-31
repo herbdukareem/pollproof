@@ -134,6 +134,7 @@ class SetupController extends Controller
                     'step_label' => User::ONBOARDING_STEPS[$a->step],
                     'quiz_score' => $a->quiz_score,
                     'unavailable' => $a->unavailable_at !== null,
+                    'has_photo' => $a->photo_path !== null,
                 ];
             }),
         ]);
