@@ -30,6 +30,7 @@ class StructureController extends Controller
 
     public function import(Request $request, StructureImporter $importer, AuditLogger $audit): JsonResponse
     {
+        $request->user()->campaign->abortIfFrozen(); // the button is disabled too; this stops a direct call
         $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:20480']]);
         $summary = $importer->import($request->user()->campaign, $request->file('file')->getRealPath());
         $audit->log($request->user(), 'structure.imported', null, $summary, $request->ip());
