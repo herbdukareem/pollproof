@@ -94,6 +94,13 @@
 @utility btn-ghost {
     @apply btn border border-[#d6dae1] bg-white font-semibold text-ink-2 hover:border-navy hover:text-ink;
 }
+/* Buttons on the dark bulk-action bar. */
+@utility btn-bar {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-[13px] font-semibold whitespace-nowrap text-white transition hover:bg-white/20 disabled:opacity-50;
+}
+@utility checkbox {
+    @apply h-4 w-4 cursor-pointer rounded accent-navy;
+}
 @utility btn-good {
     @apply btn bg-good text-white hover:opacity-90;
 }
@@ -244,6 +251,15 @@
     .toast-leave-to {
         opacity: 0;
         transform: translateX(32px);
+    }
+    .bulk-enter-active,
+    .bulk-leave-active {
+        transition: opacity 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .bulk-enter-from,
+    .bulk-leave-to {
+        opacity: 0;
+        translate: 0 16px;
     }
     /* The table loader's bar runs left to right while a page, sort or filter loads. */
     .table-busy-bar {

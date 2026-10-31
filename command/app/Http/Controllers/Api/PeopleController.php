@@ -104,6 +104,22 @@ class PeopleController extends Controller
         ]);
     }
 
+    /** Take several supervisors off their posts at once. */
+    public function bulkUnassign(Request $request): JsonResponse
+    {
+        $campaign = $request->user()->campaign;
+        $campaign->abortIfFrozen();
+        $data = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:500'], 'ids.*' => ['integer']]);
+        $people = User::where('campaign_id', $campaign->id)->whereIn('role', [Role::WardSupervisor, Role::LgaSupervisor])->whereNull('deactivated_at')->whereIn('id', $data['ids'])->get();
+        foreach ($people as $person) {
+            $before = PeopleMover::post($person);
+            $this->mover->unassign($campaign, $person);
+            $this->audit->log($request->user(), 'supervisor.removed', $person, ['from' => $before, 'bulk' => true], $request->ip());
+        }
+
+        return response()->json(['done' => $people->count(), 'skipped' => count($data['ids']) - $people->count()]);
+    }
+
     /** Take a supervisor off their post. */
     public function unassign(Request $request, User $person): JsonResponse
     {

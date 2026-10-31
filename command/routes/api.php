@@ -90,11 +90,13 @@ Route::prefix('v1')->group(function () {
         // Supervisors
         Route::middleware('role:ward_supervisor,lga_supervisor,situation_room,dg')->group(function () {
             Route::get('check-ins', [CheckInController::class, 'index']);
+            Route::post('check-ins/bulk-review', [CheckInController::class, 'bulkReview']);
             Route::post('check-ins/{checkIn}/review', [CheckInController::class, 'review']);
             Route::get('check-ins/{checkIn}/selfie', [CheckInController::class, 'selfie']);
             Route::get('agents', AgentListController::class);
             Route::post('agents/{agent}/assign', [AgentController::class, 'assign']);
             Route::middleware('role:situation_room,dg')->patch('agents/{agent}', [AgentController::class, 'update']);
+            Route::middleware('role:situation_room,dg')->post('agents/bulk', [AgentController::class, 'bulk']);
             Route::patch('polling-units/{unit}', [PollingUnitController::class, 'update']);
         });
 
@@ -194,6 +196,7 @@ Route::prefix('v1')->group(function () {
             Route::post('people/{person}/photo', [IdTagController::class, 'uploadPhoto']);
             Route::post('people/{person}/reissue-tag', [IdTagController::class, 'reissue']);
             Route::post('people/{person}/make-agent', [PeopleController::class, 'makeAgent']);
+            Route::post('people/bulk-unassign', [PeopleController::class, 'bulkUnassign']);
             Route::post('people/{person}/unassign', [PeopleController::class, 'unassign']);
             Route::get('readiness', [ReadinessController::class, 'index']);
             Route::post('readiness/remind', [ReadinessController::class, 'remind'])->middleware('throttle:10,1');

@@ -93,4 +93,41 @@ class AgentController extends Controller
 
         return response()->json(['id' => $agent->id, 'name' => $agent->name, 'phone' => $agent->phone, 'active' => $agent->isActive(), 'polling_unit_id' => $agent->polling_unit_id]);
     }
+
+    /**
+     * The same changes for many agents at once, from the table's checkboxes: release to the
+     * reserves, deactivate (frees the unit, signs out) or reactivate (as a reserve).
+     * Agents the change doesn't apply to are skipped and counted.
+     */
+    public function bulk(Request $request, AuditLogger $audit): JsonResponse
+    {
+        $user = $request->user();
+        $user->campaign->abortIfDeclared();
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:2000'], 'ids.*' => ['integer'],
+            'action' => ['required', 'in:release,deactivate,reactivate'],
+        ]);
+        $agents = User::where('campaign_id', $user->campaign_id)->where('role', Role::Agent)->whereIn('id', $data['ids'])->get();
+        $done = 0;
+        DB::transaction(function () use ($agents, $data, $user, $audit, $request, &$done) {
+            foreach ($agents as $agent) {
+                $changes = match ($data['action']) {
+                    'release' => $agent->isActive() && $agent->polling_unit_id ? ['polling_unit_id' => null, 'is_reserve' => true] : null,
+                    'deactivate' => $agent->isActive() ? ['deactivated_at' => now(), 'polling_unit_id' => null] : null,
+                    'reactivate' => ! $agent->isActive() ? ['deactivated_at' => null, 'is_reserve' => true] : null,
+                };
+                if (! $changes) {
+                    continue;
+                }
+                $agent->update($changes);
+                if ($data['action'] === 'deactivate') {
+                    $agent->tokens()->delete();
+                }
+                $audit->log($user, $data['action'] === 'release' ? 'agent.released' : 'agent.'.$data['action'].'d', $agent, ['bulk' => true], $request->ip());
+                $done++;
+            }
+        });
+
+        return response()->json(['done' => $done, 'skipped' => count($data['ids']) - $done]);
+    }
 }
