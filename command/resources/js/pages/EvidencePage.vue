@@ -57,7 +57,7 @@ const headline = computed(() => {
 </script>
 
 <template>
-    <PageHeader title="Evidence pack" :subtitle="d ? `${d.polling_unit.code} · ${d.polling_unit.name} · ${d.polling_unit.ward} · ${d.polling_unit.lga}` : 'Everything we hold for one polling unit, for a petition.'" :updated-at="pack.updatedAt.value" :loading="pack.loading.value" @refresh="pack.load">
+    <PageHeader back="/units" title="Evidence pack" :subtitle="d ? `${d.polling_unit.code} · ${d.polling_unit.name} · ${d.polling_unit.ward} · ${d.polling_unit.lga}` : 'Everything we hold for one polling unit, for a petition.'" :updated-at="pack.updatedAt.value" :loading="pack.loading.value" @refresh="pack.load">
         <template #actions>
             <Badge v-if="headline" :tone="headline[0]">{{ headline[1] }}</Badge>
             <button class="btn-primary print:hidden" @click="printPack"><Icon name="download" :size="16" /> Print or save as PDF</button>

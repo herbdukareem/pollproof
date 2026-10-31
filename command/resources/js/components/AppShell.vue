@@ -80,6 +80,12 @@ function announceCheckIns(c) {
     seenCount = c.checkins;
 }
 
+// Back to where they came from (keeping its filters and page), or to the page's parent if opened directly.
+function goBack() {
+    if (window.history.state?.back) router.back();
+    else router.push(page.back);
+}
+
 async function loadCounts() {
     try {
         counts.value = await api.get('nav-counts');
@@ -159,6 +165,9 @@ async function logout() {
         <div class="flex h-full min-w-0 flex-1 flex-col print:block print:h-auto">
             <header class="z-20 flex min-h-[68px] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e3e6ec] bg-white/95 px-4 py-3 backdrop-blur sm:px-7 print:hidden">
                 <button class="btn-outline h-10 w-10 !px-0 lg:hidden" aria-label="Open menu" @click="open = true"><Icon name="menu" /></button>
+                <button v-if="page.back" class="btn-ghost h-10 shrink-0 gap-1.5 px-3" title="Back to the previous page" @click="goBack">
+                    <Icon name="chevron" :size="16" class="rotate-180" /><span class="hidden sm:inline">Back</span>
+                </button>
                 <div class="min-w-0 flex-1">
                     <h1 class="truncate text-[22px] leading-tight font-extrabold tracking-[-0.3px] text-ink">{{ title }}</h1>
                     <p v-if="page.subtitle" class="truncate text-[13px] text-ink-2">{{ page.subtitle }}</p>

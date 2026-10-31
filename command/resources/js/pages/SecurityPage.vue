@@ -83,7 +83,7 @@ function download() {
 </script>
 
 <template>
-    <PageHeader title="Account security" :subtitle="forced ? 'Your campaign requires two-step sign-in. Set it up to continue.' : 'Your password and two-step sign-in.'" />
+    <PageHeader :back="forced ? '' : '/'" title="Account security" :subtitle="forced ? 'Your campaign requires two-step sign-in. Set it up to continue.' : 'Your password and two-step sign-in.'" />
     <LoadState :loading="status.loading.value && !s" :error="status.error.value" :empty="!s">
         <div class="grid max-w-4xl items-start gap-5 lg:grid-cols-[1fr_300px]">
             <section class="card p-6">
