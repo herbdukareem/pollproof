@@ -71,6 +71,7 @@ class SetupTest extends TestCase
 
         $this->post('/api/v1/roster/import', ['file' => $this->csv('a.csv', "name,phone\nA,08031110000\n")], ['Accept' => 'application/json'])->assertStatus(423);
         $this->patchJson("/api/v1/polling-units/{$this->units['PU1']->id}", ['latitude' => 9.6, 'longitude' => 6.5])->assertStatus(423);
+        $this->post('/api/v1/structure/import', ['file' => $this->csv('u.csv', "lga_code,lga_name,ward_code,ward_name,pu_code,pu_name\n1,A,1,B,1-1-1,C\n")], ['Accept' => 'application/json'])->assertStatus(423);
         $this->postJson('/api/v1/roster/auto-assign', ['apply' => false])->assertOk(); // a preview is still fine
         $this->postJson('/api/v1/roster/auto-assign', ['apply' => true])->assertStatus(423);
 
