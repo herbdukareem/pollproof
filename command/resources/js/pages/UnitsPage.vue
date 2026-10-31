@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Pagination from '../components/Pagination.vue';
+import SearchSelect from '../components/SearchSelect.vue';
 import SortTh from '../components/SortTh.vue';
 import { useSortState } from '../lib/useSort';
 import Modal from '../components/Modal.vue';
@@ -124,10 +125,7 @@ function go(page) {
                 <label class="sr-only" for="unit-search">Search units</label>
                 <input id="unit-search" v-model="filters.search" class="field max-w-xs flex-1" placeholder="Search unit code or name" />
                 <label class="sr-only" for="lga">LGA</label>
-                <select id="lga" v-model="filters.lga_id" class="field max-w-[220px]">
-                    <option value="">All LGAs</option>
-                    <option v-for="l in structure.data.value?.lgas ?? []" :key="l.id" :value="l.id">{{ l.name }}</option>
-                </select>
+                <SearchSelect id="lga" v-model="filters.lga_id" class="w-full sm:w-[220px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
             </div>
             <LoadState :loading="units.loading.value" :error="units.error.value" :empty="!rows.length" empty-text="No units match.">
                 <div class="overflow-x-auto">
