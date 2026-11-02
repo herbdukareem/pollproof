@@ -12,7 +12,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Imports the state's polling-unit list from CSV with the header:
  * lga_code,lga_name,ward_code,ward_name,pu_code,pu_name,latitude,longitude,registered_voters
- * Re-importing is safe: rows are matched on their codes and updated.
+ * Re-importing is safe: rows are matched on their codes and updated; blank coordinates or voter
+ * counts leave the unit's existing ones in place.
  */
 final class StructureImporter
 {
@@ -55,19 +56,15 @@ final class StructureImporter
 
                 $lat = is_numeric($row['latitude'] ?? null) ? (float) $row['latitude'] : null;
                 $lng = is_numeric($row['longitude'] ?? null) ? (float) $row['longitude'] : null;
-                if ($lat === null || $lng === null) {
+                // A blank location or voter count keeps what the unit already has (a pin a supervisor
+                // dropped at the unit, say), so re-importing a list never wipes them.
+                $attrs = ['ward_id' => $ward->id, 'name' => $row['pu_name']]
+                    + ($lat !== null && $lng !== null ? ['latitude' => $lat, 'longitude' => $lng] : [])
+                    + (is_numeric($row['registered_voters'] ?? null) ? ['registered_voters' => (int) $row['registered_voters']] : []);
+                $unit = PollingUnit::updateOrCreate(['campaign_id' => $campaign->id, 'code' => $row['pu_code']], $attrs);
+                if ($unit->latitude === null || $unit->longitude === null) {
                     $missingGps++;
                 }
-                PollingUnit::updateOrCreate(
-                    ['campaign_id' => $campaign->id, 'code' => $row['pu_code']],
-                    [
-                        'ward_id' => $ward->id,
-                        'name' => $row['pu_name'],
-                        'latitude' => $lat,
-                        'longitude' => $lng,
-                        'registered_voters' => is_numeric($row['registered_voters'] ?? null) ? (int) $row['registered_voters'] : null,
-                    ],
-                );
                 $units++;
             }
         });
