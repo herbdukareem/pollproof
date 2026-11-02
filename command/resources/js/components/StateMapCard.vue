@@ -172,10 +172,15 @@ function popover(item, where) {
 
     return h('div', 'pp-pop',
         h('p', 'pp-pop-sub', where.level === 'wards' ? `Ward in ${where.lga}` : 'LGA', ` · ${num(a.reported)} of ${num(a.units)} units reported`),
+        h('div', 'pp-pop-total',
+            h('span', null, 'Total votes cast'),
+            h('strong', null, a.reported ? num(a.cast) : '–'),
+            a.reported && a.units > a.reported ? h('small', null, `so far, from ${num(a.reported)} units`) : null,
+        ),
         h('div', 'pp-pop-rows',
             row('Registered voters', a.registered ? num(a.registered) : '–'),
             row('Accredited', a.reported ? num(a.accredited) : '–'),
-            row('Total votes cast', a.reported ? num(a.cast) : '–'),
+            row('Valid votes', a.valid ? num(a.valid) : '–'),
             a.rejected ? row('Rejected', num(a.rejected)) : null,
         ),
         a.valid
@@ -195,6 +200,18 @@ function popover(item, where) {
                 ))),
             ]
             : h('p', 'pp-pop-empty', a.units ? 'No results yet.' : 'No polling units are placed here.'),
+        where.openWards
+            ? (() => {
+                const b = h('button', 'pp-pop-wards', 'Show wards');
+                b.type = 'button';
+                b.title = 'Or double-click the LGA';
+                b.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    where.openWards();
+                });
+                return b;
+            })()
+            : null,
     );
 }
 
@@ -253,7 +270,7 @@ onBeforeUnmount(() => {
         <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
                 <h2 class="card-title">{{ adapter?.name ?? 'State map' }}</h2>
-                <p class="card-sub">{{ VIEWS.find((v) => v.key === metric).sub }} Tap an LGA to see its wards.</p>
+                <p class="card-sub">{{ VIEWS.find((v) => v.key === metric).sub }} Click an area for its figures; double-click an LGA for its wards.</p>
             </div>
             <div role="tablist" aria-label="What the map shows" class="inline-flex rounded-xl bg-mist p-1 text-[12.5px] font-semibold">
                 <button
@@ -343,6 +360,12 @@ onBeforeUnmount(() => {
     overflow: auto;
     background: #fff;
 }
+/* The map's dark toolbar: its hover turned buttons near-white under white text. Keep them dark. */
+.pp-state-map :deep(.inistmap-tools-overlay button:hover:not(:disabled)) {
+    background: #2b3a5c;
+    border-color: #6d7d9c;
+    color: #fff;
+}
 /* In full screen the map fits the space both ways instead of following the width. */
 .pp-map-full .pp-state-map :deep(.inistmap-svg) {
     width: 100%;
@@ -396,6 +419,32 @@ onBeforeUnmount(() => {
 .pp-map-popover .pp-pop-sub {
     margin: 0 0 7px;
     font-size: 11.5px;
+    color: #5b6578;
+}
+.pp-map-popover .pp-pop-total {
+    display: grid;
+    margin: 0 0 9px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    background: #f1f3f7;
+}
+.pp-map-popover .pp-pop-total span {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #5b6578;
+}
+.pp-map-popover .pp-pop-total strong {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: #13213c;
+    font-variant-numeric: tabular-nums;
+}
+.pp-map-popover .pp-pop-total small {
+    font-size: 11px;
     color: #5b6578;
 }
 .pp-map-popover .pp-pop-rows {
@@ -479,6 +528,20 @@ onBeforeUnmount(() => {
     width: 9px;
     height: 9px;
     border-radius: 3px;
+}
+.pp-map-popover .pp-pop-wards {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #13213c;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.pp-map-popover .pp-pop-wards:hover {
+    background: #24345a;
 }
 .pp-map-popover .pp-pop-empty {
     margin-top: 8px;
