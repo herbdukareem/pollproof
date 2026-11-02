@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import Icon from './Icon.vue';
 import { api } from '../lib/api';
 import { num, pct } from '../lib/format';
 
@@ -226,10 +227,29 @@ onMounted(async () => {
 watch(() => props.tally, loadPoints);
 watch([regions, wards], ([r, w]) => map.value?.update(r, w ?? undefined));
 onBeforeUnmount(() => map.value?.destroy());
+
+// Full screen for the whole card: views, map and legend. Esc or the button leaves it.
+const card = ref(null);
+const full = ref(false);
+const canFull = typeof document !== 'undefined' && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+function toggleFull() {
+    const fsEl = document.fullscreenElement ?? document.webkitFullscreenElement;
+    if (fsEl) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document);
+    else (card.value.requestFullscreen ?? card.value.webkitRequestFullscreen)?.call(card.value);
+}
+const onFullChange = () => (full.value = (document.fullscreenElement ?? document.webkitFullscreenElement) === card.value);
+onMounted(() => {
+    document.addEventListener('fullscreenchange', onFullChange);
+    document.addEventListener('webkitfullscreenchange', onFullChange);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('fullscreenchange', onFullChange);
+    document.removeEventListener('webkitfullscreenchange', onFullChange);
+});
 </script>
 
 <template>
-    <section id="map" class="card scroll-mt-4 overflow-hidden p-5 transition">
+    <section id="map" ref="card" class="card scroll-mt-4 overflow-hidden p-5 transition" :class="full && 'pp-map-full'">
         <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
                 <h2 class="card-title">{{ adapter?.name ?? 'State map' }}</h2>
@@ -246,10 +266,19 @@ onBeforeUnmount(() => map.value?.destroy());
                     @click="metric = v.key"
                 >{{ v.label }}</button>
             </div>
+            <button
+                v-if="canFull"
+                type="button"
+                class="btn-outline h-9 shrink-0 gap-1.5 px-3 text-[13px]"
+                :title="full ? 'Leave full screen (Esc)' : 'Show the map full screen'"
+                @click="toggleFull"
+            >
+                <Icon :name="full ? 'shrink' : 'expand'" :size="16" />{{ full ? 'Exit full screen' : 'Full screen' }}
+            </button>
         </div>
 
         <p v-if="failed" class="rounded-xl bg-mist p-6 text-center text-sm text-ink-2">The map couldn't load. The tracker beside it has the same figures.</p>
-        <div v-else class="pp-state-map -mx-2 h-[520px]">
+        <div v-else class="pp-state-map -mx-2" :class="full ? 'min-h-0 flex-1' : 'h-[520px]'">
             <div ref="el" class="h-full"></div>
         </div>
 
@@ -302,6 +331,27 @@ onBeforeUnmount(() => map.value?.destroy());
 .pp-state-map :deep(.inistmap-stage) {
     background: transparent;
     padding-top: 56px;
+}
+/* Full screen: the card fills the screen and the map takes the space left by the header and key. */
+.pp-map-full {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    padding: 24px 28px;
+    overflow: auto;
+    background: #fff;
+}
+/* In full screen the map fits the space both ways instead of following the width. */
+.pp-map-full .pp-state-map :deep(.inistmap-svg) {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+}
+/* The card's button covers full screen (with the views and key), so drop the map-only one. */
+.pp-state-map :deep([data-action='fullscreen']) {
+    display: none;
 }
 /* On a phone the toolbar keeps to one row: export is for desks. */
 @media (max-width: 639px) {
