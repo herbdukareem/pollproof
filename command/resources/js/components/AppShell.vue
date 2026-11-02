@@ -16,6 +16,15 @@ const route = useRoute();
 const router = useRouter();
 const open = ref(false);
 const menu = ref(false);
+// On wide screens the menu can fold down to a rail of icons; remembered per browser.
+const KEY = 'pp:menu-collapsed';
+const collapsed = ref((() => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } })());
+function toggleCollapsed() {
+    collapsed.value = !collapsed.value;
+    try { localStorage.setItem(KEY, collapsed.value ? '1' : '0'); } catch { /* private window: just this visit */ }
+}
+// The rail only applies on wide screens; the phone menu always opens full width.
+const rail = computed(() => collapsed.value && !open.value);
 const counts = ref({});
 const sections = computed(() => sectionsFor(session.user?.role));
 const current = computed(() => itemForPath(route.path));
@@ -117,48 +126,73 @@ async function logout() {
 <template>
     <div class="flex h-dvh overflow-hidden bg-mist print:block print:h-auto print:overflow-visible">
         <aside
-            class="fixed inset-y-0 left-0 z-40 flex w-[256px] shrink-0 flex-col gap-5 overflow-hidden bg-navy px-4 py-5 text-white transition-transform duration-200 lg:static lg:h-full lg:translate-x-0 print:hidden"
-            :class="open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-40 flex w-[256px] shrink-0 flex-col gap-5 overflow-hidden bg-navy py-5 text-white transition-[transform,width,padding] duration-200 lg:static lg:h-full lg:translate-x-0 print:hidden"
+            :class="[open ? 'translate-x-0 shadow-2xl' : '-translate-x-full', rail ? 'px-4 lg:w-[84px] lg:px-3' : 'px-4']"
         >
-            <RouterLink to="/" class="flex items-center gap-2.5 px-2">
+            <RouterLink to="/" class="flex items-center gap-2.5" :class="rail ? 'px-2 lg:justify-center lg:px-0' : 'px-2'" title="PollProof home">
                 <PinLogo :size="30" />
-                <span class="text-[21px] tracking-[-0.4px]"><b class="font-extrabold">Poll</b><span class="font-medium">Proof</span></span>
+                <span class="text-[21px] tracking-[-0.4px]" :class="rail && 'lg:hidden'"><b class="font-extrabold">Poll</b><span class="font-medium">Proof</span></span>
             </RouterLink>
 
-            <div v-if="sections.length > 1" role="tablist" aria-label="Menu sections" class="grid gap-1 rounded-xl bg-navy-2 p-1" :style="{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }">
+            <div
+                v-if="sections.length > 1"
+                role="tablist"
+                aria-label="Menu sections"
+                class="grid gap-1 rounded-xl bg-navy-2 p-1"
+                :class="rail && 'lg:!grid-cols-1'"
+                :style="{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }"
+            >
                 <button
                     v-for="s in sections"
                     :key="s.key"
                     role="tab"
                     :aria-selected="s.key === activeKey"
                     :title="s.title"
-                    class="h-8 rounded-lg px-1 text-[12px] font-bold transition"
-                    :class="s.key === activeKey ? 'bg-white text-navy shadow-sm' : 'text-[#c9d1de] hover:text-white'"
+                    class="h-8 rounded-lg px-1 font-bold transition"
+                    :class="[s.key === activeKey ? 'bg-white text-navy shadow-sm' : 'text-[#c9d1de] hover:text-white', rail ? 'text-[12px] lg:h-7 lg:text-[10.5px]' : 'text-[12px]']"
                     @click="chosen = s.key"
                 >{{ s.label }}</button>
             </div>
 
             <Transition name="nav" mode="out-in">
             <nav :key="activeKey" aria-label="Main" class="-mr-2 flex flex-1 flex-col gap-1 overflow-y-auto pr-2">
-                <div class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase">{{ active?.title }}</div>
+                <div class="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-[#8d9bb3] uppercase" :class="rail && 'lg:hidden'">{{ active?.title }}</div>
                 <RouterLink
                     v-for="item in active?.items ?? []"
                     :key="item.name"
                     :to="item.path"
-                    class="group flex h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] text-[#c9d1de] transition hover:bg-navy-2 hover:text-white"
-                    :class="current?.name === item.name ? '!bg-navy-3 font-bold !text-white' : ''"
+                    class="group relative flex h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] text-[#c9d1de] transition hover:bg-navy-2 hover:text-white"
+                    :class="[current?.name === item.name ? '!bg-navy-3 font-bold !text-white' : '', rail && 'lg:justify-center lg:px-0']"
+                    :title="rail ? item.label + (item.count && counts[item.count] ? ` (${counts[item.count]})` : '') : undefined"
+                    :aria-label="rail ? item.label : undefined"
                 >
-                    <Icon :name="item.icon" class="opacity-80 group-hover:opacity-100" />
-                    <span class="flex-1 truncate">{{ item.label }}</span>
-                    <span v-if="item.count && counts[item.count]" class="rounded-full bg-action px-2 py-px text-xs font-bold text-white">{{ counts[item.count] > 99 ? '99+' : counts[item.count] }}</span>
+                    <Icon :name="item.icon" class="shrink-0 opacity-80 group-hover:opacity-100" />
+                    <span class="flex-1 truncate" :class="rail && 'lg:hidden'">{{ item.label }}</span>
+                    <span
+                        v-if="item.count && counts[item.count]"
+                        class="rounded-full bg-action px-2 py-px text-xs font-bold text-white"
+                        :class="rail && 'lg:absolute lg:top-1 lg:right-1 lg:px-1.5 lg:text-[10px] lg:leading-4'"
+                    >{{ counts[item.count] > 99 ? '99+' : counts[item.count] }}</span>
                 </RouterLink>
             </nav>
             </Transition>
 
-            <div class="rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]">
+            <div class="rounded-xl bg-navy-2 p-3.5 text-[13px] leading-relaxed text-[#c9d1de]" :class="rail && 'lg:hidden'">
                 <div class="mb-0.5 font-bold text-white">{{ footer.title }}</div>
                 {{ footer.text }}
             </div>
+
+            <button
+                class="-mt-2 hidden h-10 items-center gap-3 rounded-[10px] px-3 text-[13.5px] font-semibold text-[#8d9bb3] transition hover:bg-navy-2 hover:text-white lg:flex"
+                :class="rail && 'justify-center !px-0'"
+                :title="collapsed ? 'Expand the menu' : 'Collapse the menu'"
+                :aria-label="collapsed ? 'Expand the menu' : 'Collapse the menu'"
+                :aria-expanded="!collapsed"
+                @click="toggleCollapsed"
+            >
+                <Icon name="sidebar" class="shrink-0 transition-transform" :class="collapsed && 'rotate-180'" />
+                <span v-if="!rail">Collapse menu</span>
+            </button>
         </aside>
         <div v-if="open" class="fixed inset-0 z-30 bg-navy/40 backdrop-blur-[1px] lg:hidden" @click="open = false"></div>
 
