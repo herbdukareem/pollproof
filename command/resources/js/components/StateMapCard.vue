@@ -27,6 +27,23 @@ const NAVY = '#13213c';
 const BELOW = '#e8590c';
 const NONE = '#e3e6ec';
 const RAMP = ['#e9edf3', '#b8c3d4', '#7f90ab', '#475a7d', NAVY];
+
+// Heat colours. Our share runs on two scales split at the 25% line: deep orange at 0% fading
+// to pale just under the line, then pale navy at the line deepening to full navy at TOP.
+const TOP = 0.6;
+const BELOW_STOPS = ['#a83a05', '#e8590c', '#fbcfb2'];
+const ABOVE_STOPS = ['#c5cee0', '#7f90ab', '#13213c'];
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => '#' + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
+/** A colour part-way (0 to 1) along a list of stops. */
+function along(stops, t) {
+    const x = Math.min(1, Math.max(0, t)) * (stops.length - 1);
+    const i = Math.min(stops.length - 2, Math.floor(x));
+    return mix(stops[i], stops[i + 1], x - i);
+}
+const shareHeat = (share, line) => (share < line ? along(BELOW_STOPS, share / line) : along(ABOVE_STOPS, (share - line) / (TOP - line)));
+/** The leader's colour, paler for a narrow lead and full for a lead of 30 points or more. */
+const leadHeat = (color, margin) => mix('#ffffff', color, 0.3 + 0.7 * Math.min(1, margin / 0.3));
 const RIVALS = ['#b5002b', '#d99a00', '#2f7d4a', '#6b4fbb', '#0e7c86', '#8a5a44', '#c2185b'];
 const VIEWS = [
     { key: 'share', label: '25% line', sub: 'Our share of valid votes.' },
@@ -49,15 +66,22 @@ function entry(a, url, linkLabel) {
     const line = `${num(a.reported)} of ${num(a.units)} units reported${valid ? ` · our share ${pct(share)}` : ''}`;
     const link = url ? { url, linkLabel } : {};
     if (metric.value === 'reporting') {
-        return { value: Math.round(rep * 1000) / 10, label: pct(rep), color: a.reported ? RAMP[Math.min(RAMP.length - 1, Math.floor(rep * RAMP.length))] : NONE, description: `${line}.`, ...link };
+        return { value: Math.round(rep * 1000) / 10, label: pct(rep), color: a.reported ? along(RAMP, rep) : NONE, description: `${line}.`, ...link };
     }
     if (!valid) return { value: null, label: '–', color: NONE, description: `No results yet. ${num(a.units)} units.`, ...link };
     if (metric.value === 'lead') {
-        const [lead, votes] = Object.entries(a.votes).sort((x, y) => y[1] - x[1])[0];
-        return { value: Math.round((votes / valid) * 1000) / 10, label: lead, color: partyColor.value[lead], description: `${partyName(lead)} leads with ${pct(votes / valid)}. ${line}.`, ...link };
+        const [[lead, votes], [, next] = [null, 0]] = Object.entries(a.votes).sort((x, y) => y[1] - x[1]);
+        const margin = (votes - next) / valid;
+        return {
+            value: Math.round((votes / valid) * 1000) / 10,
+            label: lead,
+            color: leadHeat(partyColor.value[lead], margin),
+            description: `${partyName(lead)} leads with ${pct(votes / valid)}, ${pct(margin)} ahead of the next party. ${line}.`,
+            ...link,
+        };
     }
     const t = props.tally.threshold;
-    return { value: Math.round(share * 1000) / 10, label: pct(share), color: share >= t ? NAVY : BELOW, description: `${share >= t ? 'Meets' : 'Below'} the ${pct(t)} line. ${line}.`, ...link };
+    return { value: Math.round(share * 1000) / 10, label: pct(share), color: shareHeat(share, t), description: `${share >= t ? 'Meets' : 'Below'} the ${pct(t)} line. ${line}.`, ...link };
 }
 
 const regions = computed(() => Object.fromEntries((props.tally.lgas ?? []).map((l) => [
@@ -89,6 +113,14 @@ const wards = computed(() => {
         const id = lgaId[lga.toLowerCase()];
         return [ward, entry(a, id ? `/units?lga_id=${id}` : null, `Open ${lga} units`)];
     }))]));
+});
+
+// The 25% legend: the same two scales as the map, with the line marked.
+const linePos = computed(() => `${(props.tally.threshold / TOP) * 100}%`);
+const shareScale = computed(() => {
+    const at = (props.tally.threshold / TOP) * 100;
+    const stops = (list, from, to) => list.map((c, i) => `${c} ${from + ((to - from) * i) / (list.length - 1)}%`);
+    return `linear-gradient(to right, ${[...stops(BELOW_STOPS, 0, at), ...stops(ABOVE_STOPS, at, 100)].join(', ')})`;
 });
 
 const counts = computed(() => {
@@ -163,21 +195,29 @@ onBeforeUnmount(() => map.value?.destroy());
             <div ref="el" class="h-full"></div>
         </div>
 
-        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-ink-2">
+        <div class="mt-3 text-[12.5px] text-ink-2">
             <template v-if="metric === 'share'">
-                <span class="inline-flex items-center gap-1.5"><i class="h-3 w-3 rounded-sm" :style="{ background: NAVY }"></i>{{ pct(tally.threshold) }} or more · {{ counts.met }} LGAs</span>
-                <span class="inline-flex items-center gap-1.5"><i class="h-3 w-3 rounded-sm" :style="{ background: BELOW }"></i>Below · {{ counts.below }}</span>
-                <span class="inline-flex items-center gap-1.5"><i class="h-3 w-3 rounded-sm" :style="{ background: NONE }"></i>No results yet · {{ counts.none }}</span>
+                <div class="relative max-w-[340px] pt-4">
+                    <div class="h-3 rounded-full" :style="{ background: shareScale }"></div>
+                    <span class="absolute top-0 -translate-x-1/2 text-[11px] font-bold text-ink" :style="{ left: linePos }">{{ pct(tally.threshold) }}</span>
+                    <span class="absolute top-3.5 h-4 w-0.5 -translate-x-1/2 bg-ink" :style="{ left: linePos }"></span>
+                    <div class="mt-1 flex justify-between text-[11px]"><span>0%</span><span>{{ pct(TOP) }}+</span></div>
+                </div>
+                <p class="mt-1.5">{{ counts.met }} LGAs at the line or above, {{ counts.below }} below<template v-if="counts.none">, {{ counts.none }} with no results yet</template>. Darker means further from the line.</p>
             </template>
-            <span v-else-if="metric === 'reporting'" class="inline-flex items-center gap-2">
-                0%
-                <span class="flex h-2.5 w-36 overflow-hidden rounded-full"><i v-for="c in RAMP" :key="c" class="flex-1" :style="{ background: c }"></i></span>
-                100% of units reported
-            </span>
+            <template v-else-if="metric === 'reporting'">
+                <div class="max-w-[340px]">
+                    <div class="h-3 rounded-full" :style="{ background: `linear-gradient(to right, ${RAMP.join(', ')})` }"></div>
+                    <div class="mt-1 flex justify-between text-[11px]"><span>0%</span><span>100% of units reported</span></div>
+                </div>
+            </template>
             <template v-else>
-                <span v-for="c in parties" :key="c.party" class="inline-flex items-center gap-1.5">
-                    <i class="h-3 w-3 rounded-sm" :style="{ background: partyColor[c.party] }"></i>{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }} · {{ counts.leads[c.party] ?? 0 }}
-                </span>
+                <div class="flex flex-wrap gap-x-4 gap-y-1.5">
+                    <span v-for="c in parties" :key="c.party" class="inline-flex items-center gap-1.5">
+                        <i class="h-3 w-7 rounded-sm" :style="{ background: `linear-gradient(to right, ${leadHeat(partyColor[c.party], 0)}, ${partyColor[c.party]})` }"></i>{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }} · {{ counts.leads[c.party] ?? 0 }}
+                    </span>
+                </div>
+                <p class="mt-1.5">Paler is a narrow lead; full colour is 30 points or more ahead.</p>
             </template>
         </div>
         <p v-if="adapter?.credit" class="mt-2 text-[11px] leading-snug text-ink-3">{{ adapter.credit }}</p>

@@ -48,13 +48,26 @@ export function locate(lat, lng) {
     return out;
 }
 
+/**
+ * Every ward of every LGA, with ours where we have figures. Wards with no polling units are
+ * marked as such rather than left to the map's default colour, which reads like a value.
+ */
+function complete(wards) {
+    const out = {};
+    for (const s of shapes) {
+        const lga = Object.keys(wards ?? {}).find((k) => k.toLowerCase() === s.lga.toLowerCase()) ?? s.lga;
+        (out[s.lga] ??= {})[s.ward] = wards?.[lga]?.[s.ward] ?? { color: '#e3e6ec', label: '', description: 'No polling units are placed in this ward.' };
+    }
+    return out;
+}
+
 // --- The map --------------------------------------------------------------------------------
 
 export function mount(el, { title, regions, wards, onOpen }) {
     const map = new INISTMap(el, {
         title,
         data: rename(regions),
-        wardData: wards ?? {},
+        wardData: complete(wards),
         wardDrilldown: true, // LGAs drawn from the ward source; tap one to see its wards
         wardGeoJSON,
         variant: 'plain',
@@ -90,7 +103,7 @@ export function mount(el, { title, regions, wards, onOpen }) {
         // Refresh both levels; whichever is on screen repaints, the other is kept for later.
         update(next, nextWards) {
             map.setData(rename(next), { level: 'lgas' });
-            if (nextWards) map.setWardData(nextWards);
+            if (nextWards) map.setWardData(complete(nextWards));
         },
         destroy() {
             el.removeEventListener('click', follow);
