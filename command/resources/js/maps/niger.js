@@ -80,16 +80,47 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
         extrusionDepth: 6,
         extrusionColor: '#c9d1de',
         popover: true,
-        popoverTrigger: 'both',
+        popoverTrigger: 'click', // click an area for its figures; double-click an LGA for its wards
         popoverPlacement: 'auto',
         popoverClassName: 'pp-map-popover',
         // The card's own popover body (a DOM node, so names are never parsed as HTML).
-        renderPopover: popover ? (feature) => popover(feature.data ?? {}, { level: feature.level, lga: feature.lga }) : null,
+        renderPopover: popover
+            ? (feature) => popover(feature.data ?? {}, {
+                level: feature.level,
+                lga: feature.lga,
+                // Phones don't reliably send double-taps, so the LGA popup offers its wards too.
+                openWards: feature.level === 'wards' ? null : () => map.openWardMap(feature.name),
+            })
+            : null,
         wheelZoom: false, // the page scrolls past the map; zoom with the buttons or a pinch
         panOverscroll: 0,
         maxZoom: 40, // the default (8) can't fit small LGAs such as Chanchaga or Suleja in ward view
         colors: ['#eef1f6', '#13213c'],
     });
+
+    // On the state map a click shows an LGA's popup and a double-click opens its wards. The
+    // library would open the wards on a single click, so take LGA clicks before it does.
+    const lgaUnder = (e) => {
+        if (map.level !== 'lgas') return null;
+        const hit = e.target.closest?.('.inistmap-feature, .inistmap-feature-label');
+        const id = hit?.getAttribute('data-inistmap-id') || hit?.getAttribute('data-feature-id');
+        return id ? map.features.find((f) => f.id === id) ?? null : null;
+    };
+    const onClick = (e) => {
+        const lga = lgaUnder(e);
+        if (!lga) return;
+        e.stopPropagation();
+        if (e.detail <= 1) map.select(lga.id, e); // the second click of a double-click does nothing
+    };
+    const onDoubleClick = (e) => {
+        const lga = lgaUnder(e);
+        if (!lga) return;
+        e.stopPropagation();
+        e.preventDefault();
+        map.openWardMap(lga.name);
+    };
+    el.addEventListener('click', onClick, true);
+    el.addEventListener('dblclick', onDoubleClick, true);
 
     // Follow "Open units" inside the app instead of reloading the page. The popup floats on
     // <body>, outside the map, so listen on the document for links in it or in the map.
@@ -112,6 +143,8 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
         },
         destroy() {
             document.removeEventListener('click', follow);
+            el.removeEventListener('click', onClick, true);
+            el.removeEventListener('dblclick', onDoubleClick, true);
             map.destroy();
         },
     };
