@@ -109,6 +109,23 @@ Push to `main` (with `HOSTINGER_AUTO_DEPLOY=true`), or press **Run workflow** wi
 
 Don't deploy on election day unless something is broken.
 
+## Polling units and their GPS from INEC
+
+`pollproof:inec-coordinates` pulls a state's LGAs, wards and polling units, with INEC's own GPS
+coordinates, from INEC's public locator (https://cvr.inecnigeria.org/pu) and writes a unit list in
+the Import unit list format. Run it on the server (it needs to reach INEC):
+
+```
+php artisan pollproof:inec-coordinates niger                  # writes storage/app/inec/niger-polling-units.csv
+php artisan pollproof:inec-coordinates niger --campaign=1     # and loads it into campaign 1
+```
+
+Wards and units are listed concurrently, then coordinates are fetched `--concurrency` at a time
+(default 20, up to 100) with retries and back-off. Progress is saved in `storage/app/inec/<state>/`,
+so an interrupted run resumes; `--fresh` starts over, `--retry-missing` asks again for units INEC
+had no location for. Units INEC has no location for keep any pin a supervisor dropped. Loading into
+a campaign after its freeze date needs `--force`.
+
 ## The agent app download
 
 Every change to the agent app is built by GitHub Actions (workflow **Agent app**) and published to the
