@@ -52,6 +52,37 @@ class TallyAndStipendTest extends TestCase
         $this->getJson('/api/v1/tally')->assertJsonPath('units_reported', 0);
     }
 
+    public function test_unit_points_carry_gps_and_votes_for_the_map(): void
+    {
+        $this->submitResult('PU1', ['A' => 50, 'B' => 40, 'C' => 10], 100);
+        $sentBack = $this->submitResult('PU3', ['A' => 30, 'B' => 60, 'C' => 10], 100);
+        $this->actingAsUser($this->staff(Role::Verifier));
+        $this->postJson("/api/v1/results/{$sentBack}/send-back", ['note' => 'Blurred']);
+
+        $this->actingAsUser($this->staff(Role::SituationRoom));
+        $res = $this->getJson('/api/v1/tally/points')->assertOk();
+        $this->assertSame(['A', 'B', 'C'], array_column($res->json('parties'), 'code'));
+        $points = collect($res->json('points'));
+        $this->assertCount(6, $points);
+        $this->assertSame(1, $points->sum(2)); // only PU1 counts; PU3 was sent back
+        $reported = $points->firstWhere(2, 1);
+        $this->assertSame([50, 40, 10], array_slice($reported, 3));
+        $this->assertSame([0, 0, 0], array_slice($points->firstWhere(2, 0), 3));
+
+        $this->actingAsUser($this->staff(Role::Finance));
+        $this->getJson('/api/v1/tally/points')->assertForbidden();
+    }
+
+    public function test_the_state_map_setting_reaches_the_command_room(): void
+    {
+        config(['pollproof.state_map' => 'niger']);
+        $this->actingAsUser($this->staff(Role::SituationRoom));
+        $this->getJson('/api/v1/me')->assertJsonPath('rules.state_map', 'niger');
+
+        config(['pollproof.state_map' => '']);
+        $this->getJson('/api/v1/me')->assertJsonPath('rules.state_map', null);
+    }
+
     public function test_stipends_need_a_verified_check_in_and_a_result(): void
     {
         $paid = $this->agentFor('PU1');

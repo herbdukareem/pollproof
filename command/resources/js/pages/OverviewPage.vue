@@ -6,6 +6,8 @@ import AlertList from '../components/AlertList.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import StateMapCard from '../components/StateMapCard.vue';
+import { stateMapFor } from '../maps';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole, session } from '../lib/session';
@@ -14,6 +16,8 @@ import { num, pct } from '../lib/format';
 const tally = useResource(() => api.get('tally'), { refreshMs: 30000 });
 const alerts = useResource(() => api.get('alerts', { status: 'open', per_page: 5, sort: 'latest' }), { refreshMs: 30000 });
 const busy = ref(null);
+// The state map, when the server names one for this campaign's state (POLLPROOF_STATE_MAP).
+const mapLoader = computed(() => stateMapFor(session.user?.rules?.state_map, session.user?.campaign?.state_name));
 
 const t = computed(() => tally.data.value);
 const ours = computed(() => t.value?.candidates.find((c) => c.is_ours));
@@ -79,6 +83,7 @@ async function resolve(alert) {
             </section>
 
             <div class="flex min-w-0 flex-col gap-5">
+                <StateMapCard v-if="mapLoader" :loader="mapLoader" :tally="t" :our-code="ourCode" />
                 <section id="alerts" class="card scroll-mt-4 p-5 transition">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <h2 class="card-title flex items-center gap-2">

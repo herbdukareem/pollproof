@@ -126,6 +126,14 @@ so an interrupted run resumes; `--fresh` starts over, `--retry-missing` asks aga
 had no location for. Units INEC has no location for keep any pin a supervisor dropped. Loading into
 a campaign after its freeze date needs `--force`.
 
+## The state map on the overview
+
+The overview shows a map of the campaign's state beside the 25% tracker. It has three views (the 25% line, units reporting, and who leads), and tapping an LGA opens its wards. Ward figures add up polling units by their GPS, so they are only as good as the units' coordinates (see above).
+
+- **Which state:** set by `POLLPROOF_STATE_MAP` in the server's `.env`. The deploy writes `niger` unless the repository variable `POLLPROOF_STATE_MAP` names another state. The map only shows when it matches the campaign's state, so a Kogi campaign on a server set to `niger` shows no map.
+- **Another state:** add `command/resources/js/maps/<state>.js` with the same exports as `niger.js` (`name`, `credit`, `mount`, and optionally `locate` for wards), list it in `maps/index.js`, and set `POLLPROOF_STATE_MAP=<state>`. Only the chosen state's map is downloaded.
+- **Niger's map** is the `@saidabdul80/inistmap` package by Said Abdulsalam. Its licence allows educational and academic use only; other use needs his permission. Its ward boundaries are GRID3 / CIESIN data under CC BY-SA 4.0, and the attribution must stay on the map.
+
 ## The agent app download
 
 Every change to the agent app is built by GitHub Actions (workflow **Agent app**) and published to the
