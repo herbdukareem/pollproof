@@ -9,16 +9,11 @@ import wardGeoJSON from '@saidabdul80/inistmap/ward-data';
 export const name = 'Niger State';
 export const credit = 'Map: INISTMap by Said Abdulsalam. Boundaries: GRID3 / CIESIN operational wards (CC BY-SA 4.0). Wards are GRID3’s, so units are placed in them by GPS.';
 
-// INEC's LGA names where the map library spells them differently.
+// The map's LGA shapes spell two of INEC's LGAs differently (its ward data takes either).
 const ALIASES = { Munya: 'Muya', Agaie: 'Agai' };
-const mapName = (lga) => ALIASES[lga] ?? lga;
 
-const geoName = (lga) => Object.keys(ALIASES).find((k) => ALIASES[k] === lga) ?? lga;
-
-/** Our region data keyed the way the map names its LGAs. */
-const rename = (regions) => Object.fromEntries(Object.entries(regions ?? {}).map(([k, v]) => [mapName(k), v]));
-/** Ward data under both spellings: the LGA shapes and the ward boundaries name two LGAs differently. */
-const renameWards = (wards) => Object.fromEntries(Object.entries(wards ?? {}).flatMap(([k, v]) => [...new Set([k, mapName(k)])].map((n) => [n, v])));
+/** Our LGA data keyed the way the map names its LGA shapes. */
+const rename = (regions) => Object.fromEntries(Object.entries(regions ?? {}).map(([k, v]) => [ALIASES[k] ?? k, v]));
 
 // --- Which ward a GPS point falls in -------------------------------------------------------
 
@@ -59,7 +54,7 @@ export function mount(el, { title, regions, wards, onOpen }) {
     const map = new INISTMap(el, {
         title,
         data: rename(regions),
-        wardData: renameWards(wards),
+        wardData: wards ?? {},
         wardDrilldown: true, // LGAs drawn from the ward source; tap one to see its wards
         wardGeoJSON,
         variant: 'plain',
@@ -92,19 +87,10 @@ export function mount(el, { title, regions, wards, onOpen }) {
 
     return {
         ready: map.ready,
+        // Refresh both levels; whichever is on screen repaints, the other is kept for later.
         update(next, nextWards) {
-            const lgas = rename(next);
-            if (nextWards) map.options.wardData = renameWards(nextWards);
-            if (map._mapLevel !== 'wards') {
-                map.setData(lgas);
-                return;
-            }
-            // Looking at one LGA's wards: refresh those, and what Back returns to.
-            if (map._mainViewSnapshot) map._mainViewSnapshot.data = lgas;
-            const lga = map._currentLgaName;
-            const supplied = map.options.wardData?.[lga] ?? {};
-            map.setData(Object.fromEntries(shapes.filter((s) => s.lga === geoName(lga)).map((s) => [s.ward,
-                supplied[s.ward] ?? { color: 'rgba(255,255,255,.035)', description: 'No polling units with GPS in this ward.' }])));
+            map.setData(rename(next), { level: 'lgas' });
+            if (nextWards) map.setWardData(nextWards);
         },
         destroy() {
             el.removeEventListener('click', follow);
