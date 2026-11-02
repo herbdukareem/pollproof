@@ -289,6 +289,8 @@ onBeforeUnmount(() => map.value?.destroy());
     --im-muted: #5b6578;
     --im-line: #e3e6ec;
     --im-accent: #13213c;
+    --im-popover-width: 290px;
+    --im-popover-radius: 16px;
     height: 100%;
 }
 .pp-state-map :deep(.inistmap-shell) {
@@ -314,62 +316,64 @@ onBeforeUnmount(() => map.value?.destroy());
 .pp-state-map :deep(.inistmap-stage) {
     height: 100%;
 }
+/* GRID3's attribution has to stay visible (CC BY-SA); keep it small and out of the way. */
+.pp-state-map :deep(.inistmap-source-label),
+.pp-state-map :deep(.inistmap-ward-attribution) {
+    font-size: 10px;
+    padding: 3px 7px;
+    opacity: 0.85;
+}
+</style>
+
+<style>
 /*
- * The area popup: title, figures in rows, then votes by party. It is tall, so it often sits
- * over the area under the pointer: clicks pass through its body to the map (to open an LGA),
- * and only its close button and link take them.
+ * The area popup. The map library floats it on <body>, outside this component, so these
+ * rules are global and keyed by the class it is given (popoverClassName: 'pp-map-popover').
  */
-.pp-state-map :deep(.inistmap-popover) {
-    width: 280px;
+.pp-map-popover {
     padding: 14px 16px;
-    border-radius: 16px;
-    pointer-events: none;
 }
-.pp-state-map :deep(.inistmap-popover a),
-.pp-state-map :deep(.inistmap-popover button) {
-    pointer-events: auto;
-}
-.pp-state-map :deep(.inistmap-popover-title) {
+.pp-map-popover .inistmap-popover-title {
     font-size: 15px;
     font-weight: 800;
     letter-spacing: 0.02em;
     text-transform: uppercase;
 }
-.pp-state-map :deep(.inistmap-popover-kicker),
-.pp-state-map :deep(.inistmap-popover-value) {
+.pp-map-popover .inistmap-popover-kicker,
+.pp-map-popover .inistmap-popover-value {
     display: none; /* our rows carry the figures */
 }
-.pp-state-map :deep(.pp-pop-sub) {
+.pp-map-popover .pp-pop-sub {
     margin: 0 0 7px;
     font-size: 11.5px;
     color: #5b6578;
 }
-.pp-state-map :deep(.pp-pop-rows) {
+.pp-map-popover .pp-pop-rows {
     display: grid;
     gap: 3px;
 }
-.pp-state-map :deep(.pp-pop-sep) {
+.pp-map-popover .pp-pop-sep {
     margin-top: 7px;
     padding-top: 7px;
     border-top: 1px solid #e3e6ec;
 }
-.pp-state-map :deep(.pp-pop-row) {
+.pp-map-popover .pp-pop-row {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
     font-size: 12.5px;
 }
-.pp-state-map :deep(.pp-pop-key) {
+.pp-map-popover .pp-pop-key {
     color: #5b6578;
 }
-.pp-state-map :deep(.pp-pop-val) {
+.pp-map-popover .pp-pop-val {
     font-weight: 800;
     color: #13213c;
     font-variant-numeric: tabular-nums;
     text-align: right;
 }
-.pp-state-map :deep(.pp-pop-val small) {
+.pp-map-popover .pp-pop-val small {
     display: inline-block;
     min-width: 38px;
     margin-left: 6px;
@@ -377,7 +381,7 @@ onBeforeUnmount(() => map.value?.destroy());
     font-weight: 600;
     color: #8a93a3;
 }
-.pp-state-map :deep(.pp-pop-val em) {
+.pp-map-popover .pp-pop-val em {
     margin-left: 4px;
     padding: 1px 6px;
     border-radius: 999px;
@@ -385,18 +389,18 @@ onBeforeUnmount(() => map.value?.destroy());
     font-style: normal;
     font-weight: 700;
 }
-.pp-state-map :deep(.pp-pop-ok) {
+.pp-map-popover .pp-pop-ok {
     background: #e3f4ea;
     color: #1d7a45;
 }
-.pp-state-map :deep(.pp-pop-bad) {
+.pp-map-popover .pp-pop-bad {
     background: #fde9dd;
     color: #b8470a;
 }
-.pp-state-map :deep(.pp-pop-lead) {
+.pp-map-popover .pp-pop-lead {
     font-size: 14px;
 }
-.pp-state-map :deep(.pp-pop-head) {
+.pp-map-popover .pp-pop-head {
     margin: 8px 0 4px;
     padding-top: 7px;
     border-top: 1px solid #e3e6ec;
@@ -406,14 +410,14 @@ onBeforeUnmount(() => map.value?.destroy());
     text-transform: uppercase;
     color: #8a93a3;
 }
-.pp-state-map :deep(.pp-pop-party) {
+.pp-map-popover .pp-pop-party {
     display: inline-flex;
     align-items: center;
     gap: 7px;
     font-weight: 600;
     color: #13213c;
 }
-.pp-state-map :deep(.pp-pop-party small) {
+.pp-map-popover .pp-pop-party small {
     padding: 0 5px;
     border-radius: 999px;
     background: #eef1f6;
@@ -421,17 +425,17 @@ onBeforeUnmount(() => map.value?.destroy());
     font-weight: 700;
     color: #5b6578;
 }
-.pp-state-map :deep(.pp-pop-dot) {
+.pp-map-popover .pp-pop-dot {
     width: 9px;
     height: 9px;
     border-radius: 3px;
 }
-.pp-state-map :deep(.pp-pop-empty) {
+.pp-map-popover .pp-pop-empty {
     margin-top: 8px;
     font-size: 13px;
     color: #5b6578;
 }
-.pp-state-map :deep(.inistmap-detail-link) {
+.pp-map-popover .inistmap-detail-link {
     display: block;
     margin-top: 8px;
     padding-top: 7px;
@@ -439,12 +443,5 @@ onBeforeUnmount(() => map.value?.destroy());
     font-size: 13px;
     font-weight: 700;
     color: #13213c;
-}
-/* GRID3's attribution has to stay visible (CC BY-SA); keep it small and out of the way. */
-.pp-state-map :deep(.inistmap-source-label),
-.pp-state-map :deep(.inistmap-ward-attribution) {
-    font-size: 10px;
-    padding: 3px 7px;
-    opacity: 0.85;
 }
 </style>

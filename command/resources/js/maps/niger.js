@@ -81,6 +81,8 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
         extrusionColor: '#c9d1de',
         popover: true,
         popoverTrigger: 'both',
+        popoverPlacement: 'auto',
+        popoverClassName: 'pp-map-popover',
         // The card's own popover body (a DOM node, so names are never parsed as HTML).
         renderPopover: popover ? (feature) => popover(feature.data ?? {}, { level: feature.level, lga: feature.lga }) : null,
         wheelZoom: false, // the page scrolls past the map; zoom with the buttons or a pinch
@@ -89,16 +91,17 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
         colors: ['#eef1f6', '#13213c'],
     });
 
-    // Follow "Open units" inside the app instead of reloading the page.
+    // Follow "Open units" inside the app instead of reloading the page. The popup floats on
+    // <body>, outside the map, so listen on the document for links in it or in the map.
     const follow = (e) => {
-        const a = e.target.closest('a[href]');
-        if (!a || !el.contains(a) || a.target === '_blank' || e.metaKey || e.ctrlKey) return;
+        const a = e.target.closest?.('a[href]');
+        if (!a || !(el.contains(a) || a.closest('.pp-map-popover')) || a.target === '_blank' || e.metaKey || e.ctrlKey) return;
         const url = new URL(a.href, window.location.href);
         if (url.origin !== window.location.origin) return;
         e.preventDefault();
         onOpen?.(url.pathname + url.search);
     };
-    el.addEventListener('click', follow);
+    document.addEventListener('click', follow);
 
     return {
         ready: map.ready,
@@ -108,7 +111,7 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
             if (nextWards) map.setWardData(complete(nextWards));
         },
         destroy() {
-            el.removeEventListener('click', follow);
+            document.removeEventListener('click', follow);
             map.destroy();
         },
     };
