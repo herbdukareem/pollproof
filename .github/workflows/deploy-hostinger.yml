@@ -76,6 +76,7 @@ jobs:
           SMS_WEBHOOK_TOKEN: ${{ secrets.POLLPROOF_SMS_WEBHOOK_TOKEN }}
           USSD_TOKEN: ${{ secrets.POLLPROOF_USSD_TOKEN }}
           USSD_CODE: ${{ vars.POLLPROOF_USSD_CODE || secrets.POLLPROOF_USSD_CODE }}
+          STATE_MAP: ${{ vars.POLLPROOF_STATE_MAP }}
           TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
           TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID || secrets.TERMII_SENDER_ID }}
           MAIL_HOST: ${{ vars.MAIL_HOST || secrets.MAIL_HOST }}
@@ -112,6 +113,7 @@ jobs:
             echo "POLLPROOF_SMS_WEBHOOK_TOKEN=$(q "$SMS_WEBHOOK_TOKEN")"
             echo "POLLPROOF_USSD_TOKEN=$(q "$USSD_TOKEN")"
             echo "POLLPROOF_USSD_CODE=$(q "$USSD_CODE")"
+            echo "POLLPROOF_STATE_MAP=$(q "${STATE_MAP:-niger}")"
             echo "TERMII_API_KEY=$(q "$TERMII_API_KEY")"
             echo "TERMII_SENDER_ID=$(q "${TERMII_SENDER_ID:-PollProof}")"
             echo "TERMII_CHANNEL=dnd"

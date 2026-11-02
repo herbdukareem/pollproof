@@ -111,6 +111,7 @@ Route::prefix('v1')->group(function () {
         // Command room: read
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
             Route::get('tally', TallyController::class);
+            Route::get('tally/points', [TallyController::class, 'points']);
             Route::get('nav-counts', NavCountsController::class);
             Route::get('units', [UnitController::class, 'index']);
             Route::get('alerts', [AlertController::class, 'index']);

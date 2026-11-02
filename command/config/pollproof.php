@@ -16,6 +16,10 @@ return [
     // Number agents text results and YES/NO replies to (shown in the app's fallback screen).
     'sms_number' => env('POLLPROOF_SMS_NUMBER'),
 
+    // Which state's map the overview shows beside the 25% tracker (resources/js/maps/<name>.js).
+    // Blank shows no map. Only shown when it matches the campaign's state.
+    'state_map' => strtolower(trim((string) env('POLLPROOF_STATE_MAP', ''))),
+
     // USSD through Africa's Talking, for agents whose phones have no data. The callback URL set in the
     // Africa's Talking dashboard is https://<your domain>/api/v1/ussd/africastalking/<token>.
     'ussd' => [

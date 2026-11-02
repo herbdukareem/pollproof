@@ -13,4 +13,10 @@ class TallyController extends Controller
     {
         return response()->json($tally->summary($request->user()->campaign));
     }
+
+    /** Every unit with GPS and its votes, for the map's ward view. */
+    public function points(Request $request, TallyService $tally): JsonResponse
+    {
+        return response()->json($tally->points($request->user()->campaign));
+    }
 }

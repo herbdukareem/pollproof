@@ -96,4 +96,45 @@ final class TallyService
             'lgas' => $lgas,
         ];
     }
+
+    /**
+     * Each polling unit that has GPS, with its current result, so the map can total them by
+     * whatever boundaries it draws. Compact rows: [lat, lng, reported (0/1), votes per party...]
+     * with the votes in the order of `parties`.
+     *
+     * @return array{parties: list<array{code: string, name: string, is_ours: bool}>, points: list<list<float|int>>}
+     */
+    public function points(Campaign $campaign): array
+    {
+        $parties = $campaign->parties()->get(['id', 'code', 'name', 'is_ours']);
+        $slot = $parties->pluck('id')->flip()->all(); // party id => column
+
+        $units = DB::table('polling_units as pu')
+            ->leftJoin('result_submissions as r', function ($j) {
+                $j->on('r.polling_unit_id', '=', 'pu.id')->where('r.is_current', true)->where('r.status', '!=', ResultSubmission::SENT_BACK);
+            })
+            ->where('pu.campaign_id', $campaign->id)
+            ->whereNotNull('pu.latitude')->whereNotNull('pu.longitude')
+            ->orderBy('pu.id')
+            ->get(['pu.latitude', 'pu.longitude', 'r.id as rid']);
+
+        $votes = [];
+        DB::table('result_votes as rv')
+            ->join('result_submissions as r', 'r.id', '=', 'rv.result_submission_id')
+            ->where('r.campaign_id', $campaign->id)->where('r.is_current', true)->where('r.status', '!=', ResultSubmission::SENT_BACK)
+            ->get(['rv.result_submission_id', 'rv.party_id', 'rv.votes'])
+            ->each(function ($v) use (&$votes, $slot) {
+                if (isset($slot[$v->party_id])) {
+                    $votes[$v->result_submission_id][$slot[$v->party_id]] = (int) $v->votes;
+                }
+            });
+
+        $blank = array_fill(0, $parties->count(), 0);
+
+        return [
+            'parties' => $parties->map(fn ($p) => ['code' => $p->code, 'name' => $p->name, 'is_ours' => (bool) $p->is_ours])->values()->all(),
+            'points' => $units->map(fn ($u) => [round((float) $u->latitude, 5), round((float) $u->longitude, 5), $u->rid ? 1 : 0,
+                ...array_replace($blank, $votes[$u->rid] ?? [])])->all(),
+        ];
+    }
 }
