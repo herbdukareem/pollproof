@@ -35,7 +35,7 @@ final class TallyService
             })
             ->where('pu.campaign_id', $campaign->id)
             ->groupBy('w.lga_id')
-            ->selectRaw('w.lga_id, COUNT(pu.id) as units, COUNT(r.id) as reported')
+            ->selectRaw('w.lga_id, COUNT(pu.id) as units, COUNT(r.id) as reported, SUM(COALESCE(pu.registered_voters, 0)) as registered, SUM(COALESCE(r.accredited, 0)) as accredited, SUM(COALESCE(r.total_cast, 0)) as cast, SUM(COALESCE(r.rejected, 0)) as rejected')
             ->get()->keyBy('lga_id');
 
         $byLga = [];
@@ -57,6 +57,11 @@ final class TallyService
                 'name' => $lga->name,
                 'units' => (int) ($unitCounts[$lga->id]->units ?? 0),
                 'units_reported' => (int) ($unitCounts[$lga->id]->reported ?? 0),
+                // Registered covers every unit; the rest only units that have reported.
+                'registered' => (int) ($unitCounts[$lga->id]->registered ?? 0),
+                'accredited' => (int) ($unitCounts[$lga->id]->accredited ?? 0),
+                'cast' => (int) ($unitCounts[$lga->id]->cast ?? 0),
+                'rejected' => (int) ($unitCounts[$lga->id]->rejected ?? 0),
                 'votes' => $votes,
                 'share' => array_map(fn ($n) => $valid > 0 ? round($n / $valid, 4) : 0.0, $votes),
             ];
@@ -99,7 +104,8 @@ final class TallyService
 
     /**
      * Each polling unit that has GPS, with its current result, so the map can total them by
-     * whatever boundaries it draws. Compact rows: [lat, lng, reported (0/1), votes per party...]
+     * whatever boundaries it draws. Compact rows: [lat, lng, reported (0/1), registered,
+     * accredited, cast, rejected, votes per party...]
      * with the votes in the order of `parties`.
      *
      * @return array{parties: list<array{code: string, name: string, is_ours: bool}>, points: list<list<float|int>>}
@@ -116,7 +122,7 @@ final class TallyService
             ->where('pu.campaign_id', $campaign->id)
             ->whereNotNull('pu.latitude')->whereNotNull('pu.longitude')
             ->orderBy('pu.id')
-            ->get(['pu.latitude', 'pu.longitude', 'r.id as rid']);
+            ->get(['pu.latitude', 'pu.longitude', 'pu.registered_voters', 'r.id as rid', 'r.accredited', 'r.total_cast', 'r.rejected']);
 
         $votes = [];
         DB::table('result_votes as rv')
@@ -133,7 +139,9 @@ final class TallyService
 
         return [
             'parties' => $parties->map(fn ($p) => ['code' => $p->code, 'name' => $p->name, 'is_ours' => (bool) $p->is_ours])->values()->all(),
+            'fields' => ['lat', 'lng', 'reported', 'registered', 'accredited', 'cast', 'rejected'],
             'points' => $units->map(fn ($u) => [round((float) $u->latitude, 5), round((float) $u->longitude, 5), $u->rid ? 1 : 0,
+                (int) $u->registered_voters, (int) $u->accredited, (int) $u->total_cast, (int) $u->rejected,
                 ...array_replace($blank, $votes[$u->rid] ?? [])])->all(),
         ];
     }

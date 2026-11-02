@@ -58,13 +58,16 @@ const partyColor = computed(() => {
 });
 const partyName = (code) => parties.value.find((c) => c.party === code)?.name ?? code;
 
-/** One area's map entry from its totals: { units, reported, votes: { code: n } }. */
+/**
+ * One area's map entry from its totals: { units, reported, registered, accredited, cast,
+ * rejected, votes: { code: n } }. `stats` rides along for the popover.
+ */
 function entry(a, url, linkLabel) {
     const valid = Object.values(a.votes).reduce((s, n) => s + n, 0);
     const share = valid ? (a.votes[props.ourCode] ?? 0) / valid : 0;
     const rep = a.units ? a.reported / a.units : 0;
     const line = `${num(a.reported)} of ${num(a.units)} units reported${valid ? ` · our share ${pct(share)}` : ''}`;
-    const link = url ? { url, linkLabel } : {};
+    const link = { ...(url ? { url, linkLabel } : {}), stats: { ...a, valid, share } };
     if (metric.value === 'reporting') {
         return { value: Math.round(rep * 1000) / 10, label: pct(rep), color: a.reported ? along(RAMP, rep) : NONE, description: `${line}.`, ...link };
     }
@@ -86,7 +89,7 @@ function entry(a, url, linkLabel) {
 
 const regions = computed(() => Object.fromEntries((props.tally.lgas ?? []).map((l) => [
     l.name,
-    entry({ units: l.units, reported: l.units_reported, votes: l.votes ?? {} }, `/units?lga_id=${l.id}`, `Open ${l.name} units`),
+    entry({ units: l.units, reported: l.units_reported, registered: l.registered ?? 0, accredited: l.accredited ?? 0, cast: l.cast ?? 0, rejected: l.rejected ?? 0, votes: l.votes ?? {} }, `/units?lga_id=${l.id}`, `Open ${l.name} units`),
 ])));
 
 /** Units added up by the map's own wards, placed by GPS. */
@@ -94,14 +97,20 @@ const wardTotals = computed(() => {
     const p = points.value;
     if (!p || !adapter.value?.locate) return null;
     const codes = p.parties.map((x) => x.code);
+    const head = p.fields?.length ?? 3; // the votes follow the named fields
     const out = {};
-    for (const [lat, lng, reported, ...votes] of p.points) {
+    for (const row of p.points) {
+        const [lat, lng, reported, registered = 0, accredited = 0, cast = 0, rejected = 0] = row;
         const at = adapter.value.locate(lat, lng);
         if (!at) continue;
-        const w = ((out[at.lga] ??= {})[at.ward] ??= { units: 0, reported: 0, votes: Object.fromEntries(codes.map((c) => [c, 0])) });
+        const w = ((out[at.lga] ??= {})[at.ward] ??= { units: 0, reported: 0, registered: 0, accredited: 0, cast: 0, rejected: 0, votes: Object.fromEntries(codes.map((c) => [c, 0])) });
         w.units++;
         w.reported += reported;
-        votes.forEach((n, i) => (w.votes[codes[i]] += n));
+        w.registered += registered;
+        w.accredited += accredited;
+        w.cast += cast;
+        w.rejected += rejected;
+        row.slice(head).forEach((n, i) => (w.votes[codes[i]] += n));
     }
     return out;
 });
@@ -140,6 +149,54 @@ const counts = computed(() => {
     };
 });
 
+/**
+ * The popup for an area: who it is, the voter figures, our share against the line, and the
+ * votes by party. Built from DOM nodes with text only, so names are never read as HTML.
+ */
+function h(tag, cls, ...kids) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    for (const k of kids.flat()) if (k != null && k !== false) n.append(k instanceof Node ? k : String(k));
+    return n;
+}
+function popover(item, where) {
+    const a = item.stats;
+    if (!a) return null;
+    const t = props.tally.threshold;
+    const row = (label, value, cls = '') => h('div', 'pp-pop-row', h('span', 'pp-pop-key', label), h('span', `pp-pop-val ${cls}`, value));
+    const sorted = Object.entries(a.votes).sort((x, y) => y[1] - x[1]);
+    const [lead, leadVotes] = sorted[0] ?? [];
+    const tie = sorted.length > 1 && sorted[1][1] === leadVotes;
+    const swatch = (code) => { const i = h('i', 'pp-pop-dot'); i.style.background = partyColor.value[code]; return i; };
+
+    return h('div', 'pp-pop',
+        h('p', 'pp-pop-sub', where.level === 'wards' ? `Ward in ${where.lga}` : 'LGA', ` · ${num(a.reported)} of ${num(a.units)} units reported`),
+        h('div', 'pp-pop-rows',
+            row('Registered voters', a.registered ? num(a.registered) : '–'),
+            row('Accredited', a.reported ? num(a.accredited) : '–'),
+            row('Total votes cast', a.reported ? num(a.cast) : '–'),
+            a.rejected ? row('Rejected', num(a.rejected)) : null,
+        ),
+        a.valid
+            ? [
+                h('div', 'pp-pop-rows pp-pop-sep',
+                    row('Our share', h('span', null, pct(a.share), ' ', h('em', a.share >= t ? 'pp-pop-ok' : 'pp-pop-bad', a.share >= t ? `≥ ${pct(t)}` : `< ${pct(t)}`))),
+                    (() => {
+                        const r = row('Leading party', tie ? 'Tied' : lead, 'pp-pop-lead');
+                        if (!tie) r.lastChild.style.color = partyColor.value[lead];
+                        return r;
+                    })(),
+                ),
+                h('p', 'pp-pop-head', 'Votes by party'),
+                h('div', 'pp-pop-rows', sorted.map(([code, n]) => h('div', 'pp-pop-row',
+                    h('span', 'pp-pop-key pp-pop-party', swatch(code), code, code === props.ourCode ? h('small', null, 'ours') : null),
+                    h('span', 'pp-pop-val', num(n), h('small', null, pct(n / a.valid))),
+                ))),
+            ]
+            : h('p', 'pp-pop-empty', a.units ? 'No results yet.' : 'No polling units are placed here.'),
+    );
+}
+
 async function loadPoints() {
     try {
         points.value = await api.get('tally/points');
@@ -158,6 +215,7 @@ onMounted(async () => {
             regions: regions.value,
             wards: wards.value ?? {},
             onOpen: (to) => router.push(to),
+            popover,
         });
         if ((await map.value.ready) === null) failed.value = true;
     } catch {
@@ -191,7 +249,7 @@ onBeforeUnmount(() => map.value?.destroy());
         </div>
 
         <p v-if="failed" class="rounded-xl bg-mist p-6 text-center text-sm text-ink-2">The map couldn't load. The tracker beside it has the same figures.</p>
-        <div v-else class="pp-state-map -mx-2 h-[440px]">
+        <div v-else class="pp-state-map -mx-2 h-[520px]">
             <div ref="el" class="h-full"></div>
         </div>
 
@@ -250,6 +308,137 @@ onBeforeUnmount(() => map.value?.destroy());
     .pp-state-map :deep(.inistmap-zoom-level) {
         display: none;
     }
+}
+/* Let the map fill the card's height. */
+.pp-state-map :deep(.inistmap-content),
+.pp-state-map :deep(.inistmap-stage) {
+    height: 100%;
+}
+/*
+ * The area popup: title, figures in rows, then votes by party. It is tall, so it often sits
+ * over the area under the pointer: clicks pass through its body to the map (to open an LGA),
+ * and only its close button and link take them.
+ */
+.pp-state-map :deep(.inistmap-popover) {
+    width: 280px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    pointer-events: none;
+}
+.pp-state-map :deep(.inistmap-popover a),
+.pp-state-map :deep(.inistmap-popover button) {
+    pointer-events: auto;
+}
+.pp-state-map :deep(.inistmap-popover-title) {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.pp-state-map :deep(.inistmap-popover-kicker),
+.pp-state-map :deep(.inistmap-popover-value) {
+    display: none; /* our rows carry the figures */
+}
+.pp-state-map :deep(.pp-pop-sub) {
+    margin: 0 0 7px;
+    font-size: 11.5px;
+    color: #5b6578;
+}
+.pp-state-map :deep(.pp-pop-rows) {
+    display: grid;
+    gap: 3px;
+}
+.pp-state-map :deep(.pp-pop-sep) {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid #e3e6ec;
+}
+.pp-state-map :deep(.pp-pop-row) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+}
+.pp-state-map :deep(.pp-pop-key) {
+    color: #5b6578;
+}
+.pp-state-map :deep(.pp-pop-val) {
+    font-weight: 800;
+    color: #13213c;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.pp-state-map :deep(.pp-pop-val small) {
+    display: inline-block;
+    min-width: 38px;
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8a93a3;
+}
+.pp-state-map :deep(.pp-pop-val em) {
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+}
+.pp-state-map :deep(.pp-pop-ok) {
+    background: #e3f4ea;
+    color: #1d7a45;
+}
+.pp-state-map :deep(.pp-pop-bad) {
+    background: #fde9dd;
+    color: #b8470a;
+}
+.pp-state-map :deep(.pp-pop-lead) {
+    font-size: 14px;
+}
+.pp-state-map :deep(.pp-pop-head) {
+    margin: 8px 0 4px;
+    padding-top: 7px;
+    border-top: 1px solid #e3e6ec;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8a93a3;
+}
+.pp-state-map :deep(.pp-pop-party) {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    color: #13213c;
+}
+.pp-state-map :deep(.pp-pop-party small) {
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #eef1f6;
+    font-size: 10px;
+    font-weight: 700;
+    color: #5b6578;
+}
+.pp-state-map :deep(.pp-pop-dot) {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+}
+.pp-state-map :deep(.pp-pop-empty) {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #5b6578;
+}
+.pp-state-map :deep(.inistmap-detail-link) {
+    display: block;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid #e3e6ec;
+    font-size: 13px;
+    font-weight: 700;
+    color: #13213c;
 }
 /* GRID3's attribution has to stay visible (CC BY-SA); keep it small and out of the way. */
 .pp-state-map :deep(.inistmap-source-label),

@@ -66,8 +66,9 @@ class TallyAndStipendTest extends TestCase
         $this->assertCount(6, $points);
         $this->assertSame(1, $points->sum(2)); // only PU1 counts; PU3 was sent back
         $reported = $points->firstWhere(2, 1);
-        $this->assertSame([50, 40, 10], array_slice($reported, 3));
-        $this->assertSame([0, 0, 0], array_slice($points->firstWhere(2, 0), 3));
+        $this->assertSame([50, 40, 10], array_slice($reported, 7));
+        $this->assertSame(100, $reported[5]); // votes cast
+        $this->assertSame([0, 0, 0], array_slice($points->firstWhere(2, 0), 7));
 
         $this->actingAsUser($this->staff(Role::Finance));
         $this->getJson('/api/v1/tally/points')->assertForbidden();

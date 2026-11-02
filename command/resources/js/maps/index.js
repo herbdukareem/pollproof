@@ -7,10 +7,12 @@
  *
  *   name         'Niger State'
  *   credit       one line of attribution shown under the map
- *   mount(el, { title, regions, onOpen }) -> { ready: Promise, update(regions), destroy() }
+ *   mount(el, { title, regions, wards, onOpen, popover }) -> { ready, update(regions, wards), destroy() }
+ *   locate(lat, lng) -> { lga, ward } | null      optional: lets the card total units by ward
  *
- * `regions` is keyed by LGA name: { value, label, description, color, url }. `onOpen(url)` is
- * called when someone follows a region's link, so the app can route without a page reload.
+ * `regions` is keyed by LGA name, `wards` by LGA then ward: { value, label, description, color,
+ * url, stats }. `onOpen(url)` is called when someone follows an area's link, so the app routes
+ * without a page reload. `popover(item, { level, lga })` returns a DOM node for the area's popup.
  */
 const ADAPTERS = {
     niger: () => import('./niger.js'),

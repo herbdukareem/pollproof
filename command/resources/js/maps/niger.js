@@ -63,7 +63,7 @@ function complete(wards) {
 
 // --- The map --------------------------------------------------------------------------------
 
-export function mount(el, { title, regions, wards, onOpen }) {
+export function mount(el, { title, regions, wards, onOpen, popover }) {
     const map = new INISTMap(el, {
         title,
         data: rename(regions),
@@ -81,6 +81,8 @@ export function mount(el, { title, regions, wards, onOpen }) {
         extrusionColor: '#c9d1de',
         popover: true,
         popoverTrigger: 'both',
+        // The card's own popover body (a DOM node, so names are never parsed as HTML).
+        renderPopover: popover ? (feature) => popover(feature.data ?? {}, { level: feature.level, lga: feature.lga }) : null,
         wheelZoom: false, // the page scrolls past the map; zoom with the buttons or a pinch
         panOverscroll: 0,
         maxZoom: 40, // the default (8) can't fit small LGAs such as Chanchaga or Suleja in ward view
