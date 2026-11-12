@@ -1,0 +1,10 @@
+# When the whole repository is cloned into the web root (Hostinger: Advanced > Git into public_html),
+# serve every request from command/public so the code, .env and storage are never reachable.
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ command/public/$1 [L]
+</IfModule>
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

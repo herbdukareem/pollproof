@@ -1,0 +1,10 @@
+# Used when this folder itself is the web root (e.g. Hostinger Git deploy into public_html):
+# every request is served from public/, so .env, storage and the code are never reachable.
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
