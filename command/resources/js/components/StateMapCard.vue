@@ -266,35 +266,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <section id="map" ref="card" class="card scroll-mt-4 overflow-hidden p-5 transition" :class="full && 'pp-map-full'">
-        <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="card-title">{{ adapter?.name ?? 'State map' }}</h2>
-                <p class="card-sub">{{ VIEWS.find((v) => v.key === metric).sub }} Click an area for its figures; double-click an LGA for its wards.</p>
-            </div>
-            <div role="tablist" aria-label="What the map shows" class="inline-flex rounded-xl bg-mist p-1 text-[12.5px] font-semibold">
+    <section id="map" ref="card" class="card scroll-mt-4 overflow-hidden px-5 pb-4" :class="full && 'pp-map-full'">
+        <header class="-mx-5 mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-rule px-5 pt-4 pb-3">
+            <h2 class="card-title">{{ adapter?.name ?? 'State map' }}</h2>
+            <div class="flex items-center gap-2">
+                <div role="tablist" aria-label="What the map shows" class="seg">
+                    <button
+                        v-for="v in VIEWS"
+                        :key="v.key"
+                        role="tab"
+                        :aria-selected="metric === v.key"
+                        class="seg-btn"
+                        :class="metric === v.key && 'seg-on'"
+                        @click="metric = v.key"
+                    >{{ v.label }}</button>
+                </div>
                 <button
-                    v-for="v in VIEWS"
-                    :key="v.key"
-                    role="tab"
-                    :aria-selected="metric === v.key"
-                    class="rounded-lg px-2.5 py-1.5 transition"
-                    :class="metric === v.key ? 'bg-white shadow-sm' : 'text-ink-2 hover:text-ink'"
-                    @click="metric = v.key"
-                >{{ v.label }}</button>
+                    v-if="canFull"
+                    type="button"
+                    class="btn-ghost h-8 shrink-0 gap-1.5 px-2.5 text-[13px]"
+                    :title="full ? 'Leave full screen (Esc)' : 'Show the map full screen'"
+                    @click="toggleFull"
+                >
+                    <Icon :name="full ? 'shrink' : 'expand'" :size="15" />{{ full ? 'Exit full screen' : 'Full screen' }}
+                </button>
             </div>
-            <button
-                v-if="canFull"
-                type="button"
-                class="btn-outline h-9 shrink-0 gap-1.5 px-3 text-[13px]"
-                :title="full ? 'Leave full screen (Esc)' : 'Show the map full screen'"
-                @click="toggleFull"
-            >
-                <Icon :name="full ? 'shrink' : 'expand'" :size="16" />{{ full ? 'Exit full screen' : 'Full screen' }}
-            </button>
-        </div>
+        </header>
+        <p class="text-[13px] text-ink-2">{{ VIEWS.find((v) => v.key === metric).sub }} Click an area for its figures; double-click an LGA for its wards.</p>
 
-        <p v-if="failed" class="rounded-xl bg-mist p-6 text-center text-sm text-ink-2">The map couldn't load. The tracker beside it has the same figures.</p>
+        <p v-if="failed" class="rounded-lg bg-mist p-6 text-center text-sm text-ink-2">The map couldn't load. The tracker beside it has the same figures.</p>
         <div v-else class="pp-state-map -mx-2" :class="full ? 'min-h-0 flex-1' : 'h-[520px]'">
             <div ref="el" class="h-full"></div>
         </div>
@@ -360,11 +360,29 @@ onBeforeUnmount(() => {
     overflow: auto;
     background: #fff;
 }
-/* The map's dark toolbar: its hover turned buttons near-white under white text. Keep them dark. */
+/* The map's toolbar, light to match the panels around it. */
+.pp-state-map :deep(.inistmap-tools-overlay) {
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #dfe3ea;
+    box-shadow: none;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+.pp-state-map :deep(.inistmap-tools-overlay button) {
+    background: transparent;
+    border: 0;
+    color: #4b5567;
+    border-radius: 6px;
+    font-weight: 560;
+    box-shadow: none;
+}
 .pp-state-map :deep(.inistmap-tools-overlay button:hover:not(:disabled)) {
-    background: #2b3a5c;
-    border-color: #6d7d9c;
-    color: #fff;
+    background: #f1f3f6;
+    color: #13213c;
+}
+.pp-state-map :deep(.inistmap-tools-overlay .inistmap-zoom-level) {
+    color: #8790a0;
 }
 /* In full screen the map fits the space both ways instead of following the width. */
 .pp-map-full .pp-state-map :deep(.inistmap-svg) {

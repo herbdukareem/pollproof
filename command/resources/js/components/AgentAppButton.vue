@@ -58,8 +58,8 @@ async function update() {
             <p class="mt-1 text-[13px] text-ink-2">The Android app agents check in and send results with. Download it here, or show the QR code to an agent to scan.</p>
             <button class="btn-navy mt-3 w-full" @click="show"><Icon name="download" :size="16" /> Download or show QR code</button>
         </section>
-        <button v-else class="btn-outline h-10 gap-2 px-3" title="Download the agent app" aria-label="Agent app" @click="show">
-            <Icon name="phone" :size="17" /><span class="hidden text-sm font-semibold xl:inline">Agent app</span>
+        <button v-else class="btn-ghost h-9 gap-2 px-2.5" title="Download the agent app" aria-label="Agent app" @click="show">
+            <Icon name="phone" :size="16" /><span class="hidden xl:inline">Agent app</span>
         </button>
         <Modal :open="open" title="PollProof agent app" subtitle="For Android phones. Agents sign in with their registered number." width="max-w-xl" :busy="busy" @close="open = false">
             <p v-if="error" class="mb-3 rounded-xl bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>

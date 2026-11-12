@@ -1,52 +1,60 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/archivo/wdth.css';
 
 @source '../js/**/*.vue';
 @source '../views/**/*.blade.php';
 
 @theme {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* Archivo, self-hosted: one family. Words at normal width; figures semi-condensed, like a tally board. */
+    --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
 
     --color-navy: #13213c;
-    --color-navy-2: #1d2d4c;
-    --color-navy-3: #2a3d63;
+    --color-navy-2: #1c2b48;
+    --color-navy-3: #273a5e;
     --color-ink: #13213c;
-    --color-ink-2: #4a5464;
-    --color-ink-3: #8a93a3;
-    --color-mist: #f3f5f8;
-    --color-line: #e1e4ea;
+    --color-ink-2: #4b5567;
+    --color-ink-3: #8790a0;
+    --color-mist: #f1f3f6;
+    --color-line: #dfe3ea;
+    --color-rule: #ebeef3;
     --color-orange: #e8590c;
     --color-action: #c2410c;
     --color-action-dark: #9a3412;
     --color-peach: #ffb48a;
     --color-good: #17694b;
-    --color-good-bg: #e3f4ec;
+    --color-good-bg: #e4f2ea;
     --color-warn: #7a4f00;
-    --color-warn-bg: #fff1cc;
-    --color-bad: #8f350a;
-    --color-bad-bg: #fde7da;
+    --color-warn-bg: #fbefd2;
+    --color-bad: #9a3a0c;
+    --color-bad-bg: #fcebe1;
 }
 
 @layer base {
     html {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        font-feature-settings: 'cv11', 'ss01';
+        font-optical-sizing: auto;
     }
     body {
         @apply bg-mist text-ink;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    h1,
+    h2,
+    h3 {
+        text-wrap: balance;
     }
     :focus-visible {
         outline: 2px solid var(--color-action);
         outline-offset: 2px;
     }
-    tbody tr {
-        transition: background-color 120ms ease;
-    }
     tbody tr:hover {
-        background-color: #fafbfc;
+        background-color: #f8f9fb;
     }
-    td, th {
+    td,
+    th {
         font-variant-numeric: tabular-nums;
     }
     ::selection {
@@ -56,31 +64,50 @@
         width: 6px;
     }
     nav::-webkit-scrollbar-thumb {
-        background: #2a3d63;
+        background: #273a5e;
         border-radius: 3px;
     }
 }
 
+/* Figures: counts, percentages, codes. Semi-condensed, tabular, so columns of numbers line up. */
+@utility fig {
+    font-stretch: 84%;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
+}
+
+/* A sheet: white, one hairline, no shadow. Hierarchy comes from type and rules, not boxes. */
 @utility card {
-    @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(19,33,60,0.04)];
+    @apply rounded-[10px] border border-line bg-white;
 }
 @utility card-title {
-    @apply text-[17px] font-bold text-ink;
+    @apply text-[15.5px] leading-snug font-[680] text-ink;
 }
 @utility card-sub {
-    @apply mt-1 text-[13px] text-ink-2;
+    @apply mt-0.5 text-[13px] text-ink-2;
 }
+/* A filter that is on or off. */
 @utility chip {
-    @apply inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#d6dae1] bg-white px-3.5 text-sm font-semibold text-ink transition hover:border-navy;
+    @apply inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-[13.5px] font-[560] text-ink-2 transition-colors hover:border-ink-3 hover:text-ink;
 }
 @utility chip-on {
-    @apply border-navy bg-navy text-white hover:border-navy;
+    @apply border-navy bg-navy text-white hover:border-navy hover:text-white;
 }
 @utility pill {
-    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold whitespace-nowrap;
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-[620] whitespace-nowrap;
+}
+/* A small set of mutually exclusive views: a segmented control. */
+@utility seg {
+    @apply inline-flex rounded-lg border border-line bg-white p-0.5 text-[13px] font-[560];
+}
+@utility seg-btn {
+    @apply rounded-md px-2.5 py-1 text-ink-2 transition-colors hover:text-ink;
+}
+@utility seg-on {
+    @apply bg-navy text-white hover:text-white;
 }
 @utility btn {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold whitespace-nowrap transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[13.5px] font-[620] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
     @apply btn bg-action text-white hover:bg-action-dark;
@@ -89,14 +116,14 @@
     @apply btn bg-navy text-white hover:bg-navy-2;
 }
 @utility btn-outline {
-    @apply btn border-[1.5px] border-navy bg-white text-navy hover:bg-mist;
+    @apply btn border border-navy bg-white text-navy hover:bg-mist;
 }
 @utility btn-ghost {
-    @apply btn border border-[#d6dae1] bg-white font-semibold text-ink-2 hover:border-navy hover:text-ink;
+    @apply btn border border-line bg-white text-ink-2 hover:border-ink-3 hover:text-ink;
 }
 /* Buttons on the dark bulk-action bar. */
 @utility btn-bar {
-    @apply inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-[13px] font-semibold whitespace-nowrap text-white transition hover:bg-white/20 disabled:opacity-50;
+    @apply inline-flex h-8 items-center gap-1.5 rounded-md bg-white/10 px-3 text-[13px] font-[560] whitespace-nowrap text-white transition hover:bg-white/20 disabled:opacity-50;
 }
 @utility checkbox {
     @apply h-4 w-4 cursor-pointer rounded accent-navy;
@@ -105,30 +132,20 @@
     @apply btn bg-good text-white hover:opacity-90;
 }
 @utility field {
-    @apply h-11 w-full rounded-xl border border-[#d6dae1] bg-white px-3 text-sm text-ink outline-none focus:border-navy focus:ring-2 focus:ring-navy/15;
+    @apply h-10 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-3 focus:border-navy focus:ring-2 focus:ring-navy/10;
 }
 @utility label {
-    @apply mb-1.5 block text-[13px] font-bold text-ink;
+    @apply mb-1.5 block text-[13px] font-[620] text-ink;
 }
+/* Table headings in sentence case: they name the column, they don't shout it. */
 @utility th {
-    @apply bg-[#f6f7f9] px-4 py-3 text-left text-[12px] font-bold tracking-[0.04em] whitespace-nowrap text-ink-2 uppercase;
+    @apply border-b border-line bg-white px-4 py-2.5 text-left text-[12.5px] font-[580] whitespace-nowrap text-ink-2;
 }
 @utility td {
-    @apply border-t border-[#eef0f3] px-4 py-3 align-middle;
+    @apply border-t border-rule px-4 py-3 align-middle;
 }
 
 /* Motion: everything here is skipped for people who ask their device for less motion. */
-@keyframes card-in {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-}
-@keyframes bar-grow {
-    from {
-        width: 0;
-    }
-}
 @keyframes fade-in {
     from {
         opacity: 0;
@@ -153,30 +170,14 @@
 }
 
 .skeleton {
-    border-radius: 8px;
-    background: linear-gradient(90deg, #eceff3 25%, #f6f7f9 50%, #eceff3 75%);
+    border-radius: 4px;
+    background: linear-gradient(90deg, #eceff3 25%, #f5f6f8 50%, #eceff3 75%);
     background-size: 200% 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-    main .card {
-        animation: card-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-    }
-    main .grid > .card:nth-child(2),
-    main .grid > :nth-child(2) > .card:first-child {
-        animation-delay: 0.05s;
-    }
-    main .grid > .card:nth-child(3) {
-        animation-delay: 0.1s;
-    }
-    main .grid > .card:nth-child(4) {
-        animation-delay: 0.15s;
-    }
-    main .grid > .card:nth-child(n + 5) {
-        animation-delay: 0.2s;
-    }
+    /* Bars move when their figure changes; they don't animate in on arrival. */
     .bar-fill {
-        animation: bar-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
         transition: width 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
     }
     .fade-in {
@@ -189,37 +190,28 @@
         animation: value-flash 1.4s ease-out;
     }
     .page-enter-active {
-        transition:
-            opacity 0.26s ease,
-            transform 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+        transition: opacity 0.14s ease;
     }
     .page-leave-active {
-        transition: opacity 0.12s ease;
+        transition: opacity 0.08s ease;
     }
     .page-enter-from {
         opacity: 0;
-        transform: translateY(8px);
     }
     .page-leave-to {
         opacity: 0;
     }
     .nav-enter-active {
-        transition:
-            opacity 0.2s ease,
-            transform 0.2s ease;
+        transition: opacity 0.12s ease;
     }
     .nav-leave-active {
-        transition: opacity 0.1s ease;
+        transition: opacity 0.08s ease;
     }
     .nav-enter-from {
         opacity: 0;
-        transform: translateX(-6px);
     }
     .nav-leave-to {
         opacity: 0;
-    }
-    tbody tr {
-        animation: fade-in 0.3s ease backwards;
     }
     .alert-enter-active,
     .alert-leave-active,
@@ -286,11 +278,10 @@
         transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
     }
     .tile-enter-active {
-        transition: opacity 0.3s ease, transform 0.3s ease;
+        transition: opacity 0.2s ease;
     }
     .tile-enter-from {
         opacity: 0;
-        transform: scale(0.92);
     }
     .tile-leave-active {
         display: none;
@@ -313,7 +304,7 @@
 }
 
 @utility pager-btn {
-    @apply inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[#d6dae1] bg-white px-2 text-[13px] font-bold text-ink transition hover:border-navy active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d6dae1];
+    @apply inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-line bg-white px-2 text-[13px] font-[600] text-ink transition-colors hover:border-ink-3 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line;
 }
 @utility pager-on {
     @apply border-navy bg-navy text-white hover:border-navy;
