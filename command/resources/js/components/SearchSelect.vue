@@ -175,7 +175,7 @@ function typed(e) {
                         </span>
                         <Icon v-if="same(o.value, modelValue)" name="check" :size="14" class="shrink-0 text-navy" />
                     </li>
-                    <li v-if="words.length && shown.length" class="border-t border-[#eef0f3] px-3 pt-1.5 pb-1 text-[11.5px] text-ink-3">{{ shown.length }} of {{ options.length }} {{ noun }}</li>
+                    <li v-if="words.length && shown.length" class="border-t border-rule px-3 pt-1.5 pb-1 text-[11.5px] text-ink-3">{{ shown.length }} of {{ options.length }} {{ noun }}</li>
                 </ul>
             </Transition>
         </Teleport>

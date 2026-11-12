@@ -85,17 +85,17 @@ function download() {
 <template>
     <PageHeader :back="forced ? '' : '/'" title="Account security" :subtitle="forced ? 'Your campaign requires two-step sign-in. Set it up to continue.' : 'Your password and two-step sign-in.'" />
     <LoadState :loading="status.loading.value && !s" :error="status.error.value" :empty="!s">
-        <div class="grid max-w-4xl items-start gap-5 lg:grid-cols-[1fr_300px]">
-            <section class="card p-6">
-                <div class="flex items-center justify-between gap-3">
-                    <h2 class="card-title ">Two-step sign-in</h2>
+        <div class="grid max-w-4xl items-start gap-4 lg:grid-cols-[1fr_300px]">
+            <section class="card p-5">
+                <div class="card-title-ruled flex items-center justify-between gap-3">
+                    <h2>Two-step sign-in</h2>
                     <Badge :tone="s.enabled ? 'good' : 'warn'">{{ s.enabled ? 'On' : 'Off' }}</Badge>
                 </div>
-                <p class="mt-1 text-sm text-ink-2">After your password, you type a 6-digit code from an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, Authy). Someone with your password alone can't get in.</p>
+                <p class="text-sm text-ink-2">After your password, you type a 6-digit code from an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, Authy). Someone with your password alone can't get in.</p>
 
                 <template v-if="step === 'idle'">
                     <div v-if="s.enabled" class="mt-4 flex flex-wrap gap-3">
-                        <span class="self-center text-sm text-ink-2">{{ s.recovery_codes_left }} recovery codes left</span>
+                        <span class="self-center text-sm text-ink-2 tabular-nums">{{ s.recovery_codes_left }} recovery codes left</span>
                         <button class="btn-outline" @click="begin('codes')">New recovery codes</button>
                         <button v-if="!s.required" class="btn-outline" @click="begin('disable')">Turn off</button>
                     </div>
@@ -112,7 +112,7 @@ function download() {
                 </form>
 
                 <div v-if="step === 'scan'" class="mt-5 grid gap-5 sm:grid-cols-[220px_1fr]">
-                    <img :src="qr" alt="QR code to add PollProof to your authenticator app" class="h-[220px] w-[220px] rounded-xl border border-line" />
+                    <img :src="qr" alt="QR code to add PollProof to your authenticator app" class="h-[220px] w-[220px] rounded-lg border border-line" />
                     <form class="flex flex-col gap-3" @submit.prevent="confirm">
                         <ol class="list-decimal pl-5 text-sm text-ink-2">
                             <li>In your authenticator app, add an account and scan this code.</li>
@@ -120,15 +120,15 @@ function download() {
                         </ol>
                         <details class="text-xs text-ink-2"><summary class="cursor-pointer">Can't scan? Type this key instead</summary><code class="mt-1 block font-mono text-sm break-all text-ink">{{ setup.secret.match(/.{1,4}/g).join(' ') }}</code></details>
                         <label class="label !mb-0" for="otp">Code from the app</label>
-                        <input id="otp" v-model="code" class="field w-40 text-center font-mono text-xl tracking-[0.3em]" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
+                        <input id="otp" v-model="code" class="field h-11 w-40 text-center font-mono text-[20px] tracking-[0.3em]" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
                         <button class="btn-primary self-start" :disabled="busy">Turn on</button>
                     </form>
                 </div>
 
                 <div v-if="step === 'codes'" class="mt-5">
-                    <h3 class="text-sm font-bold">Save your recovery codes</h3>
+                    <h3 class="text-[14px] font-[650]">Save your recovery codes</h3>
                     <p class="mt-1 text-sm text-ink-2">If you lose your phone, each of these lets you sign in once. They won't be shown again.</p>
-                    <ul class="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-mist p-4 font-mono text-[15px] sm:grid-cols-4">
+                    <ul class="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-mist p-4 font-mono text-[15px] sm:grid-cols-4">
                         <li v-for="c in codes" :key="c">{{ c }}</li>
                     </ul>
                     <div class="mt-3 flex gap-2">
@@ -140,9 +140,9 @@ function download() {
                 <p v-if="error" role="alert" class="mt-4 rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
             </section>
 
-            <section class="card p-6">
-                <h2 class="card-title ">Password</h2>
-                <p class="mt-1 text-sm text-ink-2">Changing it signs you out on other devices.</p>
+            <section class="card p-5">
+                <h2 class="card-title-ruled">Password</h2>
+                <p class="text-sm text-ink-2">Changing it signs you out on other devices.</p>
                 <RouterLink to="/account/password" class="btn-outline mt-4">Change password</RouterLink>
             </section>
         </div>

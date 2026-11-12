@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import Tabs from '../components/Tabs.vue';
 import Pagination from '../components/Pagination.vue';
 import TableBusy from '../components/TableBusy.vue';
 import BulkBar from '../components/BulkBar.vue';
@@ -132,19 +133,24 @@ const dispatch = ref({});
 
 const tone = { present: 'good', absent: 'bad', outside_area: 'warn', reserve: 'info', deactivated: 'neutral' };
 const label = { present: 'Present', absent: 'Absent', outside_area: 'Outside area', reserve: 'Reserve', deactivated: 'Deactivated' };
-const statuses = [['', 'All active'], ['present', 'Present'], ['absent', 'Absent'], ['outside_area', 'Outside area'], ['reserve', 'Reserves'], ['deactivated', 'Deactivated']];
 
 function done(text) {
     message.value = text;
     error.value = '';
     agents.load();
 }
-const tiles = [
-    ['present', 'Present at their unit', 'bg-good'],
-    ['absent', 'Absent', 'bg-action'],
-    ['outside_area', 'Checked in outside area', 'bg-[#d99a00]'],
-    ['reserve', 'Reserves on standby', 'bg-[#1c6fc2]'],
-];
+// Absent and outside-area agents are the ones someone has to act on.
+const tabs = computed(() => {
+    const n = filtered.value ? matching.value : summary.value;
+    return [
+        { value: '', label: 'All active' },
+        { value: 'present', label: 'Present', count: n.present ?? 0 },
+        { value: 'absent', label: 'Absent', count: n.absent ?? 0, act: true },
+        { value: 'outside_area', label: 'Outside area', count: n.outside_area ?? 0, act: true },
+        { value: 'reserve', label: 'Reserves', count: n.reserve ?? 0 },
+        { value: 'deactivated', label: 'Deactivated' },
+    ];
+});
 
 async function review(c, decision) {
     busy.value = `c${c.id}`;
@@ -180,52 +186,43 @@ async function send(agent) {
 
 <template>
     <PageHeader title="Agents" subtitle="Who is at their polling unit, who needs replacing, and check-ins to confirm." :updated-at="agents.updatedAt.value" :loading="agents.loading.value" @refresh="() => { agents.load(); pending.load(); }" />
-    <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
-    <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+    <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
+    <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-    <div class="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <button v-for="[key, text, bar] in tiles" :key="key" class="card flex items-center gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-navy/40 hover:shadow-[0_8px_24px_rgba(19,33,60,0.10)]" :class="filter === key ? 'ring-2 ring-navy' : ''" :title="filter === key ? 'Show all agents' : 'Show only these agents'" :aria-pressed="filter === key" @click="filter = filter === key ? '' : key">
-            <span class="h-11 w-2.5 rounded-full" :class="bar"></span>
-            <span><span class="block text-[26px] leading-none font-extrabold">{{ num(summary[key] ?? 0) }}</span><span class="text-[13px] text-ink-2">{{ text }}</span></span>
-        </button>
-    </div>
+    <Tabs v-model="filter" label="Agent status" :tabs="tabs" />
 
-    <div class="grid gap-5 xl:grid-cols-[1fr_360px]">
-        <section class="card min-w-0 self-start overflow-hidden">
-            <div class="flex flex-wrap items-center gap-3 border-b border-[#eef0f3] p-4">
+    <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="card min-w-0 overflow-hidden">
+            <div class="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
                 <div class="relative max-w-xs min-w-[200px] flex-1">
                     <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
                     <label class="sr-only" for="agent-search">Search agents</label>
-                    <input id="agent-search" v-model="search" class="field w-full pl-9" placeholder="Agent ID, name, phone or unit" />
+                    <input id="agent-search" v-model="search" class="field h-9 w-full pl-9" placeholder="Agent ID, name, phone or unit" />
                 </div>
                 <label class="sr-only" for="agent-lga">LGA</label>
-                <SearchSelect id="agent-lga" v-model="lgaId" class="w-full sm:w-[200px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
-                <label class="sr-only" for="agent-status">Status</label>
-                <select id="agent-status" v-model="filter" class="field max-w-[180px]">
-                    <option v-for="[v, text] in statuses" :key="v" :value="v">{{ text }}{{ v && v !== 'deactivated' ? ` (${num(matching[v] ?? 0)})` : '' }}</option>
-                </select>
-                <button v-if="filter || filtered" class="text-[13px] font-bold text-navy hover:underline" @click="() => { filter = ''; search = ''; lgaId = ''; }">Clear filters</button>
+                <SearchSelect id="agent-lga" v-model="lgaId" class="w-full sm:w-[200px]" size="sm" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
+                <button v-if="filter || filtered" class="link text-[13px]" @click="() => { filter = ''; search = ''; lgaId = ''; }">Clear filters</button>
             </div>
             <LoadState :loading="agents.loading.value" :error="agents.error.value" :empty="!rows.length" :empty-text="filtered || filter ? 'No agents match these filters.' : 'No agents yet.'">
                 <div class="relative overflow-x-auto">
                     <TableBusy :busy="agents.busy.value" />
                     <table class="w-full min-w-[680px] text-sm">
-                        <thead class="bg-mist"><tr><th v-if="canEdit" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
+                        <thead><tr><th v-if="canEdit" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
                         <tbody>
                             <tr v-for="a in rows" :key="a.id" :class="[a.active === false ? 'opacity-60' : '', picked.has(a.id) ? '!bg-[#eef2fb]' : '']">
                                 <td v-if="canEdit" class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
-                                <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div><div v-if="a.phone"><a :href="`tel:${a.phone}`" class="text-xs text-ink-3 hover:text-navy hover:underline" title="Call (copies the number on a computer)" @click="callOrCopy($event, a.phone, a.name || a.code)">{{ a.phone }}</a></div></td>
-                                <td class="td"><template v-if="a.polling_unit"><div class="font-semibold">{{ a.polling_unit.code }}</div><div class="text-xs text-ink-2">{{ a.polling_unit.ward }} · {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
+                                <td class="td"><div class="fig font-[650] whitespace-nowrap">{{ a.code }}</div><div class="text-[13px] text-ink-2">{{ a.name }}</div><div v-if="a.phone"><a :href="`tel:${a.phone}`" class="text-[12.5px] text-ink-3 tabular-nums hover:text-navy hover:underline" title="Call (copies the number on a computer)" @click="callOrCopy($event, a.phone, a.name || a.code)">{{ a.phone }}</a></div></td>
+                                <td class="td"><template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="text-[13px] text-ink-2">{{ a.polling_unit.ward }}, {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
                                 <td class="td">
                                     <Badge :tone="tone[a.status]">{{ label[a.status] }}</Badge>
-                                    <div v-if="a.check_in" class="mt-1 text-xs whitespace-nowrap text-ink-2">{{ sameDay(a.check_in.at) ? 'In' : 'Last in' }} {{ timeOrDate(a.check_in.at) }}<template v-if="a.check_in.distance_m != null"> · {{ a.check_in.distance_m }} m</template></div>
+                                    <div v-if="a.check_in" class="mt-1 text-[12.5px] whitespace-nowrap text-ink-2 tabular-nums">{{ sameDay(a.check_in.at) ? 'In' : 'Last in' }} {{ timeOrDate(a.check_in.at) }}<template v-if="a.check_in.distance_m != null">, {{ a.check_in.distance_m }} m</template></div>
                                 </td>
-                                <td class="td whitespace-nowrap text-ink-2">{{ a.result ? `Sent ${time(a.result.at)}` : '–' }}</td>
+                                <td class="td whitespace-nowrap text-ink-2 tabular-nums">{{ a.result ? `Sent at ${time(a.result.at)}` : '–' }}</td>
                                 <td class="td">
                                     <div class="flex items-center justify-end gap-2">
                                         <template v-if="a.status === 'absent' && reserves.length">
                                             <label class="sr-only" :for="`r-${a.id}`">Reserve for {{ a.polling_unit?.code }}</label>
-                                            <SearchSelect :id="`r-${a.id}`" v-model="dispatch[a.id]" class="w-40" size="xs" placeholder="Send a reserve" noun="reserves" :options="reserves.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}`, hint: r.area }))" />
+                                            <SearchSelect :id="`r-${a.id}`" v-model="dispatch[a.id]" class="w-40" size="xs" placeholder="Send a reserve" noun="reserves" :options="reserves.map((r) => ({ value: r.id, label: `${r.code}, ${r.name}`, hint: r.area }))" />
                                             <button class="btn-primary h-8 px-3 text-xs" :disabled="!dispatch[a.id] || busy === `a${a.id}`" @click="send(a)">Send</button>
                                         </template>
                                         <AgentActions :agent="a" :can-edit="canEdit" can-assign @done="done" />
@@ -245,37 +242,37 @@ async function send(agent) {
             <Pagination :meta="paged.meta.value" :sort="sort" noun="agents" :per-page-options="[25, 50, 100]" @page="paged.setPage" @per-page="paged.setPerPage" />
         </section>
 
-        <section id="checkins" class="card scroll-mt-4 self-start p-5">
-            <div class="flex items-center justify-between gap-2">
+        <section id="checkins" class="card scroll-mt-4 overflow-hidden">
+            <header class="card-head">
                 <h2 class="card-title">Check-ins to confirm</h2>
-                <span v-if="queue.length" class="rounded-full bg-action px-2.5 py-0.5 text-xs font-bold text-white">{{ queue.length }}</span>
-            </div>
-            <p class="mt-1 mb-3 text-[13px] text-ink-2">Agents who checked in outside the unit area, or by USSD with no GPS. New ones appear at the top.</p>
-            <div v-if="queue.length > 1" class="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-                <label class="flex items-center gap-2 font-semibold text-ink-2"><input type="checkbox" class="checkbox" :checked="pickedCheckIns.allOn(queue.map((c) => c.id))" :indeterminate.prop="pickedCheckIns.someOn(queue.map((c) => c.id))" @change="pickedCheckIns.setMany(queue.map((c) => c.id), $event.target.checked)" /> {{ pickedCheckIns.count.value ? `${pickedCheckIns.count.value} ticked` : 'Tick all' }}</label>
+                <span class="fig text-[15px] font-[700]" :class="queue.length ? 'text-action' : 'text-ink-3'">{{ queue.length }}</span>
+            </header>
+            <p class="px-5 pt-3 text-[13px] text-ink-2">Agents who checked in outside the unit area, or by USSD with no GPS. New ones appear at the top.</p>
+            <div v-if="queue.length > 1" class="flex flex-wrap items-center gap-2 px-5 pt-3 text-[13px]">
+                <label class="flex items-center gap-2 font-[560] text-ink-2"><input type="checkbox" class="checkbox" :checked="pickedCheckIns.allOn(queue.map((c) => c.id))" :indeterminate.prop="pickedCheckIns.someOn(queue.map((c) => c.id))" @change="pickedCheckIns.setMany(queue.map((c) => c.id), $event.target.checked)" /> {{ pickedCheckIns.count.value ? `${pickedCheckIns.count.value} ticked` : 'Tick all' }}</label>
                 <template v-if="pickedCheckIns.count.value">
-                    <button class="btn-good ml-auto h-8 px-3 text-xs" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('approve')">Approve {{ pickedCheckIns.count.value }}</button>
-                    <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('reject')">Reject {{ pickedCheckIns.count.value }}</button>
+                    <button class="btn-good ml-auto h-8 px-3 text-[13px]" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('approve')">Approve {{ pickedCheckIns.count.value }}</button>
+                    <button class="btn-outline h-8 px-3 text-[13px]" :disabled="busy === 'bulk-checkins'" @click="reviewPicked('reject')">Reject {{ pickedCheckIns.count.value }}</button>
                 </template>
             </div>
             <LoadState :loading="pending.loading.value" :error="pending.error.value" :empty="!queue.length" empty-text="Nothing to confirm.">
-                <TransitionGroup name="alert" tag="ul" class="relative flex flex-col gap-2">
-                    <li v-for="c in queue" :key="c.id" class="rounded-xl border p-3.5 transition-colors" :class="fresh.has(c.id) ? 'checkin-new border-[#1c6fc2]/40 bg-[#eef5fc]' : 'border-transparent bg-mist'">
+                <TransitionGroup name="alert" tag="ul" class="relative mt-2">
+                    <li v-for="c in queue" :key="c.id" class="border-t border-rule px-5 py-3.5 transition-colors" :class="fresh.has(c.id) ? 'checkin-new bg-[#f1f6fc]' : ''">
                         <div class="flex items-start justify-between gap-2 text-sm">
                             <span class="flex flex-wrap items-center gap-1.5">
                                 <input v-if="queue.length > 1" type="checkbox" class="checkbox" :aria-label="`Tick check-in for ${c.polling_unit.code}`" :checked="pickedCheckIns.has(c.id)" @change="pickedCheckIns.toggle(c.id)" />
-                                <b>{{ c.polling_unit.code }}</b>
-                                <span v-if="fresh.has(c.id)" class="rounded-full bg-[#1c6fc2] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-white uppercase">New</span>
-                                <span class="rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase" :class="c.channel === 'ussd' ? 'bg-[#fff1d6] text-[#8a5a00]' : 'bg-white text-ink-2'">{{ c.channel === 'ussd' ? 'USSD' : 'App' }}</span>
+                                <b class="fig text-[15px] font-[650]">{{ c.polling_unit.code }}</b>
+                                <Badge v-if="fresh.has(c.id)" tone="info">New</Badge>
+                                <Badge :tone="c.channel === 'ussd' ? 'warn' : 'neutral'">{{ c.channel === 'ussd' ? 'USSD' : 'App' }}</Badge>
                             </span>
-                            <span class="shrink-0 text-right text-xs text-ink-2" :title="dateTime(c.captured_at)">{{ waited(c.captured_at) }}</span>
+                            <span class="shrink-0 text-right text-[12.5px] text-ink-2 tabular-nums" :title="dateTime(c.captured_at)">{{ waited(c.captured_at) }}</span>
                         </div>
-                        <p class="mt-0.5 text-[13px] text-ink-2">{{ c.agent.code }}{{ c.agent.name ? ` · ${c.agent.name}` : '' }}</p>
-                        <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2"><b class="text-ink">No GPS.</b> Call the agent to confirm they are at the unit.</p>
-                        <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.distance_m != null ? `${c.distance_m} m away` : 'Unit has no GPS point' }} · accuracy {{ c.accuracy_m }} m{{ c.has_selfie ? ' · selfie attached' : '' }}</p>
+                        <p class="mt-0.5 text-[13px] text-ink-2"><span class="tabular-nums">{{ c.agent.code }}</span>{{ c.agent.name ? `, ${c.agent.name}` : '' }}</p>
+                        <p v-if="c.channel === 'ussd'" class="mt-0.5 text-[13px] text-ink-2"><b class="font-[620] text-ink">No GPS.</b> Call the agent to confirm they are at the unit.</p>
+                        <p v-else class="mt-0.5 text-[13px] text-ink-2">{{ c.distance_m != null ? `${c.distance_m} m from the unit` : 'The unit has no GPS point' }}, accurate to {{ c.accuracy_m }} m{{ c.has_selfie ? ', with a selfie' : '' }}</p>
                         <div class="mt-2.5 flex flex-wrap gap-2">
-                            <button class="btn-good h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'approve')">Approve</button>
-                            <button class="btn-outline h-8 px-3 text-xs" :disabled="busy === `c${c.id}`" @click="review(c, 'reject')">Reject</button>
+                            <button class="btn-good h-8 px-3 text-[13px]" :disabled="busy === `c${c.id}`" @click="review(c, 'approve')">Approve</button>
+                            <button class="btn-outline h-8 px-3 text-[13px]" :disabled="busy === `c${c.id}`" @click="review(c, 'reject')">Reject</button>
                             <CallButton v-if="c.agent.phone" :phone="c.agent.phone" :who="c.agent.name || c.agent.code" small class="ml-auto" />
                         </div>
                     </li>

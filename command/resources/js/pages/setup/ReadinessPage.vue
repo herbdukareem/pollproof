@@ -72,61 +72,63 @@ async function remind(group) {
     <PageHeader title="Readiness" subtitle="From every unit having an agent to every agent confirmed for election day." :updated-at="report.updatedAt.value" :loading="report.loading.value" @refresh="report.load" />
     <LoadState :loading="report.loading.value" :error="report.error.value" :empty="!r">
         <FreezeNote :freeze-at="r.freeze_at" />
-        <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
-        <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+        <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
+        <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-        <section class="card mb-5 p-5">
-            <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="card-title ">From assigned to ready</h2>
-                <span class="text-sm text-ink-2">{{ num(r.units) }} polling units</span>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <RouterLink v-for="(f, i) in r.funnel" :key="f.key" :to="{ path: '/setup/roster', query: { filter: i === 0 ? 'all' : 'incomplete' } }" class="group -m-2 flex flex-col gap-2 rounded-xl p-2 transition hover:bg-[#f6f7f9]" :title="i === 0 ? 'Open the agent roster' : 'Open agents not fully onboarded'">
-                    <div class="text-[28px] leading-none font-extrabold">{{ num(f.value) }}</div>
-                    <div class="text-sm font-bold">{{ f.label }}</div>
-                    <div class="h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="bar-fill h-full rounded-full" :class="i === 4 ? 'bg-action' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></div></div>
-                    <div class="text-[13px] text-ink-2">{{ notes[f.key](r) }}</div>
-                </RouterLink>
-            </div>
+        <section class="card mb-4 overflow-hidden">
+            <header class="card-head">
+                <h2 class="card-title">From assigned to ready</h2>
+                <span class="text-[12.5px] text-ink-2 tabular-nums">of {{ num(r.units) }} polling units</span>
+            </header>
+            <ol class="grid sm:grid-cols-2 xl:grid-cols-5">
+                <li v-for="(f, i) in r.funnel" :key="f.key" class="border-rule max-xl:border-t max-xl:first:border-t-0 sm:max-xl:[&:nth-child(2)]:border-t-0 sm:max-xl:[&:nth-child(even)]:border-l xl:[&:not(:first-child)]:border-l">
+                    <RouterLink :to="{ path: '/setup/roster', query: { filter: i === 0 ? 'all' : 'incomplete' } }" class="flex h-full flex-col px-5 py-4 transition-colors hover:bg-[#f8f9fb]" :title="i === 0 ? 'Open the agent roster' : 'Open agents not fully onboarded'">
+                        <span class="text-[13px] text-ink-2">{{ f.label }}</span>
+                        <span class="fig mt-0.5 text-[28px] leading-none font-[700]" :class="i === 4 ? 'text-ink' : ''">{{ num(f.value) }}</span>
+                        <span class="mt-2.5 h-1.5 rounded-[1px] bg-[#e8ebf0]"><span class="bar-fill block h-full rounded-[1px]" :class="i === 4 ? 'bg-good' : 'bg-navy'" :style="{ width: (r.units ? (100 * f.value) / r.units : 0) + '%' }"></span></span>
+                        <span class="mt-2 text-[12.5px] text-ink-2">{{ notes[f.key](r) }}</span>
+                    </RouterLink>
+                </li>
+            </ol>
         </section>
 
-        <div class="grid items-start gap-5 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div class="grid items-start gap-4 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <section class="card overflow-hidden">
-                <div class="flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
-                    <h2 class="card-title ">Readiness by LGA</h2>
-                    <span class="text-xs text-ink-2">Lowest confirmation first · % of units</span>
-                </div>
+                <header class="card-head">
+                    <h2 class="card-title">Readiness by LGA</h2>
+                    <span class="text-[12.5px] text-ink-2">Share of units, lowest confirmed first</span>
+                </header>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[560px] text-sm">
-                        <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="units" cls="text-right">Units</SortTh><SortTh :sort="sort" k="tested" cls="text-right">Practice</SortTh><SortTh :sort="sort" k="trained" cls="text-right">Trained</SortTh><SortTh :sort="sort" k="confirmed" cls="text-right">Confirmed</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
+                        <thead><tr><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="units" cls="text-right">Units</SortTh><SortTh :sort="sort" k="tested" cls="text-right">Practice</SortTh><SortTh :sort="sort" k="trained" cls="text-right">Trained</SortTh><SortTh :sort="sort" k="confirmed" cls="text-right">Confirmed</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                         <tbody>
                             <tr v-for="l in lgas" :key="l.id">
-                                <td class="td font-bold">{{ l.name }}</td>
-                                <td class="td text-right">{{ num(l.units) }}</td>
-                                <td class="td text-right">{{ l.tested }}%</td>
-                                <td class="td text-right">{{ l.trained }}%</td>
-                                <td class="td text-right font-bold" :class="l.status === 'ready' ? '' : l.status === 'at_risk' ? 'text-[#7a4f00]' : 'text-action'">{{ l.confirmed }}%</td>
+                                <td class="td font-[600]">{{ l.name }}</td>
+                                <td class="td fig text-right">{{ num(l.units) }}</td>
+                                <td class="td fig text-right">{{ l.tested }}%</td>
+                                <td class="td fig text-right">{{ l.trained }}%</td>
+                                <td class="td fig text-right text-[15px] font-[700]" :class="l.status === 'ready' ? '' : l.status === 'at_risk' ? 'text-[#7a4f00]' : 'text-action'">{{ l.confirmed }}%</td>
                                 <td class="td"><Badge :tone="statusTone[l.status]">{{ statusLabel[l.status] }}</Badge></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <div v-if="r.lgas.length > 8" class="border-t border-[#eef0f3] px-5 py-3 text-sm">
-                    <button class="font-bold text-navy underline-offset-2 hover:underline" @click="showAll = !showAll">{{ showAll ? 'Show the lowest 8' : `Show all ${r.lgas.length}` }}</button>
+                <div v-if="r.lgas.length > 8" class="border-t border-rule px-5 py-3 text-sm">
+                    <button class="link" @click="showAll = !showAll">{{ showAll ? 'Show the lowest 8' : `Show all ${r.lgas.length}` }}</button>
                 </div>
             </section>
 
-            <section class="card p-5">
-                <h2 class="card-title mb-3 ">Close the gaps</h2>
-                <ul class="flex flex-col gap-2">
-                    <li v-for="g in gaps" :key="g.title" class="flex items-center gap-4 rounded-xl bg-mist p-3.5">
-                        <div class="w-14 shrink-0 text-center text-[22px] font-extrabold" :class="g.count ? g.tone : 'text-ink-3'">{{ num(g.count) }}</div>
+            <section class="card overflow-hidden">
+                <header class="card-head"><h2 class="card-title">Close the gaps</h2></header>
+                <ul>
+                    <li v-for="g in gaps" :key="g.title" class="flex items-center gap-4 border-t border-rule px-5 py-3.5 first:border-t-0">
+                        <div class="fig w-12 shrink-0 text-right text-[24px] leading-none font-[700]" :class="g.count ? g.tone : 'text-ink-3'">{{ num(g.count) }}</div>
                         <div class="min-w-0 flex-1">
-                            <div class="text-sm font-bold">{{ g.title }}</div>
+                            <div class="text-[14px] font-[620]">{{ g.title }}</div>
                             <div class="text-[12.5px] text-ink-2">{{ g.note }}</div>
                         </div>
-                        <button v-if="g.group" class="btn-outline h-9 shrink-0 px-3 text-xs" :disabled="!g.count || busy === g.group" @click="remind(g.group)">{{ busy === g.group ? 'Sending…' : g.action }}</button>
-                        <RouterLink v-else :to="g.to" class="btn-outline h-9 shrink-0 px-3 text-xs">Open</RouterLink>
+                        <button v-if="g.group" class="btn-ghost h-8 shrink-0 px-3 text-[13px]" :disabled="!g.count || busy === g.group" @click="remind(g.group)">{{ busy === g.group ? 'Sending…' : g.action }}</button>
+                        <RouterLink v-else :to="g.to" class="btn-ghost h-8 shrink-0 px-3 text-[13px]">Open</RouterLink>
                     </li>
                 </ul>
             </section>

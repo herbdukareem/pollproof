@@ -14,6 +14,7 @@ import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
 import { dateTime, localInputValue, num, signed } from '../lib/format';
 import Icon from '../components/Icon.vue';
+import Tabs from '../components/Tabs.vue';
 
 const level = ref('');
 // Latest announced first; the Status header puts problems first.
@@ -38,7 +39,7 @@ const matches = computed(() => rows.value.filter((e) =>
     && (!search.value || e.comparison.scope.toLowerCase().includes(search.value.toLowerCase()))));
 const sorted = computed(() => sortRows(matches.value, sort));
 const paged = usePaged(sorted, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value, sort.key, sort.dir] });
-const levelLabel = { ward: 'Ward · EC8B', lga: 'LGA · EC8C', state: 'State · EC8D' };
+const levelLabel = { ward: 'Ward (EC8B)', lga: 'LGA (EC8C)', state: 'State (EC8D)' };
 const parties = computed(() => structure.data.value?.parties ?? []);
 const canEnter = hasRole('data_officer', 'situation_room', 'dg');
 
@@ -50,7 +51,7 @@ const lastComparison = ref(null);
 
 const scopes = computed(() => {
     const lgas = structure.data.value?.lgas ?? [];
-    if (form.level === 'ward') return lgas.flatMap((l) => l.wards.map((w) => ({ id: w.id, label: `${w.name} · ${l.name}` })));
+    if (form.level === 'ward') return lgas.flatMap((l) => l.wards.map((w) => ({ id: w.id, label: `${w.name}, ${l.name}` })));
     if (form.level === 'lga') return lgas.map((l) => ({ id: l.id, label: l.name }));
     return [];
 });
@@ -58,10 +59,17 @@ watch(() => form.level, () => (form.scope_id = ''));
 
 const levels = [
     { value: '', label: 'All' },
-    { value: 'ward', label: 'Wards · EC8B' },
-    { value: 'lga', label: 'LGAs · EC8C' },
-    { value: 'state', label: 'State · EC8D' },
+    { value: 'ward', label: 'Wards (EC8B)' },
+    { value: 'lga', label: 'LGAs (EC8C)' },
+    { value: 'state', label: 'State (EC8D)' },
 ];
+// Filters by how a sheet compares; a mismatch is the one that needs action.
+const outcomes = computed(() => [
+    { value: 'bad', label: summary.value.bad === 1 ? 'Mismatch' : 'Mismatches', n: summary.value.bad, act: true },
+    { value: 'warn', label: 'Differ, units missing', n: summary.value.warn, hide: !summary.value.warn },
+    { value: 'neutral', label: 'Partial', n: summary.value.neutral },
+    { value: 'good', label: 'Match', n: summary.value.good },
+].filter((o) => !o.hide));
 const selected = ref(null);
 const showForm = ref(true);
 const picked = computed(() => rows.value.find((r) => r.id === selected.value) ?? null);
@@ -115,34 +123,21 @@ async function submit() {
         </template>
     </PageHeader>
 
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Level" class="inline-flex max-w-full overflow-x-auto rounded-xl border border-line bg-white p-1">
-            <button
-                v-for="l in levels"
-                :key="l.value"
-                role="tab"
-                :aria-selected="level === l.value"
-                class="h-8 rounded-lg px-3.5 text-[13px] font-bold whitespace-nowrap transition"
-                :class="level === l.value ? 'bg-navy text-white' : 'text-ink-2 hover:text-ink'"
-                @click="level = l.value"
-            >{{ l.label }}</button>
-        </div>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by result">
-            <button class="pill bg-bad-bg text-bad ring-navy transition hover:brightness-95" :class="statusFilter === 'bad' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'bad'" @click="statusFilter = statusFilter === 'bad' ? '' : 'bad'">{{ summary.bad }} mismatch{{ summary.bad === 1 ? '' : 'es' }}</button>
-            <button v-if="summary.warn" class="pill bg-warn-bg text-warn ring-navy transition hover:brightness-95" :class="statusFilter === 'warn' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'warn'" @click="statusFilter = statusFilter === 'warn' ? '' : 'warn'">{{ summary.warn }} differ, units missing</button>
-            <button class="pill bg-mist text-ink-2 ring-1 ring-line ring-inset transition hover:brightness-95" :class="statusFilter === 'neutral' ? '!ring-2 !ring-navy' : ''" :aria-pressed="statusFilter === 'neutral'" @click="statusFilter = statusFilter === 'neutral' ? '' : 'neutral'">{{ summary.neutral }} partial</button>
-            <button class="pill bg-good-bg text-good ring-navy transition hover:brightness-95" :class="statusFilter === 'good' ? 'ring-2' : ''" :aria-pressed="statusFilter === 'good'" @click="statusFilter = statusFilter === 'good' ? '' : 'good'">{{ summary.good }} match</button>
-        </div>
-    </div>
+    <Tabs v-model="level" label="Level" :tabs="levels" />
 
-    <div class="grid items-start gap-5 xl:grid-cols-[1fr_400px]">
+    <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <section class="card min-w-0 overflow-hidden">
-            <div class="flex flex-wrap items-center gap-3 border-b border-[#eef0f3] p-4">
-                <div class="relative w-full max-w-xs">
+            <div class="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
+                <div class="relative w-full sm:w-[240px]">
                     <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
-                    <input v-model="search" class="field w-full pl-9" placeholder="Ward or LGA name" aria-label="Search collation points" />
+                    <input v-model="search" class="field h-9 w-full pl-9" placeholder="Ward or LGA name" aria-label="Search collation points" />
                 </div>
-                <button v-if="statusFilter || search" class="text-[13px] font-bold text-navy hover:underline" @click="() => { statusFilter = ''; search = ''; }">Clear filters</button>
+                <div class="seg max-w-full overflow-x-auto" role="group" aria-label="Filter by outcome">
+                    <button v-for="o in outcomes" :key="o.value" type="button" class="seg-btn whitespace-nowrap" :class="statusFilter === o.value && 'seg-on'" :aria-pressed="statusFilter === o.value" @click="statusFilter = statusFilter === o.value ? '' : o.value">
+                        {{ o.label }} <span class="tabular-nums" :class="statusFilter === o.value ? 'opacity-75' : o.act && o.n ? 'font-[650] text-action' : 'text-ink-3'">{{ o.n }}</span>
+                    </button>
+                </div>
+                <button v-if="statusFilter || search" class="link text-[13px] sm:ml-auto" @click="() => { statusFilter = ''; search = ''; }">Clear filters</button>
             </div>
             <LoadState :loading="entries.loading.value" :error="entries.error.value" :empty="!paged.rows.value.length" :empty-text="rows.length ? 'No collation points match.' : 'No collation sheets entered yet.'">
                 <div class="relative overflow-x-auto">
@@ -159,11 +154,11 @@ async function submit() {
                                 @click="pick(e)"
                                 @keydown.enter="pick(e)"
                             >
-                                <td class="td"><div class="font-bold">{{ e.comparison.scope }}</div><div class="text-xs text-ink-2">{{ levelLabel[e.comparison.level] }} · {{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported<template v-if="e.announced_at"> · announced {{ dateTime(e.announced_at) }}</template></div></td>
-                                <td class="td text-right font-semibold">{{ num(e.comparison.our_total_cast) }}</td>
-                                <td class="td text-right font-semibold">{{ num(e.comparison.declared_total_cast) }}</td>
+                                <td class="td"><div class="font-[620]">{{ e.comparison.scope }}</div><div class="text-[12.5px] text-ink-2 tabular-nums">{{ levelLabel[e.comparison.level] }}, {{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported<template v-if="e.announced_at">, announced {{ dateTime(e.announced_at) }}</template></div></td>
+                                <td class="td fig text-right text-[15px] font-[600]">{{ num(e.comparison.our_total_cast) }}</td>
+                                <td class="td fig text-right text-[15px] font-[600]">{{ num(e.comparison.declared_total_cast) }}</td>
                                 <td class="td">
-                                    <span v-for="(d, code) in e.comparison.differences" :key="code" class="mr-2 font-extrabold text-action">{{ code }} {{ signed(d) }}</span>
+                                    <span v-for="(d, code) in e.comparison.differences" :key="code" class="mr-2.5 whitespace-nowrap text-action"><span class="font-[560]">{{ code }}</span> <span class="fig font-[700]">{{ signed(d) }}</span></span>
                                     <span v-if="!Object.keys(e.comparison.differences).length" class="text-ink-3">None</span>
                                 </td>
                                 <td class="td"><Badge :tone="status(e.comparison)[0]">{{ status(e.comparison)[1] }}</Badge></td>
@@ -172,18 +167,18 @@ async function submit() {
                     </table>
                 </div>
                 <Pagination :meta="paged.meta.value" :sort="sort" noun="collation points" @page="paged.setPage" @per-page="paged.setPerPage" />
-                <div class="border-t border-[#eef0f3] px-4 py-2.5 text-[12.5px] text-ink-3">Figures are total votes cast. Select a row to see it party by party.</div>
+                <div class="border-t border-rule px-4 py-2.5 text-[12.5px] text-ink-3">Figures are total votes cast. Select a row to see it party by party.</div>
             </LoadState>
         </section>
 
-        <aside v-if="picked && !showForm" class="card overflow-hidden" :class="status(picked.comparison)[0] === 'bad' ? 'border-2 border-action' : ''">
+        <aside v-if="picked && !showForm" class="card overflow-hidden" :class="status(picked.comparison)[0] === 'bad' ? 'border-action/60' : ''">
             <div class="flex flex-col gap-2 p-5">
                 <div class="flex items-center gap-2">
                     <Badge :tone="status(picked.comparison)[0]">{{ status(picked.comparison)[1] }}</Badge>
-                    <span class="text-xs text-ink-2">Announced {{ dateTime(picked.announced_at) }}</span>
-                    <button class="ml-auto rounded-lg p-1 text-ink-2 hover:bg-mist" aria-label="Close" @click="selected = null; showForm = canEnter"><Icon name="x" :size="16" /></button>
+                    <span class="text-[12.5px] text-ink-2 tabular-nums">Announced {{ dateTime(picked.announced_at) }}</span>
+                    <button class="ml-auto rounded-md p-1 text-ink-2 hover:bg-mist hover:text-ink" aria-label="Close" @click="selected = null; showForm = canEnter"><Icon name="x" :size="16" /></button>
                 </div>
-                <h2 class="text-lg font-extrabold">{{ picked.comparison.scope }}</h2>
+                <h2 class="text-[19px] leading-tight font-[700]">{{ picked.comparison.scope }}</h2>
                 <p class="text-[13.5px] leading-relaxed text-ink-2">
                     <template v-if="Object.keys(picked.comparison.differences).length">
                         The declared sheet differs from the {{ picked.comparison.units_reported }} signed unit results beneath it<template v-if="!picked.comparison.coverage_complete">, though {{ picked.comparison.units_in_scope - picked.comparison.units_reported }} units haven't reported yet</template>.
@@ -193,35 +188,35 @@ async function submit() {
                 </p>
             </div>
             <table class="w-full text-sm">
-                <thead><tr><th class="th">Party</th><th class="th text-right">Ours</th><th class="th text-right">Declared</th><th class="th text-right">Diff</th></tr></thead>
+                <thead><tr><th class="th">Party</th><th class="th text-right">Our units</th><th class="th text-right">Declared</th><th class="th text-right">Difference</th></tr></thead>
                 <tbody>
                     <tr v-for="code in codes(picked.comparison)" :key="code" :class="picked.comparison.differences[code] ? 'bg-[#fff8f4]' : ''">
-                        <td class="td font-semibold">{{ partyName(code) }}</td>
-                        <td class="td text-right">{{ num(picked.comparison.ours?.[code] ?? 0) }}</td>
-                        <td class="td text-right">{{ num(picked.comparison.declared?.[code] ?? 0) }}</td>
-                        <td class="td text-right font-extrabold" :class="picked.comparison.differences[code] ? 'text-action' : 'text-ink-3'">{{ picked.comparison.differences[code] ? signed(picked.comparison.differences[code]) : '0' }}</td>
+                        <td class="td font-[600]">{{ partyName(code) }}</td>
+                        <td class="td fig text-right">{{ num(picked.comparison.ours?.[code] ?? 0) }}</td>
+                        <td class="td fig text-right">{{ num(picked.comparison.declared?.[code] ?? 0) }}</td>
+                        <td class="td fig text-right font-[700]" :class="picked.comparison.differences[code] ? 'text-action' : 'text-ink-3'">{{ picked.comparison.differences[code] ? signed(picked.comparison.differences[code]) : '0' }}</td>
                     </tr>
-                    <tr class="font-bold">
+                    <tr class="font-[650]">
                         <td class="td">Total votes cast</td>
-                        <td class="td text-right">{{ num(picked.comparison.our_total_cast) }}</td>
-                        <td class="td text-right">{{ num(picked.comparison.declared_total_cast) }}</td>
-                        <td class="td text-right" :class="picked.comparison.declared_total_cast !== picked.comparison.our_total_cast ? 'text-action' : 'text-ink-3'">{{ signed(picked.comparison.declared_total_cast - picked.comparison.our_total_cast) }}</td>
+                        <td class="td fig text-right">{{ num(picked.comparison.our_total_cast) }}</td>
+                        <td class="td fig text-right">{{ num(picked.comparison.declared_total_cast) }}</td>
+                        <td class="td fig text-right" :class="picked.comparison.declared_total_cast !== picked.comparison.our_total_cast ? 'text-action' : 'text-ink-3'">{{ signed(picked.comparison.declared_total_cast - picked.comparison.our_total_cast) }}</td>
                     </tr>
                 </tbody>
             </table>
-            <div v-if="picked.comparison.our_accredited && picked.comparison.declared_total_cast > picked.comparison.our_accredited" class="m-4 rounded-xl bg-bad-bg px-4 py-3 text-[13px] text-bad">
-                <b>Votes cast exceed accreditation.</b> The sheet declares {{ num(picked.comparison.declared_total_cast) }} votes cast; our units recorded {{ num(picked.comparison.our_accredited) }} accredited voters.
+            <div v-if="picked.comparison.our_accredited && picked.comparison.declared_total_cast > picked.comparison.our_accredited" class="m-4 rounded-lg bg-bad-bg px-4 py-3 text-[13px] text-bad">
+                <b class="font-[650]">Votes cast exceed accreditation.</b> The sheet declares {{ num(picked.comparison.declared_total_cast) }} votes cast; our units recorded {{ num(picked.comparison.our_accredited) }} accredited voters.
             </div>
             <div v-else class="h-2"></div>
         </aside>
 
-        <form v-else-if="canEnter" class="card self-start p-5" @submit.prevent="submit">
+        <form v-else-if="canEnter" class="card p-5" @submit.prevent="submit">
             <h2 class="card-title">Enter a declared sheet</h2>
             <p class="card-sub mb-4">Type the figures exactly as announced. They're checked against our units straight away.</p>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="label" for="c-level">Level</label>
-                    <select id="c-level" v-model="form.level" class="field"><option value="ward">Ward · EC8B</option><option value="lga">LGA · EC8C</option><option value="state">State · EC8D</option></select>
+                    <select id="c-level" v-model="form.level" class="field"><option value="ward">Ward (EC8B)</option><option value="lga">LGA (EC8C)</option><option value="state">State (EC8D)</option></select>
                 </div>
                 <div>
                     <label class="label" for="c-time">Announced at</label>
@@ -232,30 +227,30 @@ async function submit() {
                 <label class="label" for="c-scope">Collation centre</label>
                 <SearchSelect id="c-scope" v-model="form.scope_id" :options="scopes.map((s) => ({ value: s.id, label: s.label }))" :placeholder="form.level === 'ward' ? 'Type a ward or LGA…' : 'Type an LGA…'" :noun="form.level === 'ward' ? 'wards' : 'LGAs'" required />
             </div>
-            <div class="mt-4 overflow-hidden rounded-xl border border-line">
-                <div v-for="p in parties" :key="p.code" class="flex items-center justify-between gap-3 border-b border-[#eef0f3] px-3 py-2">
-                    <label :for="`v-${p.code}`" class="text-sm font-semibold">{{ p.name }}</label>
-                    <input :id="`v-${p.code}`" v-model.number="form.votes[p.code]" type="number" min="0" inputmode="numeric" class="field h-9 w-28 text-right font-bold" />
+            <div class="mt-4 overflow-hidden rounded-lg border border-line">
+                <div v-for="p in parties" :key="p.code" class="flex items-center justify-between gap-3 border-b border-rule px-3 py-2">
+                    <label :for="`v-${p.code}`" class="text-sm font-[600]">{{ p.name }}</label>
+                    <input :id="`v-${p.code}`" v-model.number="form.votes[p.code]" type="number" min="0" inputmode="numeric" class="field fig h-9 w-28 text-right text-[15px] font-[650]" />
                 </div>
-                <div class="flex items-center justify-between gap-3 border-b border-[#eef0f3] px-3 py-2">
-                    <label for="c-rej" class="text-sm font-semibold">Rejected ballots</label>
-                    <input id="c-rej" v-model.number="form.rejected" type="number" min="0" class="field h-9 w-28 text-right font-bold" />
+                <div class="flex items-center justify-between gap-3 border-b border-rule px-3 py-2">
+                    <label for="c-rej" class="text-sm font-[600]">Rejected ballots</label>
+                    <input id="c-rej" v-model.number="form.rejected" type="number" min="0" class="field fig h-9 w-28 text-right text-[15px] font-[650]" />
                 </div>
                 <div class="flex items-center justify-between gap-3 px-3 py-2">
-                    <label for="c-acc" class="text-sm font-semibold">Accredited (if declared)</label>
-                    <input id="c-acc" v-model.number="form.accredited" type="number" min="0" class="field h-9 w-28 text-right font-bold" />
+                    <label for="c-acc" class="text-sm font-[600]">Accredited <span class="font-[400] text-ink-2">(if declared)</span></label>
+                    <input id="c-acc" v-model.number="form.accredited" type="number" min="0" class="field fig h-9 w-28 text-right text-[15px] font-[650]" />
                 </div>
             </div>
             <label class="label mt-4" for="c-photo">Photo of the sheet (optional)</label>
             <input id="c-photo" ref="photo" type="file" accept="image/*" class="text-sm" />
             <p v-if="error" role="alert" class="mt-3 rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
-            <button class="btn-primary mt-4 h-11 w-full" :disabled="busy">{{ busy ? 'Checking…' : 'Save and compare' }}</button>
+            <button class="btn-primary mt-4 h-10 w-full" :disabled="busy">{{ busy ? 'Checking…' : 'Save and compare' }}</button>
 
-            <div v-if="lastComparison" class="mt-4 rounded-xl p-3.5 text-sm" :class="Object.keys(lastComparison.differences).length ? 'bg-bad-bg text-bad' : 'bg-good-bg text-good'">
-                <b>{{ lastComparison.scope }}:</b>
+            <div v-if="lastComparison" class="mt-4 rounded-lg p-3.5 text-sm" :class="Object.keys(lastComparison.differences).length ? 'bg-bad-bg text-bad' : 'bg-good-bg text-good'">
+                <b class="font-[650]">{{ lastComparison.scope }}:</b>
                 <template v-if="Object.keys(lastComparison.differences).length">
                     declared minus our units
-                    <span v-for="(d, code) in lastComparison.differences" :key="code" class="ml-1 font-extrabold">{{ code }} {{ signed(d) }}</span>.
+                    <span v-for="(d, code) in lastComparison.differences" :key="code" class="ml-1 whitespace-nowrap"><span class="font-[560]">{{ code }}</span> <span class="fig font-[700]">{{ signed(d) }}</span></span>.
                     The alert has gone to the legal team and collation agent.
                 </template>
                 <template v-else>matches our signed results.</template>

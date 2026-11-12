@@ -39,7 +39,7 @@ watch(() => props.open, async (o) => {
 });
 
 const lgaOptions = computed(() => lgas.value.map((l) => ({ value: l.id, label: l.name })));
-const wardOptions = computed(() => lgas.value.flatMap((l) => l.wards.map((w) => ({ value: w.id, label: `${w.name} · ${l.name}`, hint: `${w.units} units` }))));
+const wardOptions = computed(() => lgas.value.flatMap((l) => l.wards.map((w) => ({ value: w.id, label: `${w.name}, ${l.name}`, hint: `${w.units} units` }))));
 const target = computed(() => {
     if (props.post) return props.post;
     if (choice.level === 'lga') {
@@ -100,10 +100,10 @@ async function save() {
     <Modal :open="open" :title="title" :subtitle="post ? postLabel : 'Choose the post, then who fills it.'" width="max-w-xl" :busy="busy" @close="emit('close')">
         <form id="assign-sup" class="flex flex-col gap-5" @submit.prevent="save">
             <fieldset v-if="!post" class="flex flex-col gap-3">
-                <legend class="mb-2 text-sm font-bold">Post</legend>
-                <div class="inline-flex w-fit rounded-xl bg-mist p-1 text-[13px] font-semibold">
-                    <button type="button" class="rounded-lg px-3 py-1.5" :class="choice.level === 'ward' ? 'bg-white shadow-sm' : 'text-ink-2'" @click="choice.level = 'ward'">Ward supervisor</button>
-                    <button type="button" class="rounded-lg px-3 py-1.5" :class="choice.level === 'lga' ? 'bg-white shadow-sm' : 'text-ink-2'" @click="choice.level = 'lga'">LGA supervisor</button>
+                <legend class="mb-2 text-sm font-[650]">Post</legend>
+                <div class="seg w-fit ">
+                    <button type="button" class="seg-btn px-3 py-1.5" :class="choice.level === 'ward' ? 'seg-on' : ''" @click="choice.level = 'ward'">Ward supervisor</button>
+                    <button type="button" class="seg-btn px-3 py-1.5" :class="choice.level === 'lga' ? 'seg-on' : ''" @click="choice.level = 'lga'">LGA supervisor</button>
                 </div>
                 <SearchSelect v-if="choice.level === 'ward'" v-model="choice.wardId" :options="wardOptions" placeholder="Type a ward or LGA…" noun="wards" aria-label="Ward" />
                 <template v-else>
@@ -113,21 +113,21 @@ async function save() {
             </fieldset>
 
             <div>
-                <div class="mb-2 text-sm font-bold">{{ person ? 'Person' : 'Who' }}</div>
-                <div v-if="person" class="rounded-xl bg-mist p-3 text-sm"><b>{{ person.name }}</b> · {{ person.code }}<div class="text-[12.5px] text-ink-2">{{ person.post }}</div></div>
+                <div class="mb-2 text-sm font-[650]">{{ person ? 'Person' : 'Who' }}</div>
+                <div v-if="person" class="rounded-lg bg-mist p-3 text-sm"><b>{{ person.name }}</b>, {{ person.code }}<div class="text-[12.5px] text-ink-2">{{ person.post }}</div></div>
                 <PersonPicker v-else v-model="chosen" v-model:mode="mode" :fresh="fresh" :exclude="holder?.id ?? null" />
-                <ul v-if="effects.length" class="mt-2 list-disc space-y-0.5 rounded-xl bg-warn-bg/70 py-2 pr-3 pl-7 text-[12.5px] text-warn">
+                <ul v-if="effects.length" class="mt-2 list-disc space-y-0.5 rounded-lg bg-warn-bg/70 py-2 pr-3 pl-7 text-[12.5px] text-warn">
                     <li v-for="e in effects" :key="e">{{ e }}</li>
                 </ul>
             </div>
 
             <fieldset v-if="holder || !post">
-                <legend class="mb-2 text-sm font-bold">{{ holder ? `What happens to ${holder.name}?` : 'If someone holds this post now' }}</legend>
-                <label class="flex items-start gap-2 rounded-xl border border-line p-3 text-sm" :class="previous === 'unassigned' ? 'border-navy bg-[#f4f6fb]' : ''">
+                <legend class="mb-2 text-sm font-[650]">{{ holder ? `What happens to ${holder.name}?` : 'If someone holds this post now' }}</legend>
+                <label class="flex items-start gap-2 rounded-lg border border-line p-3 text-sm" :class="previous === 'unassigned' ? 'border-navy bg-[#f4f6fb]' : ''">
                     <input v-model="previous" type="radio" value="unassigned" class="mt-0.5 h-4 w-4 accent-navy" />
                     <span><b>Keep them, without a post</b><span class="block text-[12.5px] text-ink-2">They stay registered as a supervisor and can be given another post later.</span></span>
                 </label>
-                <label class="mt-2 flex items-start gap-2 rounded-xl border border-line p-3 text-sm" :class="previous === 'reserve' ? 'border-navy bg-[#f4f6fb]' : ''">
+                <label class="mt-2 flex items-start gap-2 rounded-lg border border-line p-3 text-sm" :class="previous === 'reserve' ? 'border-navy bg-[#f4f6fb]' : ''">
                     <input v-model="previous" type="radio" value="reserve" class="mt-0.5 h-4 w-4 accent-navy" />
                     <span><b>Make them a reserve agent</b><span class="block text-[12.5px] text-ink-2">They can be sent to a polling unit that needs an agent.</span></span>
                 </label>

@@ -128,7 +128,7 @@ class SetupController extends Controller
                     'name' => $a->name,
                     'phone' => $showPhones ? $a->phone : Phone::masked($a->phone),
                     'polling_unit' => $a->pollingUnit?->only(['id', 'code', 'name']),
-                    'place' => $ward ? "{$ward->name} · {$ward->lga->name}" : null,
+                    'place' => $ward ? "{$ward->name}, {$ward->lga->name}" : null,
                     'is_reserve' => $a->is_reserve,
                     'step' => $a->step,
                     'step_label' => User::ONBOARDING_STEPS[$a->step],

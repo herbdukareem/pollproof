@@ -67,7 +67,7 @@ function entry(a, url, linkLabel) {
     const valid = Object.values(a.votes).reduce((s, n) => s + n, 0);
     const share = valid ? (a.votes[props.ourCode] ?? 0) / valid : 0;
     const rep = a.units ? a.reported / a.units : 0;
-    const line = `${num(a.reported)} of ${num(a.units)} units reported${valid ? ` · our share ${pct(share)}` : ''}`;
+    const line = `${num(a.reported)} of ${num(a.units)} units reported${valid ? `, our share ${pct(share)}` : ''}`;
     const link = { ...(url ? { url, linkLabel } : {}), stats: { ...a, valid, share } };
     if (metric.value === 'reporting') {
         return { value: Math.round(rep * 1000) / 10, label: pct(rep), color: a.reported ? along(RAMP, rep) : NONE, description: `${line}.`, ...link };
@@ -171,7 +171,7 @@ function popover(item, where) {
     const swatch = (code) => { const i = h('i', 'pp-pop-dot'); i.style.background = partyColor.value[code]; return i; };
 
     return h('div', 'pp-pop',
-        h('p', 'pp-pop-sub', where.level === 'wards' ? `Ward in ${where.lga}` : 'LGA', ` · ${num(a.reported)} of ${num(a.units)} units reported`),
+        h('p', 'pp-pop-sub', where.level === 'wards' ? `Ward in ${where.lga}` : 'LGA', `, ${num(a.reported)} of ${num(a.units)} units reported`),
         h('div', 'pp-pop-total',
             h('span', null, 'Total votes cast'),
             h('strong', null, a.reported ? num(a.cast) : '–'),
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
             <template v-if="metric === 'share'">
                 <div class="relative max-w-[340px] pt-4">
                     <div class="h-3 rounded-full" :style="{ background: shareScale }"></div>
-                    <span class="absolute top-0 -translate-x-1/2 text-[11px] font-bold text-ink" :style="{ left: linePos }">{{ pct(tally.threshold) }}</span>
+                    <span class="absolute top-0 -translate-x-1/2 text-[11px] font-[650] text-ink" :style="{ left: linePos }">{{ pct(tally.threshold) }}</span>
                     <span class="absolute top-3.5 h-4 w-0.5 -translate-x-1/2 bg-ink" :style="{ left: linePos }"></span>
                     <div class="mt-1 flex justify-between text-[11px]"><span>0%</span><span>{{ pct(TOP) }}+</span></div>
                 </div>
@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
             <template v-else>
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5">
                     <span v-for="c in parties" :key="c.party" class="inline-flex items-center gap-1.5">
-                        <i class="h-3 w-7 rounded-sm" :style="{ background: `linear-gradient(to right, ${leadHeat(partyColor[c.party], 0)}, ${partyColor[c.party]})` }"></i>{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }} · {{ counts.leads[c.party] ?? 0 }}
+                        <i class="h-3 w-7 rounded-sm" :style="{ background: `linear-gradient(to right, ${leadHeat(partyColor[c.party], 0)}, ${partyColor[c.party]})` }"></i>{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }}, {{ counts.leads[c.party] ?? 0 }}
                     </span>
                 </div>
                 <p class="mt-1.5">Paler is a narrow lead; full colour is 30 points or more ahead.</p>
@@ -425,10 +425,9 @@ onBeforeUnmount(() => {
     padding: 14px 16px;
 }
 .pp-map-popover .inistmap-popover-title {
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
 }
 .pp-map-popover .inistmap-popover-kicker,
 .pp-map-popover .inistmap-popover-value {
@@ -443,21 +442,19 @@ onBeforeUnmount(() => {
     display: grid;
     margin: 0 0 9px;
     padding: 9px 12px;
-    border-radius: 12px;
-    background: #f1f3f7;
+    border-radius: 8px;
+    background: #f1f3f6;
 }
 .pp-map-popover .pp-pop-total span {
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #5b6578;
+    font-size: 12.5px;
+    color: #4b5567;
 }
 .pp-map-popover .pp-pop-total strong {
-    font-size: 26px;
-    font-weight: 800;
+    font-size: 28px;
+    font-weight: 700;
+    font-stretch: 84%;
+    font-variant-numeric: tabular-nums;
     line-height: 1.15;
-    letter-spacing: -0.02em;
     color: #13213c;
     font-variant-numeric: tabular-nums;
 }
@@ -485,7 +482,8 @@ onBeforeUnmount(() => {
     color: #5b6578;
 }
 .pp-map-popover .pp-pop-val {
-    font-weight: 800;
+    font-weight: 650;
+    font-stretch: 84%;
     color: #13213c;
     font-variant-numeric: tabular-nums;
     text-align: right;
@@ -521,11 +519,9 @@ onBeforeUnmount(() => {
     margin: 8px 0 4px;
     padding-top: 7px;
     border-top: 1px solid #e3e6ec;
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #8a93a3;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4b5567;
 }
 .pp-map-popover .pp-pop-party {
     display: inline-flex;

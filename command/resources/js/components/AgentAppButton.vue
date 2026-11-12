@@ -54,7 +54,7 @@ async function update() {
 <template>
     <template v-if="allowed">
         <section v-if="card" class="card p-5">
-            <h2 class="flex items-center gap-2 text-[15px] font-bold"><Icon name="phone" :size="17" /> Agent app</h2>
+            <h2 class="flex items-center gap-2 text-[15px] font-[650]"><Icon name="phone" :size="17" /> Agent app</h2>
             <p class="mt-1 text-[13px] text-ink-2">The Android app agents check in and send results with. Download it here, or show the QR code to an agent to scan.</p>
             <button class="btn-navy mt-3 w-full" @click="show"><Icon name="download" :size="16" /> Download or show QR code</button>
         </section>
@@ -62,16 +62,16 @@ async function update() {
             <Icon name="phone" :size="16" /><span class="hidden xl:inline">Agent app</span>
         </button>
         <Modal :open="open" title="PollProof agent app" subtitle="For Android phones. Agents sign in with their registered number." width="max-w-xl" :busy="busy" @close="open = false">
-            <p v-if="error" class="mb-3 rounded-xl bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
-            <p v-if="note" class="mb-3 rounded-xl bg-good-bg px-3 py-2 text-sm text-good">{{ note }}</p>
-            <div v-if="!info && !error" class="skeleton h-48 rounded-xl"></div>
+            <p v-if="error" class="mb-3 rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
+            <p v-if="note" class="mb-3 rounded-lg bg-good-bg px-3 py-2 text-sm text-good">{{ note }}</p>
+            <div v-if="!info && !error" class="skeleton h-48 rounded-lg"></div>
             <div v-else-if="info" class="grid gap-5 sm:grid-cols-[1fr_180px]">
                 <div>
-                    <div v-if="build" class="rounded-xl bg-mist p-3.5 text-sm">
-                        <div class="font-bold">Version {{ build.version }} <span class="font-semibold text-ink-2">· build {{ build.build }}</span></div>
-                        <div class="mt-0.5 text-ink-2">{{ mb(build.size) }}<template v-if="build.built_at"> · built {{ dateTime(build.built_at) }}</template></div>
+                    <div v-if="build" class="rounded-lg bg-mist p-3.5 text-sm">
+                        <div class="font-[650]">Version {{ build.version }}<span class="font-[600] text-ink-2">, build {{ build.build }}</span></div>
+                        <div class="mt-0.5 text-ink-2">{{ mb(build.size) }}<template v-if="build.built_at">, built {{ dateTime(build.built_at) }}</template></div>
                     </div>
-                    <div v-else class="rounded-xl bg-warn-bg p-3.5 text-[13px] text-warn">This server has no copy yet, so the download comes straight from the latest published build.</div>
+                    <div v-else class="rounded-lg bg-warn-bg p-3.5 text-[13px] text-warn">This server has no copy yet, so the download comes straight from the latest published build.</div>
                     <a :href="info.download_url" class="btn-primary mt-4 w-full justify-center" download><Icon name="download" :size="16" /> Download APK</a>
                     <ol class="mt-4 list-decimal space-y-1.5 pl-5 text-[13px] text-ink-2">
                         <li>Open the downloaded file on the phone and tap <b class="text-ink">Install</b>.</li>
@@ -80,7 +80,7 @@ async function update() {
                     </ol>
                 </div>
                 <div class="text-center">
-                    <img v-if="qr" :src="qr" alt="QR code to download the agent app" class="mx-auto w-[180px] rounded-xl border border-line p-1.5" />
+                    <img v-if="qr" :src="qr" alt="QR code to download the agent app" class="mx-auto w-[180px] rounded-lg border border-line p-1.5" />
                     <p class="mt-2 text-[12px] text-ink-2">Scan with an Android phone to download. The link works for one hour.</p>
                 </div>
             </div>

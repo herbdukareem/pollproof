@@ -52,7 +52,7 @@ class TribunalController extends Controller
             'grounds' => $case->grounds->map(fn ($g) => [
                 'id' => $g->id, 'label' => $g->label, 'claim' => $g->claim, 'answer' => $g->answer, 'evidence_note' => $g->evidence_note,
                 'status' => $g->status, 'owner' => $g->owner?->only(['id', 'name']),
-                'units' => collect($g->unit_ids ?? [])->map(fn ($id) => $units->get($id))->filter()->map(fn ($u) => ['id' => $u->id, 'code' => $u->code, 'place' => "{$u->ward->name} · {$u->ward->lga->name}"])->values(),
+                'units' => collect($g->unit_ids ?? [])->map(fn ($id) => $units->get($id))->filter()->map(fn ($u) => ['id' => $u->id, 'code' => $u->code, 'place' => "{$u->ward->name}, {$u->ward->lga->name}"])->values(),
             ]),
             'tasks' => $case->tasks->map(fn ($t) => ['id' => $t->id, 'title' => $t->title, 'owner' => $t->owner?->only(['id', 'name']), 'due_on' => $t->due_on?->toDateString(), 'done_at' => $t->done_at]),
             'staff' => $staff->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role->label()]),

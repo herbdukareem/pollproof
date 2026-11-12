@@ -13,7 +13,7 @@ const props = defineProps({
     noun: { type: String, default: 'rows' },
     perPageOptions: { type: Array, default: () => [25, 50, 100] },
     loading: Boolean,
-    /** Sort state from useSortState(): shows "Sorted by … · Latest first" when not the default. */
+    /** Sort state from useSortState(): shows "Sorted by …" and a way back when not the default. */
     sort: { type: Object, default: null },
 });
 const emit = defineEmits(['page', 'per-page']);
@@ -46,17 +46,17 @@ function go(p) {
 </script>
 
 <template>
-    <div v-if="meta" ref="root" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-[#eef0f3] px-4 py-3 text-[13px] text-ink-2" :class="loading ? 'opacity-70' : ''">
+    <div v-if="meta" ref="root" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-rule px-4 py-3 text-[13px] text-ink-2" :class="loading ? 'opacity-70' : ''">
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span v-if="total">Showing <b class="text-ink">{{ num(from) }}–{{ num(to) }}</b> of <b class="text-ink">{{ num(total) }}</b> {{ noun }}</span>
+            <span v-if="total" class="tabular-nums"><span class="text-ink">{{ num(from) }}–{{ num(to) }}</span> of <span class="text-ink">{{ num(total) }}</span> {{ noun }}</span>
             <span v-else>No {{ noun }}</span>
             <span v-if="sort && !sort.isDefault" class="inline-flex items-center gap-1.5">
-                Sorted by <b class="text-ink">{{ sort.label }} {{ sort.dir === 'asc' ? '↑' : '↓' }}</b>
-                <button class="rounded-full border border-[#d6dae1] bg-white px-2 py-0.5 text-xs font-semibold text-navy hover:border-navy" @click="sort.reset()">{{ sort.initial.key === 'latest' ? 'Latest first' : `Back to ${sort.columns[sort.initial.key]?.label ?? 'default'}` }}</button>
+                Sorted by <span class="text-ink">{{ sort.label }}, {{ sort.dir === 'asc' ? 'lowest first' : 'highest first' }}</span>
+                <button class="link" @click="sort.reset()">{{ sort.initial.key === 'latest' ? 'Show latest first' : `Sort by ${(sort.columns[sort.initial.key]?.label ?? 'default').toLowerCase()}` }}</button>
             </span>
             <label v-if="perPageOptions.length > 1 && total > perPageOptions[0]" class="flex items-center gap-2">
                 <span>Per page</span>
-                <select class="h-8 rounded-lg border border-[#d6dae1] bg-white px-2 text-[13px] font-semibold text-ink" :value="per" @change="emit('per-page', Number($event.target.value))">
+                <select class="h-8 rounded-md border border-line bg-white px-2 text-[13px] font-[560] text-ink" :value="per" @change="emit('per-page', Number($event.target.value))">
                     <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
                 </select>
             </label>

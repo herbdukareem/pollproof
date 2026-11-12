@@ -45,17 +45,17 @@ const tone = { high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' };
         <div v-if="open" class="absolute right-0 z-40 mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-[10px] border border-line bg-white shadow-[0_12px_32px_rgba(19,33,60,0.14)]" role="dialog" aria-label="Notifications">
             <div class="flex items-center justify-between border-b border-line px-4 py-3">
                 <b class="text-sm">Notifications</b>
-                <button v-if="data.unread" class="text-xs font-semibold text-navy hover:underline" @click="markRead()">Mark all read</button>
+                <button v-if="data.unread" class="text-xs font-[600] text-navy hover:underline" @click="markRead()">Mark all read</button>
             </div>
             <p v-if="!data.data.length" class="px-4 py-8 text-center text-sm text-ink-2">Nothing yet.</p>
             <ul class="max-h-[60vh] overflow-y-auto">
                 <li v-for="n in data.data" :key="n.id">
-                    <button class="flex w-full gap-3 border-b border-[#eef0f3] px-4 py-3 text-left hover:bg-mist" :class="n.read_at ? 'opacity-70' : ''" @click="go(n)">
+                    <button class="flex w-full gap-3 border-b border-rule px-4 py-3 text-left hover:bg-mist" :class="n.read_at ? 'opacity-70' : ''" @click="go(n)">
                         <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" :class="n.read_at ? 'bg-transparent' : tone[n.severity]"></span>
                         <span class="min-w-0 flex-1">
-                            <span class="block text-[13.5px] font-bold" :class="n.escalation ? 'text-action' : ''">{{ n.title }}</span>
+                            <span class="block text-[13.5px] font-[650]" :class="n.escalation ? 'text-action' : ''">{{ n.title }}</span>
                             <span class="line-clamp-2 block text-[12.5px] text-ink-2">{{ n.body }}</span>
-                            <span class="mt-0.5 block text-[11.5px] text-ink-3">{{ dateTime(n.created_at) }}{{ n.test ? ' · test' : '' }}</span>
+                            <span class="mt-0.5 block text-[11.5px] text-ink-3">{{ dateTime(n.created_at) }}{{ n.test ? ', test' : '' }}</span>
                         </span>
                     </button>
                 </li>

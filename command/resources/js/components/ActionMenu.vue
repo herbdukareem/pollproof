@@ -46,7 +46,7 @@ onBeforeUnmount(close);
 </script>
 
 <template>
-    <button ref="btn" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-ink-2 transition hover:border-[#d6dae1] hover:bg-white hover:text-ink" :class="open ? 'border-[#d6dae1] bg-white text-ink' : ''" :aria-label="label" aria-haspopup="menu" :aria-expanded="open" @click.stop="toggle">
+    <button ref="btn" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-2 transition-colors hover:bg-mist hover:text-ink" :class="open ? 'bg-mist text-ink' : ''" :aria-label="label" aria-haspopup="menu" :aria-expanded="open" @click.stop="toggle">
         <Icon name="more" :size="20" />
     </button>
     <Teleport to="body">
@@ -56,21 +56,21 @@ onBeforeUnmount(close);
                 v-if="open"
                 ref="menu"
                 role="menu"
-                class="fixed z-[56] w-[232px] overflow-hidden rounded-xl border border-line bg-white py-1 text-left shadow-xl"
+                class="fixed z-[56] float w-[232px] overflow-hidden py-1 text-left"
                 :style="{ top: pos.top + 'px', left: pos.left + 'px', transform: pos.up ? 'translateY(-100%)' : null }"
             >
                 <button
                     v-for="item in items"
                     :key="item.label"
                     role="menuitem"
-                    class="flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-45"
+                    class="flex w-full items-start gap-2.5 px-3.5 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                     :class="item.danger ? 'text-action hover:bg-bad-bg' : 'text-ink hover:bg-mist'"
                     :disabled="item.disabled"
                     :title="item.disabled && item.hint ? item.hint : null"
                     @click="pick(item)"
                 >
                     <Icon :name="item.icon" :size="16" class="mt-0.5 shrink-0 opacity-80" />
-                    <span><span class="block font-semibold">{{ item.label }}</span><span v-if="item.hint" class="block text-[12px] font-normal text-ink-2">{{ item.hint }}</span></span>
+                    <span><span class="block font-[600]">{{ item.label }}</span><span v-if="item.hint" class="block text-[12px] font-normal text-ink-2">{{ item.hint }}</span></span>
                 </button>
             </div>
         </Transition>

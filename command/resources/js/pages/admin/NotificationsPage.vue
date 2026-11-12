@@ -55,40 +55,42 @@ const names = (list) => (list?.length ? list.map((r) => roleLabel.value[r] ?? r)
 
 <template>
     <PageHeader title="Notifications" subtitle="Who hears about what, and how, on election day." :updated-at="rules.updatedAt.value" :loading="rules.loading.value" @refresh="rules.load" />
-    <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
-    <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+    <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
+    <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
     <LoadState :loading="rules.loading.value && !d" :error="rules.error.value" :empty="!d">
-        <div class="grid items-start gap-5 xl:grid-cols-[1fr_300px]">
+        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
             <section class="card overflow-hidden">
-                <h2 class="card-title px-5 pt-5 pb-1">Alert rules</h2>
-                <p class="px-5 pb-3 text-[13px] text-ink-2">Supervisors and collation agents only hear about their own LGA or ward. "If no one acts" means the alert is still open, not acknowledged, after that time.</p>
+                <div class="border-b border-rule px-5 pt-4 pb-3">
+                    <h2 class="card-title">Alert rules</h2>
+                    <p class="card-sub">Supervisors and collation agents only hear about their own LGA or ward. "If no one acts" means the alert is still open, not acknowledged, after that time.</p>
+                </div>
                 <ul>
-                    <li v-for="r in d.data" :key="r.id" class="border-t border-[#eef0f3] px-5 py-4" :class="r.enabled ? '' : 'opacity-60'">
+                    <li v-for="r in d.data" :key="r.id" class="border-t border-rule px-5 py-3.5 first:border-t-0" :class="r.enabled ? '' : 'opacity-60'">
                         <div v-if="editing !== r.id" class="grid items-center gap-3 md:grid-cols-[1.3fr_1.4fr_auto_1fr_auto]">
-                            <div class="text-sm font-bold">{{ r.label }}<Badge v-if="!r.enabled" tone="neutral" class="ml-2">Off</Badge></div>
+                            <div class="text-sm font-[620]">{{ r.label }}<Badge v-if="!r.enabled" tone="neutral" class="ml-2">Off</Badge></div>
                             <div class="text-[13px] text-ink-2">{{ names(r.recipients) }}</div>
                             <div class="flex gap-1">
-                                <span v-for="[key, label] in channels" :key="key" class="rounded-md px-1.5 py-0.5 text-[11px] font-bold" :class="r.channels.includes(key) ? 'bg-navy text-white' : 'bg-mist text-ink-3'">{{ label }}</span>
+                                <span v-for="[key, label] in channels" :key="key" class="rounded px-1.5 py-px text-[12px] font-[600]" :class="r.channels.includes(key) ? 'bg-[#e5ecf8] text-[#1d3f7a]' : 'text-ink-3 line-through decoration-ink-3/50'">{{ label }}</span>
                             </div>
                             <div class="text-[13px]" :class="r.escalate_after_minutes ? '' : 'text-ink-3'">{{ r.escalate_after_minutes ? `${names(r.escalate_to)} after ${r.escalate_after_minutes} min` : 'No escalation' }}</div>
-                            <button class="btn-outline h-8 px-3 text-xs" @click="edit(r)">Edit</button>
+                            <button class="btn-ghost h-8 px-3 text-[13px]" @click="edit(r)">Edit</button>
                         </div>
                         <form v-else class="flex flex-col gap-4" @submit.prevent="save(r)">
-                            <div class="flex items-center justify-between"><b class="text-sm">{{ r.label }}</b><label class="flex items-center gap-2 text-sm"><input v-model="draft.enabled" type="checkbox" class="h-4 w-4 accent-[#13213c]" /> On</label></div>
+                            <div class="flex items-center justify-between"><b class="text-sm font-[650]">{{ r.label }}</b><label class="flex items-center gap-2 text-sm"><input v-model="draft.enabled" type="checkbox" class="checkbox" /> On</label></div>
                             <fieldset>
                                 <legend class="label">Tell</legend>
                                 <div class="flex flex-wrap gap-2">
-                                    <label v-for="role in d.roles" :key="role.value" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.recipients.includes(role.value) ? 'border-navy bg-mist font-semibold' : 'border-line'">
-                                        <input type="checkbox" class="h-4 w-4 accent-[#13213c]" :checked="draft.recipients.includes(role.value)" @change="toggle(draft.recipients, role.value)" /> {{ role.label }}
+                                    <label v-for="role in d.roles" :key="role.value" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.recipients.includes(role.value) ? 'border-navy bg-[#f3f5f8] font-[600]' : 'border-line'">
+                                        <input type="checkbox" class="checkbox" :checked="draft.recipients.includes(role.value)" @change="toggle(draft.recipients, role.value)" /> {{ role.label }}
                                     </label>
                                 </div>
                             </fieldset>
                             <fieldset>
                                 <legend class="label">By</legend>
                                 <div class="flex gap-2">
-                                    <label v-for="[key, label] in channels" :key="key" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.channels.includes(key) ? 'border-navy bg-mist font-semibold' : 'border-line'">
-                                        <input type="checkbox" class="h-4 w-4 accent-[#13213c]" :checked="draft.channels.includes(key)" @change="toggle(draft.channels, key)" /> {{ label }}
+                                    <label v-for="[key, label] in channels" :key="key" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.channels.includes(key) ? 'border-navy bg-[#f3f5f8] font-[600]' : 'border-line'">
+                                        <input type="checkbox" class="checkbox" :checked="draft.channels.includes(key)" @change="toggle(draft.channels, key)" /> {{ label }}
                                     </label>
                                 </div>
                             </fieldset>
@@ -96,8 +98,8 @@ const names = (list) => (list?.length ? list.map((r) => roleLabel.value[r] ?? r)
                                 <legend class="label">If no one acts</legend>
                                 <div class="flex flex-wrap items-center gap-2 text-sm">
                                     after <input v-model.number="draft.escalate_after_minutes" type="number" min="1" max="1440" class="field h-9 w-20" aria-label="Minutes" placeholder="–" /> minutes, tell
-                                    <label v-for="role in d.roles" :key="role.value" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.escalate_to.includes(role.value) ? 'border-action bg-[#fff6ef] font-semibold' : 'border-line'">
-                                        <input type="checkbox" class="h-4 w-4 accent-[#c2410c]" :checked="draft.escalate_to.includes(role.value)" @change="toggle(draft.escalate_to, role.value)" /> {{ role.label }}
+                                    <label v-for="role in d.roles" :key="role.value" class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]" :class="draft.escalate_to.includes(role.value) ? 'border-action bg-[#fdf5ef] font-[600]' : 'border-line'">
+                                        <input type="checkbox" class="checkbox accent-[#c2410c]" :checked="draft.escalate_to.includes(role.value)" @change="toggle(draft.escalate_to, role.value)" /> {{ role.label }}
                                     </label>
                                 </div>
                             </fieldset>
@@ -107,18 +109,18 @@ const names = (list) => (list?.length ? list.map((r) => roleLabel.value[r] ?? r)
                 </ul>
             </section>
 
-            <div class="flex flex-col gap-5">
+            <div class="flex flex-col gap-4">
                 <section class="card p-5">
-                    <h2 class="text-[15px] font-bold">Delivery channels</h2>
-                    <ul class="mt-3 flex flex-col gap-2 text-sm">
-                        <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-good"></span><b>In-app</b><span class="text-ink-2">· the bell, and the agent app</span></li>
-                        <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" :class="d.sms_driver === 'log' ? 'bg-[#d99a00]' : 'bg-good'"></span><b>SMS</b><span class="text-ink-2">· {{ d.sms_driver === 'log' ? 'test mode, written to the log' : d.sms_driver }}</span></li>
-                        <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" :class="['log', 'array'].includes(d.mail_driver) ? 'bg-[#d99a00]' : 'bg-good'"></span><b>Email</b><span class="text-ink-2">· {{ ['log', 'array'].includes(d.mail_driver) ? 'test mode, written to the log' : d.mail_driver }}</span></li>
-                    </ul>
+                    <h2 class="card-title-ruled">Delivery channels</h2>
+                    <dl class="flex flex-col gap-2.5 text-sm">
+                        <div class="flex items-baseline gap-2.5"><span class="h-2 w-2 shrink-0 rounded-full bg-good"></span><dt class="w-14 font-[620]">In-app</dt><dd class="text-ink-2">The bell, and the agent app</dd></div>
+                        <div class="flex items-baseline gap-2.5"><span class="h-2 w-2 shrink-0 rounded-full" :class="d.sms_driver === 'log' ? 'bg-[#d99a00]' : 'bg-good'"></span><dt class="w-14 font-[620]">SMS</dt><dd class="text-ink-2">{{ d.sms_driver === 'log' ? 'Test mode, written to the log' : d.sms_driver.charAt(0).toUpperCase() + d.sms_driver.slice(1) }}</dd></div>
+                        <div class="flex items-baseline gap-2.5"><span class="h-2 w-2 shrink-0 rounded-full" :class="['log', 'array'].includes(d.mail_driver) ? 'bg-[#d99a00]' : 'bg-good'"></span><dt class="w-14 font-[620]">Email</dt><dd class="text-ink-2">{{ ['log', 'array'].includes(d.mail_driver) ? 'Test mode, written to the log' : d.mail_driver.toUpperCase() }}</dd></div>
+                    </dl>
                 </section>
                 <section class="card p-5">
-                    <h2 class="text-[15px] font-bold">Test before election day</h2>
-                    <p class="mt-1 text-[13px] text-ink-2">Send one sample of every alert to yourself to check the wording and that it arrives.</p>
+                    <h2 class="card-title-ruled">Test before election day</h2>
+                    <p class="text-[13px] text-ink-2">Send one sample of every alert to yourself to check the wording and that it arrives.</p>
                     <button class="btn-primary mt-3 w-full" :disabled="busy === 'test'" @click="test"><Icon name="send" :size="16" /> Send test alerts to me</button>
                 </section>
             </div>

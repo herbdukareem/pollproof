@@ -7,7 +7,8 @@
 @theme {
     /* Archivo, self-hosted: one family. Words at normal width; figures semi-condensed, like a tally board. */
     --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+    /* Only for strings people copy character by character: passwords, codes, hashes. */
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
     --color-navy: #13213c;
     --color-navy-2: #1c2b48;
@@ -57,6 +58,16 @@
     th {
         font-variant-numeric: tabular-nums;
     }
+    /* Selects get the same chevron as the searchable pickers, not the browser's own. */
+    select.field,
+    select.h-8 {
+        appearance: none;
+        padding-right: 2.25rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234b5567' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.7rem center;
+        background-size: 16px;
+    }
     ::selection {
         background: #ffd9c2;
     }
@@ -85,6 +96,34 @@
 }
 @utility card-sub {
     @apply mt-0.5 text-[13px] text-ink-2;
+}
+/* A sheet title inside a padded (p-5) sheet, ruled off from what follows like card-head. */
+@utility card-title-ruled {
+    @apply card-title -mx-5 -mt-1 mb-4 border-b border-rule px-5 pb-3;
+}
+/* The heading strip of a sheet: title on the left, a note or link on the right, a rule below. */
+@utility card-head {
+    @apply flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-rule px-5 pt-4 pb-3;
+}
+/* Things that float over the page (menus, popovers, toasts): the only place a shadow is used. */
+@utility float {
+    @apply rounded-[10px] border border-line bg-white shadow-[0_12px_32px_-10px_rgba(19,33,60,0.28)];
+}
+/* A figure with its label: a big number on the right of a ruled row, or stacked in a strip. */
+@utility stat-label {
+    @apply text-[13px] text-ink-2;
+}
+@utility stat-fig {
+    @apply text-[26px] leading-none font-[700] text-ink;
+    font-stretch: 84%;
+    font-variant-numeric: tabular-nums;
+}
+/* A note on a sheet: tinted, no border, square-ish. */
+@utility note {
+    @apply rounded-lg bg-mist px-4 py-3 text-[13.5px] text-ink-2;
+}
+@utility link {
+    @apply font-[600] text-navy underline-offset-2 hover:underline;
 }
 /* A filter that is on or off. */
 @utility chip {

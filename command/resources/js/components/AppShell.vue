@@ -77,7 +77,7 @@ function announceCheckIns(c) {
             icon: 'users',
             tone: 'info',
             title: `New check-in to confirm${more}`,
-            body: `${newest.agent}${newest.name ? ` · ${newest.name}` : ''} at ${newest.unit}, ${how}.`,
+            body: `${newest.agent}${newest.name ? `, ${newest.name}` : ''} at ${newest.unit}, ${how}.`,
             ...(route.path === '/agents'
                 ? { action: 'Show', run: () => document.getElementById('checkins')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
                 : { action: 'Review on Agents', to: '/agents' }),
@@ -239,7 +239,7 @@ async function logout() {
                         <div v-if="menu" class="fixed inset-0 z-30" @click="menu = false"></div>
                         <div v-if="menu" role="menu" class="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-[10px] border border-line bg-white shadow-[0_12px_32px_rgba(19,33,60,0.14)]">
                             <div class="border-b border-line px-4 py-3">
-                                <div class="truncate text-sm font-bold">{{ session.user?.name }}</div>
+                                <div class="truncate text-sm font-[650]">{{ session.user?.name }}</div>
                                 <div class="truncate text-[12.5px] text-ink-2">{{ session.user?.role_label }}, {{ campaign.name }}</div>
                             </div>
                             <RouterLink role="menuitem" to="/account/security" class="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-mist"><Icon name="key" :size="16" /> Password and two-step sign-in</RouterLink>

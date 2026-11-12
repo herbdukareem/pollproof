@@ -27,8 +27,8 @@ const items = computed(() => [
     { label: 'Print ID tag', icon: 'download', hint: 'With a QR code to verify them', run: () => window.open(`/id-tags?ids=${s.value.id}`, '_blank') },
     { label: 'Remove from post', icon: 'undo', danger: true, hint: 'Stays registered, without a post', run: () => { error.value = ''; dialog.value = 'remove'; } },
 ]);
-const wardOptions = computed(() => lgas.value.flatMap((l) => l.wards.map((w) => ({ value: w.id, label: `${w.name} · ${l.name}` }))));
-const unitOptions = computed(() => units.value.map((u) => ({ value: u.id, label: `${u.code} · ${u.name}`, hint: u.agent ? `Agent ${u.agent.code} becomes a reserve` : 'No agent now' })));
+const wardOptions = computed(() => lgas.value.flatMap((l) => l.wards.map((w) => ({ value: w.id, label: `${w.name}, ${l.name}` }))));
+const unitOptions = computed(() => units.value.map((u) => ({ value: u.id, label: `${u.code}, ${u.name}`, hint: u.agent ? `Agent ${u.agent.code} becomes a reserve` : 'No agent now' })));
 
 async function open() {
     error.value = '';
@@ -71,12 +71,12 @@ const remove = () => run(async () => {
 
     <Modal :open="dialog === 'agent'" :title="`Make ${supervisor.name} an agent`" subtitle="Their post opens up. They get an agent code and sign in to the app again." :busy="busy" @close="dialog = ''">
         <div class="flex flex-col gap-4">
-            <div class="inline-flex w-fit rounded-xl bg-mist p-1 text-[13px] font-semibold">
-                <button type="button" class="rounded-lg px-3 py-1.5" :class="where === 'unit' ? 'bg-white shadow-sm' : 'text-ink-2'" @click="where = 'unit'">At a polling unit</button>
-                <button type="button" class="rounded-lg px-3 py-1.5" :class="where === 'reserve' ? 'bg-white shadow-sm' : 'text-ink-2'" @click="where = 'reserve'">As a reserve</button>
+            <div class="seg w-fit ">
+                <button type="button" class="seg-btn px-3 py-1.5" :class="where === 'unit' ? 'seg-on' : ''" @click="where = 'unit'">At a polling unit</button>
+                <button type="button" class="seg-btn px-3 py-1.5" :class="where === 'reserve' ? 'seg-on' : ''" @click="where = 'reserve'">As a reserve</button>
             </div>
-            <label class="flex flex-col gap-1.5 text-sm font-semibold">Ward <SearchSelect v-model="ward" :options="wardOptions" placeholder="Type a ward or LGA…" noun="wards" /></label>
-            <label v-if="where === 'unit'" class="flex flex-col gap-1.5 text-sm font-semibold">Polling unit <SearchSelect v-model="unit" :options="unitOptions" placeholder="Type a unit code or name…" noun="units" /></label>
+            <label class="flex flex-col gap-1.5 text-sm font-[600]">Ward <SearchSelect v-model="ward" :options="wardOptions" placeholder="Type a ward or LGA…" noun="wards" /></label>
+            <label v-if="where === 'unit'" class="flex flex-col gap-1.5 text-sm font-[600]">Polling unit <SearchSelect v-model="unit" :options="unitOptions" placeholder="Type a unit code or name…" noun="units" /></label>
             <p v-else class="text-[13px] text-ink-2">They wait in this ward and can be sent to any unit that needs an agent.</p>
             <p v-if="error" role="alert" class="rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
         </div>

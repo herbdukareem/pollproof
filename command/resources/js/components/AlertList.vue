@@ -28,14 +28,14 @@ const bar = { high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' };
             <div v-if="a.status === 'resolved'" class="flex shrink-0 items-center"><Badge tone="good">Resolved</Badge></div>
             <div v-else-if="canResolve" class="flex shrink-0 items-center">
                 <button
-                    v-if="compact"
+                    :class="compact ? '' : 'sm:hidden'"
                     class="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-ink-2 transition-colors hover:border-good hover:bg-good-bg hover:text-good disabled:opacity-50"
                     :disabled="busy === a.id"
                     :title="'Mark resolved: ' + a.title"
                     :aria-label="'Mark resolved: ' + a.title"
                     @click="$emit('resolve', a)"
                 ><Icon name="check" :size="16" :class="busy === a.id ? 'animate-pulse' : ''" /></button>
-                <button v-else class="btn-ghost h-9" :disabled="busy === a.id" @click="$emit('resolve', a)"><Icon name="check" :size="15" /> Resolve</button>
+                <button v-if="!compact" class="btn-ghost h-9 max-sm:hidden" :disabled="busy === a.id" @click="$emit('resolve', a)"><Icon name="check" :size="15" /> Resolve</button>
             </div>
         </li>
     </TransitionGroup>

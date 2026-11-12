@@ -47,48 +47,48 @@ const total = computed(() => (d.value ? d.value.eligible + d.value.on_hold : 0))
     </PageHeader>
 
     <LoadState :loading="stipends.loading.value" :error="stipends.error.value" :empty="!d">
-        <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
-            <section class="card self-start p-5">
-                <button type="button" class="-m-2 block w-[calc(100%+1rem)] rounded-xl p-2 text-left transition hover:bg-[#f6f7f9]" :aria-pressed="show === 'eligible'" title="Show eligible agents" @click="show = 'eligible'">
-                    <div class="text-sm text-ink-2">Eligible now</div>
-                    <div class="text-[34px] font-extrabold">{{ num(d.eligible) }} <span class="text-base font-semibold text-ink-2">of {{ num(total) }}</span></div>
+        <div class="grid items-start gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+            <section class="card p-5">
+                <button type="button" class="-m-2 block w-[calc(100%+1rem)] rounded-lg p-2 text-left transition-colors hover:bg-[#f6f7f9]" :aria-pressed="show === 'eligible'" title="Show eligible agents" @click="show = 'eligible'">
+                    <div class="text-[13px] text-ink-2">Eligible now</div>
+                    <div class="fig text-[44px] leading-none font-[700]">{{ num(d.eligible) }} <span class="text-[15px] font-[500] text-ink-2">of {{ num(total) }} agents</span></div>
                 </button>
-                <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-[#e9ecf1]">
+                <div class="mt-4 flex h-2 gap-px overflow-hidden rounded-[2px] bg-[#e8ebf0]">
                     <div class="bg-good" :style="{ width: total ? (d.eligible / total) * 100 + '%' : 0 }"></div>
-                    <div class="bg-action" :style="{ width: total ? (d.on_hold / total) * 100 + '%' : 0 }"></div>
+                    <div class="bg-orange" :style="{ width: total ? (d.on_hold / total) * 100 + '%' : 0 }"></div>
                 </div>
-                <h2 class="mt-5 mb-2 text-sm font-bold"><button type="button" class="rounded-md underline-offset-2 hover:underline" :aria-pressed="show === 'hold'" @click="show = 'hold'">On hold · {{ num(d.on_hold) }}</button></h2>
+                <h2 class="mt-5 mb-1 flex items-baseline justify-between text-[14px] font-[650]"><button type="button" class="underline-offset-2 hover:underline" :aria-pressed="show === 'hold'" @click="show = 'hold'">On hold</button><span class="fig text-[17px] text-action">{{ num(d.on_hold) }}</span></h2>
                 <ul>
-                    <li v-for="(count, reason) in d.hold_reasons" :key="reason" class="flex justify-between border-t border-[#eef0f3] py-2 text-sm"><span class="text-ink-2">{{ reason }}</span><b>{{ num(count) }}</b></li>
+                    <li v-for="(count, reason) in d.hold_reasons" :key="reason" class="flex justify-between gap-3 border-t border-rule py-2 text-sm"><span class="text-ink-2">{{ reason }}</span><span class="fig font-[650]">{{ num(count) }}</span></li>
                 </ul>
-                <p class="mt-4 text-xs text-ink-2">The export lists eligible agents only, and every export is recorded in the audit log. Payment goes through the campaign's own bank.</p>
+                <p class="mt-4 text-[12.5px] text-ink-2">The export lists eligible agents only, and every export is recorded in the audit log. Payment goes through the campaign's own bank.</p>
             </section>
 
             <section class="card overflow-hidden">
-                <div class="flex flex-wrap items-center gap-2 border-b border-[#eef0f3] p-3">
-                    <div class="inline-flex rounded-xl border border-line p-1" role="tablist" aria-label="Show">
-                        <button v-for="[v, text, n] in [['hold', 'On hold', d.on_hold], ['eligible', 'Eligible', d.eligible], ['all', 'All', total]]" :key="v" role="tab" :aria-selected="show === v" class="h-8 rounded-lg px-3 text-sm font-bold transition" :class="show === v ? 'bg-navy text-white' : 'text-ink-2 hover:text-ink'" @click="show = v">{{ text }} <span class="ml-1 text-xs opacity-70">{{ num(n) }}</span></button>
+                <div class="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
+                    <div class="seg" role="group" aria-label="Show">
+                        <button v-for="[v, text, n] in [['hold', 'On hold', d.on_hold], ['eligible', 'Eligible', d.eligible], ['all', 'All', total]]" :key="v" type="button" :aria-pressed="show === v" class="seg-btn" :class="show === v && 'seg-on'" @click="show = v">{{ text }} <span class="ml-0.5 tabular-nums opacity-70">{{ num(n) }}</span></button>
                     </div>
-                    <select v-if="show !== 'eligible' && reasons.length" v-model="reason" class="field h-10 w-auto text-sm" aria-label="Reason on hold">
+                    <select v-if="show !== 'eligible' && reasons.length" v-model="reason" class="field h-9 w-auto text-sm" aria-label="Reason on hold">
                         <option value="">Any reason</option>
                         <option v-for="x in reasons" :key="x" :value="x">{{ x }}</option>
                     </select>
-                    <div class="relative ml-auto w-full max-w-[240px]">
+                    <div class="relative w-full sm:ml-auto sm:w-[240px]">
                         <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
-                        <input v-model="search" class="field h-10 w-full pl-9" placeholder="Agent ID, name or unit" aria-label="Search agents" />
+                        <input v-model="search" class="field h-9 w-full pl-9" placeholder="Agent ID, name or unit" aria-label="Search agents" />
                     </div>
                 </div>
                 <LoadState :empty="!rows.length" :empty-text="search || reason ? 'No agents match.' : 'Nobody in this list.'">
                     <div class="relative overflow-x-auto">
                         <TableBusy :busy="stipends.busy.value" />
                         <table class="w-full min-w-[560px] text-sm">
-                            <thead class="bg-mist"><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="checked">Checked in</SortTh><SortTh :sort="sort" k="result">Result</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
+                            <thead><tr><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="checked">Checked in</SortTh><SortTh :sort="sort" k="result">Result</SortTh><SortTh :sort="sort" k="status">Status</SortTh></tr></thead>
                             <tbody>
                                 <tr v-for="a in rows" :key="a.agent_id">
-                                    <td class="td"><b>{{ a.agent_code }}</b> <span class="text-ink-2">· {{ a.name }}</span></td>
-                                    <td class="td">{{ a.polling_unit }}</td>
-                                    <td class="td whitespace-nowrap">{{ a.checked_in ? (a.checked_in_at ? timeOrDate(a.checked_in_at) : 'Yes') : 'No' }}</td>
-                                    <td class="td whitespace-nowrap">{{ a.signed_result ? (a.result_at ? timeOrDate(a.result_at) : 'Yes') : 'No' }}</td>
+                                    <td class="td"><div class="fig font-[650] whitespace-nowrap">{{ a.agent_code }}</div><div class="text-[13px] text-ink-2">{{ a.name }}</div></td>
+                                    <td class="td fig whitespace-nowrap">{{ a.polling_unit }}</td>
+                                    <td class="td whitespace-nowrap tabular-nums">{{ a.checked_in ? (a.checked_in_at ? timeOrDate(a.checked_in_at) : 'Yes') : 'No' }}</td>
+                                    <td class="td whitespace-nowrap tabular-nums">{{ a.signed_result ? (a.result_at ? timeOrDate(a.result_at) : 'Yes') : 'No' }}</td>
                                     <td class="td"><Badge :tone="a.eligible ? 'good' : 'bad'">{{ a.eligible ? 'Eligible' : a.reason }}</Badge></td>
                                 </tr>
                             </tbody>

@@ -12,6 +12,7 @@ import { useSortState } from '../lib/useSort';
 import Modal from '../components/Modal.vue';
 import ResultFlags from '../components/ResultFlags.vue';
 import Icon from '../components/Icon.vue';
+import Tabs from '../components/Tabs.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
@@ -59,7 +60,7 @@ watch(() => filters.lga_id, () => {
 });
 const wardOptions = computed(() => (structure.data.value?.lgas ?? [])
     .filter((l) => !filters.lga_id || l.id === Number(filters.lga_id))
-    .flatMap((l) => l.wards.map((w) => ({ value: w.id, label: filters.lga_id ? w.name : `${w.name} · ${l.name}`, hint: `${w.units} units` }))));
+    .flatMap((l) => l.wards.map((w) => ({ value: w.id, label: filters.lga_id ? w.name : `${w.name}, ${l.name}`, hint: `${w.units} units` }))));
 watch(() => filters.search, () => { clearTimeout(debounce); debounce = setTimeout(() => { filters.page = 1; units.load(); }, 300); });
 
 const rows = computed(() => units.data.value?.data ?? []);
@@ -126,20 +127,7 @@ function go(page) {
 <template>
     <PageHeader title="Units" :subtitle="counts.all != null ? `${num(counts.all)} polling units in ${allTiles.length} LGAs` : ''" :updated-at="units.updatedAt.value" :loading="units.loading.value" @refresh="units.load(); tally.load()" />
 
-    <div class="-mt-1 mb-5 flex gap-1 overflow-x-auto border-b border-line" role="group" aria-label="Status">
-        <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            class="relative shrink-0 px-3 pt-1 pb-2.5 text-[14px] font-[560] whitespace-nowrap transition-colors"
-            :class="filters.status === tab.value ? 'text-ink' : 'text-ink-2 hover:text-ink'"
-            :aria-pressed="filters.status === tab.value"
-            @click="filters.status = tab.value"
-        >
-            {{ tab.label }}
-            <span class="ml-1 tabular-nums" :class="tab.act && counts[tab.key] ? 'font-[650] text-action' : 'text-ink-3'">{{ counts[tab.key] != null ? num(counts[tab.key]) : '' }}</span>
-            <span v-if="filters.status === tab.value" class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-navy"></span>
-        </button>
-    </div>
+    <Tabs v-model="filters.status" label="Status" :tabs="tabs.map((t) => ({ ...t, count: counts[t.key] }))" />
 
     <div class="grid items-start gap-4 2xl:grid-cols-[380px_1fr]">
         <section class="card">

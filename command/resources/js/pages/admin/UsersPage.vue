@@ -107,48 +107,48 @@ async function copy() {
 </script>
 
 <template>
-    <PageHeader title="Users and roles" :subtitle="d ? `${d.data.filter((u) => u.active).length} command-room users · ${d.data.filter((u) => u.active && u.two_factor).length} with two-step sign-in. Field staff are managed in the roster and supervisor screens.` : ''" :updated-at="users.updatedAt.value" :loading="users.loading.value" @refresh="users.load">
+    <PageHeader title="Users and roles" :subtitle="d ? `${d.data.filter((u) => u.active).length} command-room users, ${d.data.filter((u) => u.active && u.two_factor).length} with two-step sign-in. Field staff are managed in the roster and supervisor screens.` : ''" :updated-at="users.updatedAt.value" :loading="users.loading.value" @refresh="users.load">
         <template #actions>
             <button class="btn-primary" @click="form.open = !form.open"><Icon name="plus" :size="16" /> Add user</button>
         </template>
     </PageHeader>
 
-    <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+    <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-    <section v-if="secret" class="mb-5 rounded-2xl border-2 border-navy bg-white p-5" aria-live="polite">
-        <h2 class="text-[15px] font-bold">Temporary password for {{ secret.who }}</h2>
+    <section v-if="secret" class="card mb-4 border-navy p-5" aria-live="polite">
+        <h2 class="card-title">Temporary password for {{ secret.who }}</h2>
         <p class="mt-1 text-sm text-ink-2">Give it to them in person or by phone. It is shown only once, and they must choose their own password when they first sign in with {{ secret.email }}.</p>
         <div class="mt-3 flex flex-wrap items-center gap-3">
-            <code class="rounded-xl bg-mist px-4 py-2.5 font-mono text-lg font-bold tracking-wider">{{ secret.password }}</code>
+            <code class="rounded-lg bg-mist px-4 py-2 font-mono text-[18px] font-[600] tracking-wide">{{ secret.password }}</code>
             <button class="btn-outline" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
             <button class="btn-navy" @click="secret = null">Done</button>
         </div>
     </section>
 
-    <form v-if="form.open" class="card mb-5 grid gap-3 p-5 md:grid-cols-[1fr_1fr_220px_auto]" @submit.prevent="add">
+    <form v-if="form.open" class="card mb-4 grid gap-3 p-5 md:grid-cols-[1fr_1fr_220px_auto]" @submit.prevent="add">
         <div><label class="label" for="u-name">Name</label><input id="u-name" v-model="form.name" class="field" required /></div>
         <div><label class="label" for="u-email">Email</label><input id="u-email" v-model="form.email" type="email" class="field" required /></div>
         <div>
             <label class="label" for="u-role">Role</label>
             <select id="u-role" v-model="form.role" class="field"><option v-for="r in d?.roles ?? []" :key="r.value" :value="r.value">{{ r.label }}</option></select>
         </div>
-        <div class="flex items-end"><button class="btn-navy h-11 w-full" :disabled="busy === 'add'">Add user</button></div>
+        <div class="flex items-end"><button class="btn-navy h-10 w-full" :disabled="busy === 'add'">Add user</button></div>
     </form>
 
     <LoadState :loading="users.loading.value && !d" :error="users.error.value" :empty="!d">
-        <section class="card mb-5 overflow-hidden">
-            <div class="px-5 pt-5 pb-3">
-                <h2 class="card-title ">What each role can do</h2>
-                <p class="text-[13px] text-ink-2">Agent phone numbers and payment lists are limited to the roles that need them.</p>
+        <section class="card mb-4 overflow-hidden">
+            <div class="px-5 pt-4 pb-3">
+                <h2 class="card-title">What each role can do</h2>
+                <p class="card-sub">Agent phone numbers and payment lists are limited to the roles that need them.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[760px] text-sm">
-                    <thead class="bg-mist"><tr><th class="th">Role</th><th v-for="p in perms" :key="p" class="th text-center">{{ p }}</th></tr></thead>
+                    <thead><tr><th class="th">Role</th><th v-for="p in perms" :key="p" class="th text-center">{{ p }}</th></tr></thead>
                     <tbody>
                         <tr v-for="r in d.roles" :key="r.value">
-                            <td class="td"><b>{{ r.label }}</b> <span class="text-xs text-ink-2">· {{ r.count }} {{ r.count === 1 ? 'user' : 'users' }}</span></td>
+                            <td class="td"><span class="font-[620]">{{ r.label }}</span> <span class="text-[12.5px] text-ink-2 tabular-nums">{{ r.count }} {{ r.count === 1 ? 'user' : 'users' }}</span></td>
                             <td v-for="(p, i) in perms" :key="p" class="td text-center">
-                                <span v-if="matrix[r.value][i] === '1'" class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-good-bg text-good"><Icon name="check" :size="14" /><span class="sr-only">Yes</span></span>
+                                <span v-if="matrix[r.value][i] === '1'" class="inline-flex text-good"><Icon name="check" :size="16" /><span class="sr-only">Yes</span></span>
                                 <span v-else class="text-ink-3" aria-label="No">–</span>
                             </td>
                         </tr>
@@ -158,17 +158,17 @@ async function copy() {
         </section>
 
         <section class="card overflow-hidden">
-            <div class="flex flex-wrap items-center gap-3 border-b border-[#eef0f3] p-4">
-                <h2 class="card-title mr-auto">People</h2>
-                <div class="relative w-full max-w-[240px]">
+            <div class="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
+                <h2 class="card-title mr-auto pl-1">People</h2>
+                <div class="relative w-full sm:w-[220px]">
                     <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
-                    <input v-model="search" class="field h-10 w-full pl-9" placeholder="Name or email" aria-label="Search users" />
+                    <input v-model="search" class="field h-9 w-full pl-9" placeholder="Name or email" aria-label="Search users" />
                 </div>
-                <select v-model="roleFilter" class="field h-10 w-auto" aria-label="Role">
+                <select v-model="roleFilter" class="field h-9 w-auto" aria-label="Role">
                     <option value="">All roles</option>
                     <option v-for="r in d.roles" :key="r.value" :value="r.value">{{ r.label }} ({{ r.count }})</option>
                 </select>
-                <select v-model="statusFilter" class="field h-10 w-auto" aria-label="Status">
+                <select v-model="statusFilter" class="field h-9 w-auto" aria-label="Status">
                     <option value="active">Active</option>
                     <option value="no2fa">Two-step not set up</option>
                     <option value="temp">Temporary password</option>
@@ -179,13 +179,13 @@ async function copy() {
             <div class="relative overflow-x-auto">
                 <TableBusy :busy="users.busy.value" />
                 <table class="w-full min-w-[920px] text-sm">
-                    <thead class="bg-mist"><tr><SortTh :sort="sort" k="name">User</SortTh><SortTh :sort="sort" k="role">Role</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="twofa">Two-step</SortTh><SortTh :sort="sort" k="active">Last active</SortTh><th class="th text-right">Actions</th></tr></thead>
+                    <thead><tr><SortTh :sort="sort" k="name">User</SortTh><SortTh :sort="sort" k="role">Role</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="twofa">Two-step</SortTh><SortTh :sort="sort" k="active">Last active</SortTh><th class="th text-right">Actions</th></tr></thead>
                     <tbody>
                         <tr v-for="u in rows" :key="u.id" :class="u.active ? '' : 'opacity-60'">
                             <td class="td">
                                 <div class="flex items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white" aria-hidden="true">{{ u.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() }}</span>
-                                    <span><span class="block font-bold">{{ u.name }}<span v-if="u.is_me" class="font-medium text-ink-2"> (you)</span></span><span class="text-xs text-ink-2">{{ u.email }}</span></span>
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e6e9ef] text-[12px] font-[650] text-navy" aria-hidden="true">{{ u.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() }}</span>
+                                    <span><span class="block font-[620]">{{ u.name }}<span v-if="u.is_me" class="font-[400] text-ink-2"> (you)</span></span><span class="text-[12.5px] text-ink-2">{{ u.email }}</span></span>
                                 </div>
                             </td>
                             <td class="td">
@@ -200,7 +200,7 @@ async function copy() {
                                 <Badge v-else tone="good">Active</Badge>
                             </td>
                             <td class="td"><Badge :tone="u.two_factor ? 'good' : 'bad'">{{ u.two_factor ? 'On' : 'Not set up' }}</Badge></td>
-                            <td class="td text-ink-2">{{ u.last_active_at ? dateTime(u.last_active_at) : 'Never' }}</td>
+                            <td class="td text-ink-2 tabular-nums">{{ u.last_active_at ? dateTime(u.last_active_at) : 'Never' }}</td>
                             <td class="td">
                                 <div class="flex justify-end"><ActionMenu v-if="!u.is_me" :items="menuFor(u)" :label="`Actions for ${u.name}`" /></div>
                             </td>
@@ -214,7 +214,7 @@ async function copy() {
     </LoadState>
 
     <Modal :open="!!editing.user" :title="`Edit ${editing.user?.name}`" :busy="busy.startsWith('n')" @close="editing.user = null">
-        <form id="user-edit" @submit.prevent="saveName"><label class="flex flex-col gap-1.5 text-sm font-semibold">Full name <input v-model="editing.name" class="field" required maxlength="120" /></label></form>
+        <form id="user-edit" @submit.prevent="saveName"><label class="flex flex-col gap-1.5 text-sm font-[600]">Full name <input v-model="editing.name" class="field" required maxlength="120" /></label></form>
         <p class="mt-3 text-xs text-ink-2">Change the role from the Role column. Email addresses can't be changed; add a new user instead.</p>
         <template #footer>
             <button class="btn-ghost" @click="editing.user = null">Cancel</button>

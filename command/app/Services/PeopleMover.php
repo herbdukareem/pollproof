@@ -88,7 +88,7 @@ final class PeopleMover
         $person->update(['lga_id' => null, 'ward_id' => null, 'is_backup' => false]);
     }
 
-    /** A short description of where someone is now, e.g. "Agent at 01-01-001" or "Ward supervisor · Boku, Agaie". */
+    /** A short description of where someone is now, e.g. "Agent at 01-01-001" or "Ward supervisor, Boku, Agaie". */
     public static function post(User $u): string
     {
         $u->loadMissing(['pollingUnit', 'ward.lga', 'lga']);
@@ -96,10 +96,10 @@ final class PeopleMover
         return match (true) {
             $u->deactivated_at !== null => 'Deactivated',
             $u->hasRole(Role::Agent) && $u->pollingUnit !== null => "Agent at {$u->pollingUnit->code}",
-            $u->hasRole(Role::Agent) && $u->is_reserve => 'Reserve agent'.($u->ward ? " · {$u->ward->name}" : ''),
+            $u->hasRole(Role::Agent) && $u->is_reserve => 'Reserve agent'.($u->ward ? " in {$u->ward->name}" : ''),
             $u->hasRole(Role::Agent) => 'Agent, not assigned',
-            $u->hasRole(Role::WardSupervisor) && $u->ward !== null => "Ward supervisor · {$u->ward->name}, {$u->ward->lga->name}",
-            $u->hasRole(Role::LgaSupervisor) && $u->lga !== null => 'LGA supervisor · '.$u->lga->name.($u->is_backup ? ' (backup)' : ''),
+            $u->hasRole(Role::WardSupervisor) && $u->ward !== null => "Ward supervisor for {$u->ward->name}, {$u->ward->lga->name}",
+            $u->hasRole(Role::LgaSupervisor) && $u->lga !== null => 'LGA supervisor for '.$u->lga->name.($u->is_backup ? ' (backup)' : ''),
             $u->hasRole(Role::WardSupervisor, Role::LgaSupervisor) => $u->role->label().', no post',
             default => $u->role->label(),
         };
