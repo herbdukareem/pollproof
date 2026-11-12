@@ -8,10 +8,10 @@ const classes = computed(() => ({
     bad: 'bg-bad-bg text-bad',
     info: 'bg-[#e5ecf8] text-[#1d3f7a]',
     navy: 'bg-navy text-white',
-    neutral: 'bg-mist text-ink-2',
+    neutral: 'bg-[#eceff3] text-ink-2',
 })[props.tone]);
 </script>
 
 <template>
-    <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11.5px] font-extrabold tracking-wide whitespace-nowrap uppercase" :class="classes"><slot /></span>
+    <span class="inline-block rounded px-1.5 py-px text-[12px] leading-[18px] font-[600] whitespace-nowrap first-letter:uppercase" :class="classes"><slot /></span>
 </template>

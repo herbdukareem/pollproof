@@ -29,9 +29,9 @@ onBeforeUnmount(() => {
 <template>
     <Teleport defer to="#pp-actions">
         <slot name="actions" />
-        <button v-if="updatedAt !== undefined" class="btn-ghost" :disabled="loading" :title="updatedAt ? 'Refresh now' : 'Refresh'" @click="$emit('refresh')">
-            <Icon name="refresh" :size="16" :class="loading ? 'animate-spin' : ''" />
-            <span>{{ updatedAt ? 'Updated ' + time(updatedAt) : 'Refresh' }}</span>
+        <button v-if="updatedAt !== undefined" class="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] text-ink-2 transition-colors hover:bg-mist hover:text-ink disabled:opacity-60" :disabled="loading" :title="updatedAt ? 'Refresh now' : 'Refresh'" @click="$emit('refresh')">
+            <Icon name="refresh" :size="15" :class="loading ? 'animate-spin' : ''" />
+            <span class="tabular-nums">{{ updatedAt ? 'Updated ' + time(updatedAt) : 'Refresh' }}</span>
         </button>
     </Teleport>
 </template>

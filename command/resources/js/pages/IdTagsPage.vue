@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 
 /**
  * Printable ID tags, ten to an A4 sheet at ID-card size (85.6 × 54 mm), with cut marks.
- * Opened from the roster (an LGA, or chosen people) or a person's menu. ?ids=1,2 · ?lga_id= · ?role=supervisors
+ * Opened from the roster (an LGA, or chosen people) or a person's menu: ?ids=1,2, ?lga_id= or ?role=supervisors
  */
 const route = useRoute();
 const tags = ref([]);
@@ -44,16 +44,16 @@ const year = (d) => (d ? new Date(`${d}T12:00:00`).getFullYear() : '');
     <div class="min-h-dvh bg-[#e9ecf2] print:bg-white">
         <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-white px-5 py-3 print:hidden">
             <PinLogo :size="24" pin="#13213c" />
-            <b>ID tags</b>
-            <span class="text-sm text-ink-2">{{ loading ? 'Loading…' : `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'} · ${pages.length} ${pages.length === 1 ? 'sheet' : 'sheets'} of A4` }}</span>
-            <span class="text-xs text-ink-3">Print at 100% (actual size), then cut along the marks.</span>
+            <b class="font-[650]">ID tags</b>
+            <span class="text-sm text-ink-2">{{ loading ? 'Loading…' : `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'} on ${pages.length} ${pages.length === 1 ? 'sheet' : 'sheets'} of A4` }}</span>
+            <span class="text-[12.5px] text-ink-3">Print at 100% (actual size), then cut along the marks.</span>
             <button class="btn-primary ml-auto" :disabled="loading || !tags.length" @click="print">Print</button>
             <button class="btn-outline" @click="close">Close</button>
         </div>
-        <p v-if="error" class="m-6 rounded-xl bg-bad-bg p-4 text-bad">{{ error }}</p>
-        <p v-else-if="!loading && !tags.length" class="m-6 rounded-xl bg-white p-6 text-center text-ink-2">Nobody to print for this choice.</p>
+        <p v-if="error" class="m-6 rounded-lg bg-bad-bg p-4 text-bad">{{ error }}</p>
+        <p v-else-if="!loading && !tags.length" class="m-6 rounded-lg bg-white p-6 text-center text-ink-2">Nobody to print for this choice.</p>
 
-        <div v-for="(sheet, s) in pages" :key="s" class="tag-sheet mx-auto my-6 bg-white shadow-lg print:my-0 print:shadow-none">
+        <div v-for="(sheet, s) in pages" :key="s" class="tag-sheet mx-auto my-6 bg-white shadow-[0_6px_24px_-8px_rgba(19,33,60,0.25)] print:my-0 print:shadow-none">
             <article v-for="t in sheet" :key="t.id" class="tag">
                 <header class="tag-head">
                     <PinLogo :size="15" />
@@ -68,14 +68,14 @@ const year = (d) => (d ? new Date(`${d}T12:00:00`).getFullYear() : '');
                         <div class="tag-name">{{ t.name }}</div>
                         <div class="tag-code">{{ t.code }}</div>
                         <div v-if="t.unit" class="tag-line"><b>{{ t.unit.code }}</b> {{ t.unit.name }}</div>
-                        <div class="tag-line">{{ [t.ward, t.lga].filter(Boolean).join(' · ') }}</div>
+                        <div class="tag-line">{{ [t.ward, t.lga].filter(Boolean).join(', ') }}</div>
                     </div>
                     <div class="tag-qr">
                         <img :src="qr[t.id]" alt="QR code to check this tag" />
                         <span>Scan to verify</span>
                     </div>
                 </div>
-                <footer class="tag-foot">{{ t.campaign.state }} governorship {{ year(t.campaign.election_date) }} · Valid only while the QR check says VALID</footer>
+                <footer class="tag-foot">{{ t.campaign.state }} governorship {{ year(t.campaign.election_date) }}. Valid only while the QR check says VALID.</footer>
             </article>
         </div>
     </div>

@@ -60,7 +60,7 @@ class AgentListController extends Controller
                 'active' => $a->isActive(),
                 'has_photo' => $a->photo_path !== null,
                 'lga_id' => $a->pollingUnit?->ward->lga_id ?? $a->ward?->lga_id ?? $a->lga_id,
-                'area' => $a->pollingUnit ? null : (trim(($a->ward?->name ?? '').($a->ward?->lga ? ' · '.$a->ward->lga->name : ''), ' ·') ?: null),
+                'area' => $a->pollingUnit ? null : (trim(($a->ward?->name ?? '').($a->ward?->lga ? ', '.$a->ward->lga->name : ''), ' ,') ?: null),
                 'polling_unit' => $a->pollingUnit ? ['id' => $a->pollingUnit->id, 'code' => $a->pollingUnit->code, 'ward' => $a->pollingUnit->ward->name, 'lga' => $a->pollingUnit->ward->lga->name] : null,
                 'check_in' => $c ? ['id' => $c->id, 'status' => $c->status, 'distance_m' => $c->distance_m, 'at' => $c->captured_at] : null,
                 'result' => ($r = $results->get($a->id)) ? ['id' => $r->id, 'status' => $r->status, 'at' => $r->captured_at] : null,

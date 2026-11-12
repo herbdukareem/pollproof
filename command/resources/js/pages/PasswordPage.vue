@@ -31,18 +31,18 @@ async function submit() {
 
 <template>
     <PageHeader :back="forced ? '' : '/'" title="Change password" :subtitle="forced ? 'You signed in with a temporary password. Choose your own before you continue.' : 'Other devices signed in as you will be signed out.'" />
-    <form class="card flex max-w-md flex-col gap-4 p-6" @submit.prevent="submit">
-        <p v-if="done" role="status" class="rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">Password changed.</p>
+    <form class="card flex max-w-md flex-col gap-4 p-5" @submit.prevent="submit">
+        <p v-if="done" role="status" class="rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">Password changed.</p>
         <div>
             <label class="label" for="cur">{{ forced ? 'Temporary password' : 'Current password' }}</label>
             <input id="cur" v-model="form.current_password" type="password" autocomplete="current-password" class="field" required />
-            <p v-if="errors.current_password" class="mt-1 text-xs text-bad">{{ errors.current_password[0] }}</p>
+            <p v-if="errors.current_password" class="mt-1 text-[12.5px] text-bad">{{ errors.current_password[0] }}</p>
         </div>
         <div>
             <label class="label" for="new">New password</label>
             <input id="new" v-model="form.password" type="password" autocomplete="new-password" class="field" minlength="10" required aria-describedby="new-help" />
-            <p id="new-help" class="mt-1 text-xs text-ink-2">At least 10 characters, with letters and numbers.</p>
-            <p v-if="errors.password" class="mt-1 text-xs text-bad">{{ errors.password[0] }}</p>
+            <p id="new-help" class="mt-1 text-[12.5px] text-ink-2">At least 10 characters, with letters and numbers.</p>
+            <p v-if="errors.password" class="mt-1 text-[12.5px] text-bad">{{ errors.password[0] }}</p>
         </div>
         <div>
             <label class="label" for="confirm">Type it again</label>

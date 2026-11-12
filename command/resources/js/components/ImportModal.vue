@@ -39,7 +39,7 @@ watch(() => props.open, (o) => {
 function take(f) {
     if (!f) return;
     if (!/\.csv$/i.test(f.name) && f.type !== 'text/csv') {
-        error.value = 'Choose the .csv file. In Excel use File → Save As → CSV UTF-8.';
+        error.value = 'Choose the .csv file. In Excel, use Save As and choose CSV UTF-8.';
         return;
     }
     error.value = '';
@@ -80,22 +80,22 @@ function downloadSkipped() {
     <Modal :open="open" :title="title" :subtitle="subtitle" width="max-w-2xl" :busy="busy" @close="emit('close')">
         <ol class="flex flex-col gap-4">
             <li class="flex gap-3">
-                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">1</span>
+                <span class="fig w-5 shrink-0 text-[20px] leading-6 font-[700] text-ink-3">1</span>
                 <div class="min-w-0 flex-1">
-                    <b class="text-sm">Download the template</b>
+                    <b class="text-[14px] font-[650]">Download the template</b>
                     <p class="mt-0.5 text-[13px] text-ink-2">It already lists every post, with whoever holds it now. You only fill in names and phone numbers.</p>
                     <a :href="api.url(template)" :download="templateName" class="btn-outline mt-2 h-9"><Icon name="download" :size="15" /> Download template (.csv)</a>
                 </div>
             </li>
             <li class="flex gap-3">
-                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">2</span>
+                <span class="fig w-5 shrink-0 text-[20px] leading-6 font-[700] text-ink-3">2</span>
                 <div class="min-w-0 flex-1">
-                    <b class="text-sm">Fill it in, in Excel or Google Sheets</b>
-                    <div class="mt-2 overflow-hidden rounded-xl border border-line">
+                    <b class="text-[14px] font-[650]">Fill it in, in Excel or Google Sheets</b>
+                    <div class="mt-2 overflow-hidden rounded-lg border border-line">
                         <table class="w-full text-[12.5px]">
                             <tbody>
-                                <tr v-for="[col, what, req] in columns" :key="col" class="border-b border-[#eef0f3] last:border-0">
-                                    <td class="w-32 bg-mist px-3 py-1.5 font-mono font-semibold whitespace-nowrap">{{ col }}<span v-if="req" class="text-action">*</span></td>
+                                <tr v-for="[col, what, req] in columns" :key="col" class="border-b border-rule last:border-0">
+                                    <td class="w-32 bg-mist px-3 py-1.5 font-[600] whitespace-nowrap">{{ col }}<span v-if="req" class="text-action">*</span></td>
                                     <td class="px-3 py-1.5 text-ink-2">{{ what }}</td>
                                 </tr>
                             </tbody>
@@ -107,13 +107,13 @@ function downloadSkipped() {
                 </div>
             </li>
             <li class="flex gap-3">
-                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">3</span>
+                <span class="fig w-5 shrink-0 text-[20px] leading-6 font-[700] text-ink-3">3</span>
                 <div class="min-w-0 flex-1">
-                    <b class="text-sm">Upload it</b>
+                    <b class="text-[14px] font-[650]">Upload it</b>
                     <input ref="picker" type="file" accept=".csv,text/csv" class="sr-only" aria-label="Choose CSV file" @change="take($event.target.files?.[0]); $event.target.value = ''" />
                     <button
                         type="button"
-                        class="mt-2 flex w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center transition"
+                        class="mt-2 flex w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-6 text-center transition"
                         :class="dragging ? 'border-navy bg-[#eef2fb]' : file ? 'border-good/50 bg-good-bg/50' : 'border-line hover:border-navy/50 hover:bg-mist'"
                         @click="picker.click()"
                         @dragover.prevent="dragging = true"
@@ -121,23 +121,23 @@ function downloadSkipped() {
                         @drop.prevent="drop"
                     >
                         <Icon :name="file ? 'check' : 'upload'" :size="22" :class="file ? 'text-good' : 'text-ink-2'" />
-                        <span class="text-sm font-semibold">{{ file ? file.name : 'Drop the file here, or click to choose' }}</span>
-                        <span class="text-xs text-ink-3">{{ file ? `${(file.size / 1024).toFixed(0)} KB · click to choose another` : 'CSV file' }}</span>
+                        <span class="text-sm font-[600]">{{ file ? file.name : 'Drop the file here, or click to choose' }}</span>
+                        <span class="text-xs text-ink-3">{{ file ? `${(file.size / 1024).toFixed(0)} KB, click to choose another` : 'CSV file' }}</span>
                     </button>
                 </div>
             </li>
         </ol>
 
-        <p v-if="error" role="alert" class="mt-4 rounded-xl bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
+        <p v-if="error" role="alert" class="mt-4 rounded-lg bg-bad-bg px-3 py-2 text-sm text-bad">{{ error }}</p>
 
-        <section v-if="report" class="mt-4 rounded-xl border border-line p-4" aria-live="polite">
+        <section v-if="report" class="mt-4 rounded-lg border border-line p-4" aria-live="polite">
             <b class="text-sm" :class="report.rejected?.length ? '' : 'text-good'">{{ report.rejected?.length ? 'Uploaded, with some rows skipped' : 'Uploaded' }}</b>
             <dl class="mt-2 grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-                <div v-for="[label, key] in counts" :key="key" class="flex justify-between border-t border-[#eef0f3] py-1.5 text-[13px]">
-                    <dt class="text-ink-2">{{ label }}</dt><dd class="font-bold">{{ num(report[key] ?? 0) }}</dd>
+                <div v-for="[label, key] in counts" :key="key" class="flex justify-between border-t border-rule py-1.5 text-[13px]">
+                    <dt class="text-ink-2">{{ label }}</dt><dd class="font-[650]">{{ num(report[key] ?? 0) }}</dd>
                 </div>
-                <div class="flex justify-between border-t border-[#eef0f3] py-1.5 text-[13px]"><dt class="text-ink-2">Left empty</dt><dd class="font-bold">{{ num(report.blank ?? 0) }}</dd></div>
-                <div class="flex justify-between border-t border-[#eef0f3] py-1.5 text-[13px]"><dt class="text-ink-2">Skipped</dt><dd class="font-bold" :class="report.rejected?.length ? 'text-action' : ''">{{ num(report.rejected?.length ?? 0) }}</dd></div>
+                <div class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Left empty</dt><dd class="font-[650]">{{ num(report.blank ?? 0) }}</dd></div>
+                <div class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Skipped</dt><dd class="font-[650]" :class="report.rejected?.length ? 'text-action' : ''">{{ num(report.rejected?.length ?? 0) }}</dd></div>
             </dl>
             <template v-if="report.rejected?.length">
                 <ul class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-bad-bg/60 p-2.5 text-[12.5px]">

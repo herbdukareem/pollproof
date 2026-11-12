@@ -93,7 +93,7 @@ class RosterController extends Controller
             'applied' => $data['apply'],
             'count' => count($pairs),
             'still_unassigned' => $waiting->flatten()->count() - count($pairs),
-            'pairs' => collect($pairs)->take(200)->map(fn ($p) => ['agent' => $p[0]->code, 'name' => $p[0]->name, 'unit' => $p[1]->code, 'place' => "{$p[1]->ward->name} · {$p[1]->ward->lga->name}"]),
+            'pairs' => collect($pairs)->take(200)->map(fn ($p) => ['agent' => $p[0]->code, 'name' => $p[0]->name, 'unit' => $p[1]->code, 'place' => "{$p[1]->ward->name}, {$p[1]->ward->lga->name}"]),
         ]);
     }
 

@@ -119,51 +119,49 @@ function imported(summary) {
 
     <LoadState :loading="sup.loading.value && !d" :error="sup.error.value" :empty="!d">
         <FreezeNote :frozen="d.frozen" />
-        <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
-        <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+        <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
+        <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-        <div class="mb-5 grid gap-3 md:grid-cols-4">
-            <button type="button" class="flex flex-col justify-center rounded-2xl bg-navy p-4 text-left text-white transition" :class="hasRole('dg') ? 'hover:-translate-y-px hover:shadow-lg' : 'cursor-default'" :title="hasRole('dg') ? 'See the situation room team' : ''" @click="openRoom">
-                <div class="flex items-center gap-1 text-sm font-bold">Situation room <Icon v-if="hasRole('dg')" name="chevron" :size="14" class="opacity-70" /></div>
-                <div class="text-[13px] text-[#c9d1de]">Top of every escalation</div>
+        <div class="card mb-4 grid overflow-hidden sm:grid-cols-2 md:grid-cols-4" aria-label="Chain of command, top first">
+            <button type="button" class="flex flex-col justify-between bg-navy px-5 py-4 text-left text-white" :class="hasRole('dg') ? 'hover:bg-navy-2' : 'cursor-default'" :title="hasRole('dg') ? 'See the situation room team' : ''" @click="openRoom">
+                <span class="text-[14px] font-[650]">Situation room</span>
+                <span class="mt-3 text-[13px] text-[#c9d1de]">Top of every escalation{{ hasRole('dg') ? '. See the team' : '' }}</span>
             </button>
             <button
                 v-for="l in levels"
                 :key="l.label"
                 type="button"
-                class="card p-4 text-left transition hover:-translate-y-px hover:shadow-md"
-                :class="gap === l.key ? 'ring-2 ring-navy' : ''"
+                class="relative border-rule px-5 py-4 text-left transition-colors max-md:border-t sm:max-md:[&:nth-child(2)]:border-t-0 md:border-l"
+                :class="gap === l.key ? 'bg-[#f3f5f8]' : 'hover:bg-[#f8f9fb]'"
                 :aria-pressed="l.key === 'agents' ? undefined : gap === l.key"
                 :title="l.hint"
                 @click="openCard(l.key)"
             >
-                <div class="flex items-start justify-between gap-2">
-                    <div class="text-[24px] leading-none font-extrabold">{{ num(l.count) }}<span v-if="l.of != null" class="text-sm font-semibold text-ink-2"> of {{ num(l.of) }}</span></div>
-                    <Icon :name="l.key === 'agents' ? 'chevron' : 'filter'" :size="15" class="text-ink-3" />
-                </div>
-                <div class="mt-1 text-sm font-bold">{{ l.label }}</div>
-                <div class="text-[12.5px]" :class="/open|without/.test(l.note) ? 'font-semibold text-action' : 'text-ink-2'">{{ l.note }}</div>
+                <span v-if="gap === l.key" class="absolute inset-x-0 top-0 h-[3px] bg-navy"></span>
+                <span class="block text-[13px] text-ink-2">{{ l.label }}</span>
+                <span class="fig mt-0.5 block text-[26px] leading-none font-[700]">{{ num(l.count) }}<span v-if="l.of != null" class="text-[14px] font-[500] text-ink-2"> of {{ num(l.of) }}</span></span>
+                <span class="mt-1.5 block text-[12.5px]" :class="/open|without/.test(l.note) ? 'font-[600] text-action' : 'text-ink-2'">{{ l.note }}</span>
             </button>
         </div>
 
-        <div class="grid items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
+        <div class="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
             <section class="card overflow-hidden">
-                <div class="flex flex-wrap items-center gap-2 px-5 pt-5 pb-3">
+                <header class="card-head">
                     <h2 class="card-title">LGA supervisors</h2>
-                    <span v-if="gap" class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#eef2fb] px-3 py-1 text-[12.5px] font-semibold text-navy">{{ gapLabel[gap] }} · {{ shownLgas.length }} <button class="font-bold hover:underline" @click="gap = ''">Show all</button></span>
-                </div>
-                <p v-if="!shownLgas.length" class="mx-5 mb-5 rounded-xl bg-good-bg px-4 py-6 text-center text-sm text-good">None. Every LGA is covered here.</p>
+                    <span v-if="gap" class="text-[12.5px] text-ink-2">Only {{ gapLabel[gap].charAt(0).toLowerCase() + gapLabel[gap].slice(1) }} ({{ shownLgas.length }}). <button class="link" @click="gap = ''">Show all</button></span>
+                </header>
+                <p v-if="!shownLgas.length" class="m-5 rounded-lg bg-good-bg px-4 py-6 text-center text-sm text-good">None. Every LGA is covered here.</p>
                 <div v-else class="overflow-x-auto">
                     <table class="w-full min-w-[620px] text-sm">
-                        <thead class="bg-mist"><tr><th v-if="!d.frozen" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every LGA supervisor and backup listed" :checked="picked.allOn(lgaSupIds)" :indeterminate.prop="picked.someOn(lgaSupIds)" @change="picked.setMany(lgaSupIds, $event.target.checked)" /></th><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="supervisor">Supervisor</SortTh><SortTh :sort="sort" k="backup">Backup</SortTh><SortTh :sort="sort" k="wards">Wards covered</SortTh><SortTh :sort="sort" k="agents" cls="text-right">Agents</SortTh></tr></thead>
+                        <thead><tr><th v-if="!d.frozen" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every LGA supervisor and backup listed" :checked="picked.allOn(lgaSupIds)" :indeterminate.prop="picked.someOn(lgaSupIds)" @change="picked.setMany(lgaSupIds, $event.target.checked)" /></th><SortTh :sort="sort" k="name">LGA</SortTh><SortTh :sort="sort" k="supervisor">Supervisor</SortTh><SortTh :sort="sort" k="backup">Backup</SortTh><SortTh :sort="sort" k="wards">Wards covered</SortTh><SortTh :sort="sort" k="agents" cls="text-right">Agents</SortTh></tr></thead>
                         <tbody>
                             <tr v-for="l in shownLgas" :key="l.id" class="cursor-pointer" :class="[d.selected?.id === l.id ? 'bg-mist' : 'hover:bg-mist/60', !l.supervisor || l.wards_covered < l.wards ? 'bg-[#fff8f4]' : '']" @click="select(l.id)">
                                 <td v-if="!d.frozen" class="td w-10 !pr-0" @click.stop><input v-if="l.supervisor || l.backup" type="checkbox" class="checkbox" :aria-label="`Tick ${l.name}'s LGA supervisor${l.backup ? ' and backup' : ''}`" :checked="picked.allOn([l.supervisor?.id, l.backup?.id].filter(Boolean))" :indeterminate.prop="picked.someOn([l.supervisor?.id, l.backup?.id].filter(Boolean))" @change="picked.setMany([l.supervisor?.id, l.backup?.id].filter(Boolean), $event.target.checked)" /></td>
-                                <td class="td font-bold whitespace-nowrap"><button class="text-left" @click.stop="select(l.id)">{{ l.name }}</button></td>
-                                <td class="td"><template v-if="l.supervisor"><div class="font-semibold">{{ l.supervisor.code }} · {{ l.supervisor.name }}</div><div class="text-xs text-ink-2">{{ l.supervisor.phone }}</div></template><span v-else class="font-semibold text-action">None</span></td>
-                                <td class="td text-ink-2">{{ l.backup ? `${l.backup.code} · ${l.backup.name}` : '–' }}</td>
-                                <td class="td font-semibold" :class="l.wards_covered < l.wards ? 'text-action' : ''">{{ l.wards_covered }} of {{ l.wards }}</td>
-                                <td class="td text-right">{{ num(l.agents) }}</td>
+                                <td class="td font-[650] whitespace-nowrap"><button class="text-left" @click.stop="select(l.id)">{{ l.name }}</button></td>
+                                <td class="td"><template v-if="l.supervisor"><div class="font-[600]">{{ l.supervisor.name }}</div><div class="text-[12.5px] text-ink-2 tabular-nums">{{ l.supervisor.code }}, {{ l.supervisor.phone }}</div></template><span v-else class="font-[600] text-action">None</span></td>
+                                <td class="td text-ink-2"><template v-if="l.backup">{{ l.backup.name }}<div class="text-[12.5px] tabular-nums">{{ l.backup.code }}</div></template><template v-else>–</template></td>
+                                <td class="td font-[600] tabular-nums" :class="l.wards_covered < l.wards ? 'text-action' : ''">{{ l.wards_covered }} of {{ l.wards }}</td>
+                                <td class="td fig text-right">{{ num(l.agents) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -175,55 +173,51 @@ function imported(summary) {
             </section>
 
             <section v-if="d.selected" class="card p-5">
-                <div class="flex items-baseline justify-between gap-2">
-                    <h2 class="card-title ">{{ d.selected.name }} · wards</h2>
-                    <span class="text-sm" :class="openWards ? 'font-semibold text-action' : 'text-ink-2'">{{ openWards ? `${openWards} open` : `${d.selected.wards.length} wards` }}</span>
+                <div class="card-title-ruled flex items-baseline justify-between gap-2">
+                    <h2>{{ d.selected.name }}</h2>
+                    <span class="text-[13px] font-[400] tabular-nums" :class="openWards ? 'font-[600] text-action' : 'text-ink-2'">{{ openWards ? `${openWards} ${openWards === 1 ? 'ward' : 'wards'} open` : `${d.selected.wards.length} wards, all covered` }}</span>
                 </div>
 
-                <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                    <div v-for="[backup, label, who] in [[false, 'LGA supervisor', selectedLga?.supervisor], [true, 'Backup', selectedLga?.backup]]" :key="label" class="rounded-xl border border-line p-3">
-                        <label class="flex items-center gap-2 text-[11.5px] font-bold tracking-wide text-ink-3 uppercase"><input v-if="who && !d.frozen" type="checkbox" class="checkbox" :aria-label="`Tick ${who.name}`" :checked="picked.has(who.id)" @change="picked.toggle(who.id)" />{{ label }}</label>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <div v-for="[backup, label, who] in [[false, 'LGA supervisor', selectedLga?.supervisor], [true, 'Backup', selectedLga?.backup]]" :key="label" class="rounded-lg border border-line p-3">
+                        <label class="flex items-center gap-2 text-[12.5px] text-ink-2"><input v-if="who && !d.frozen" type="checkbox" class="checkbox" :aria-label="`Tick ${who.name}`" :checked="picked.has(who.id)" @change="picked.toggle(who.id)" />{{ label }}</label>
                         <div class="mt-1 flex items-start justify-between gap-2">
-                            <div v-if="who" class="min-w-0 text-sm"><b>{{ who.name }}</b><div class="text-[12.5px] text-ink-2">{{ who.code }} · {{ who.phone }}</div></div>
-                            <div v-else class="text-sm font-semibold" :class="backup ? 'text-ink-3' : 'text-action'">None</div>
+                            <div v-if="who" class="min-w-0 text-sm"><b class="font-[620]">{{ who.name }}</b><div class="text-[12.5px] text-ink-2 tabular-nums">{{ who.code }}, {{ who.phone }}</div></div>
+                            <div v-else class="text-sm font-[600]" :class="backup ? 'text-ink-3' : 'text-action'">None</div>
                             <template v-if="!d.frozen">
                                 <SupervisorActions v-if="who" :supervisor="who" @replace="assigning = { post: lgaPost(backup), holder: who }" @done="done" />
-                                <button v-else class="btn-outline h-8 shrink-0 px-3 text-xs" @click="assigning = { post: lgaPost(backup) }">{{ backup ? 'Add backup' : 'Assign' }}</button>
+                                <button v-else class="btn-ghost h-8 shrink-0 px-3 text-[13px]" @click="assigning = { post: lgaPost(backup) }">{{ backup ? 'Add backup' : 'Assign' }}</button>
                             </template>
                         </div>
                     </div>
                 </div>
 
                 <div class="mt-4 mb-2 flex items-center gap-2">
-                    <h3 class="text-sm font-bold">Ward supervisors</h3>
-                    <label v-if="!d.frozen && wardSupIds.length" class="ml-auto flex items-center gap-2 text-[12.5px] font-semibold text-ink-2"><input type="checkbox" class="checkbox" :checked="picked.allOn(wardSupIds)" :indeterminate.prop="picked.someOn(wardSupIds)" @change="picked.setMany(wardSupIds, $event.target.checked)" /> Tick all in {{ d.selected.name }}</label>
+                    <h3 class="text-[14px] font-[650]">Ward supervisors</h3>
+                    <label v-if="!d.frozen && wardSupIds.length" class="ml-auto flex items-center gap-2 text-[12.5px] font-[600] text-ink-2"><input type="checkbox" class="checkbox" :checked="picked.allOn(wardSupIds)" :indeterminate.prop="picked.someOn(wardSupIds)" @change="picked.setMany(wardSupIds, $event.target.checked)" /> Tick all in {{ d.selected.name }}</label>
                 </div>
-                <ul class="flex flex-col gap-2">
-                    <li v-for="w in d.selected.wards" :key="w.id" class="rounded-xl p-3 transition-colors" :class="w.supervisor && picked.has(w.supervisor.id) ? 'bg-[#eef2fb] ring-1 ring-navy/30' : w.supervisor ? 'bg-mist' : 'bg-bad-bg'">
+                <ul class="border-t border-rule">
+                    <li v-for="w in d.selected.wards" :key="w.id" class="relative border-b border-rule py-2.5 pl-3 transition-colors" :class="w.supervisor && picked.has(w.supervisor.id) ? 'bg-[#eef2fb]' : ''">
+                        <span class="absolute inset-y-2 left-0 w-[3px] rounded-[1px]" :class="w.supervisor ? 'bg-transparent' : 'bg-orange'"></span>
                         <div class="flex items-center justify-between gap-2 text-sm">
                             <input v-if="w.supervisor && !d.frozen" type="checkbox" class="checkbox shrink-0" :aria-label="`Tick ${w.supervisor.name}`" :checked="picked.has(w.supervisor.id)" @change="picked.toggle(w.supervisor.id)" />
                             <div class="min-w-0 flex-1">
-                                <b>{{ w.name }}</b> <span class="text-xs text-ink-2">· {{ w.units }} units</span>
-                                <div v-if="w.supervisor" class="text-[13px] text-ink-2">{{ w.supervisor.code }} · {{ w.supervisor.name }} · {{ w.supervisor.phone }}</div>
-                                <div v-else class="text-[13px] font-bold text-bad">No supervisor assigned</div>
+                                <b class="font-[620]">{{ w.name }}</b> <span class="text-[12.5px] text-ink-2 tabular-nums">{{ w.units }} units</span>
+                                <div v-if="w.supervisor" class="text-[13px] text-ink-2">{{ w.supervisor.name }}, <span class="tabular-nums">{{ w.supervisor.code }}, {{ w.supervisor.phone }}</span></div>
+                                <div v-else class="text-[13px] font-[600] text-action">No supervisor assigned</div>
                             </div>
                             <template v-if="!d.frozen">
                                 <div v-if="w.supervisor" class="flex shrink-0 items-center gap-1">
-                                    <button class="btn-outline h-8 px-3 text-xs" @click="assigning = { post: wardPost(w), holder: w.supervisor }">Replace</button>
+                                    <button class="btn-ghost h-8 px-3 text-[13px]" @click="assigning = { post: wardPost(w), holder: w.supervisor }">Replace</button>
                                     <SupervisorActions :supervisor="w.supervisor" :ward-id="w.id" @replace="assigning = { post: wardPost(w), holder: w.supervisor }" @done="done" />
                                 </div>
-                                <button v-else class="btn-outline h-8 shrink-0 px-3 text-xs" @click="assigning = { post: wardPost(w) }">Assign</button>
+                                <button v-else class="btn-ghost h-8 shrink-0 px-3 text-[13px]" @click="assigning = { post: wardPost(w) }">Assign</button>
                             </template>
                         </div>
                     </li>
                 </ul>
 
-                <div class="mt-5 rounded-xl border border-line p-4">
-                    <h3 class="mb-2 text-sm font-bold">Escalation on election day</h3>
-                    <div class="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
-                        <span class="rounded-lg bg-mist px-2.5 py-1">Agent</span>→<span class="rounded-lg bg-mist px-2.5 py-1">Ward supervisor</span>→<span class="rounded-lg bg-mist px-2.5 py-1">LGA supervisor</span>→<span class="rounded-lg bg-navy px-2.5 py-1 text-white">Situation room</span>
-                    </div>
-                </div>
+                <p class="note mt-4 text-[13px]"><b class="font-[620] text-ink">On election day</b> an agent calls their ward supervisor first, then the LGA supervisor, then the situation room.</p>
             </section>
         </div>
     </LoadState>

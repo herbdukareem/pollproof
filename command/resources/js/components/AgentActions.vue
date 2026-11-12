@@ -126,15 +126,15 @@ const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { ac
 
     <Modal :open="dialog === 'edit'" :title="`Edit ${agent.code}`" subtitle="Corrections are recorded in the audit log." :busy="busy" @close="dialog = ''">
         <form id="agent-edit" class="flex flex-col gap-4" @submit.prevent="saveEdit">
-            <label class="flex flex-col gap-1.5 text-sm font-semibold">Full name <input v-model="form.name" class="field" required maxlength="120" /></label>
-            <label v-if="agent.phone != null" class="flex flex-col gap-1.5 text-sm font-semibold">
+            <label class="flex flex-col gap-1.5 text-sm font-[600]">Full name <input v-model="form.name" class="field" required maxlength="120" /></label>
+            <label v-if="agent.phone != null" class="flex flex-col gap-1.5 text-sm font-[600]">
                 Phone number <input v-model="form.phone" class="field" required inputmode="tel" />
                 <span class="text-xs font-normal text-ink-2">Changing the number signs them out; they sign in again with the new number.</span>
             </label>
             <div class="flex items-center gap-3">
                 <img v-if="photoPreview || agent.has_photo" :src="photoPreview || `/api/v1/people/${agent.id}/photo`" alt="" class="h-16 w-14 rounded-lg border border-line object-cover" />
                 <div v-else class="flex h-16 w-14 items-center justify-center rounded-lg bg-mist text-xs text-ink-3">No photo</div>
-                <label class="flex flex-col gap-1 text-sm font-semibold">
+                <label class="flex flex-col gap-1 text-sm font-[600]">
                     Photo for their ID tag
                     <input type="file" accept="image/*" capture="user" class="text-xs font-normal" @change="pickPhoto" />
                     <span class="text-xs font-normal text-ink-2">A clear face, like a passport photo. Up to 5 MB.</span>
@@ -153,12 +153,12 @@ const saveActive = (active) => save(() => api.patch(`agents/${a.value.id}`, { ac
             <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
             <input v-model="unitSearch" class="field w-full pl-9" placeholder="Unit code or name, e.g. 06-03 or Kpakungu" autofocus />
         </div>
-        <p class="mt-2 text-xs text-ink-2">{{ unitSearch ? 'Matching units' : emptyUnits ? 'Every unit has an agent. Search for the unit to swap into.' : 'Units without an agent' }}{{ searching ? ' · searching…' : '' }}</p>
+        <p class="mt-2 text-xs text-ink-2">{{ unitSearch ? 'Matching units' : emptyUnits ? 'Every unit has an agent. Search for the unit to swap into.' : 'Units without an agent' }}{{ searching ? ', searching…' : '' }}</p>
         <ul class="mt-2 flex max-h-[320px] flex-col gap-1.5 overflow-y-auto">
             <li v-for="u in units" :key="u.id">
-                <button class="flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition" :class="target?.id === u.id ? 'border-navy bg-white shadow-sm' : 'border-transparent bg-mist hover:bg-[#eceff3]'" :disabled="u.id === agent.polling_unit?.id" @click="target = u">
-                    <span class="min-w-0 flex-1"><b>{{ u.code }}</b> <span class="text-ink-2">{{ u.name }}</span><span class="block text-xs text-ink-2">{{ u.ward }} · {{ u.lga }}</span></span>
-                    <span class="shrink-0 text-xs font-semibold" :class="u.agent ? 'text-[#b4470a]' : 'text-good'">{{ u.id === agent.polling_unit?.id ? 'Current unit' : u.agent ? `Has ${u.agent.code}` : 'No agent' }}</span>
+                <button class="flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left text-sm transition" :class="target?.id === u.id ? 'border-navy bg-white' : 'border-transparent bg-mist hover:bg-[#eceff3]'" :disabled="u.id === agent.polling_unit?.id" @click="target = u">
+                    <span class="min-w-0 flex-1"><b>{{ u.code }}</b> <span class="text-ink-2">{{ u.name }}</span><span class="block text-xs text-ink-2">{{ u.ward }}, {{ u.lga }}</span></span>
+                    <span class="shrink-0 text-xs font-[600]" :class="u.agent ? 'text-[#b4470a]' : 'text-good'">{{ u.id === agent.polling_unit?.id ? 'Current unit' : u.agent ? `Has ${u.agent.code}` : 'No agent' }}</span>
                 </button>
             </li>
             <li v-if="!searching && !units.length" class="py-6 text-center text-sm text-ink-2">No units match.</li>

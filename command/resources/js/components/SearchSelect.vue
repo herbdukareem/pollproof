@@ -39,7 +39,7 @@ const words = computed(() => query.value.toLowerCase().split(/\s+/).filter(Boole
 const shown = computed(() => (words.value.length
     ? all.value.filter((o) => !o.all && words.value.every((w) => `${o.label} ${o.hint ?? ''}`.toLowerCase().includes(w)))
     : all.value));
-const height = { md: 'h-11 text-sm', sm: 'h-9 text-sm', xs: 'h-8 text-xs' }[props.size] ?? 'h-11 text-sm';
+const height = { md: 'h-10 text-sm', sm: 'h-9 text-sm', xs: 'h-8 text-xs' }[props.size] ?? 'h-10 text-sm';
 
 /** The matching part of a label in bold, so it is clear why an option is listed. */
 function parts(label) {
@@ -153,7 +153,7 @@ function typed(e) {
                     :id="`${uid}-list`"
                     ref="list"
                     role="listbox"
-                    class="fixed z-[80] overflow-y-auto overscroll-contain rounded-xl border border-line bg-white py-1 text-sm shadow-xl"
+                    class="fixed z-[80] overflow-y-auto overscroll-contain rounded-lg border border-line bg-white py-1 text-sm shadow-[0_12px_32px_rgba(19,33,60,0.14)]"
                     :style="pos"
                 >
                     <li v-if="!shown.length" class="px-3 py-2.5 text-ink-2">No {{ noun }} match “{{ query }}”.</li>
@@ -165,7 +165,7 @@ function typed(e) {
                         role="option"
                         :aria-selected="same(o.value, modelValue)"
                         class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2"
-                        :class="[i === active ? 'bg-mist' : '', o.all ? 'border-b border-[#eef0f3] font-semibold text-ink-2' : '']"
+                        :class="[i === active ? 'bg-mist' : '', o.all ? 'border-b border-rule font-[600] text-ink-2' : '']"
                         @mouseenter="active = i"
                         @mousedown.prevent="choose(o)"
                     >
@@ -175,7 +175,7 @@ function typed(e) {
                         </span>
                         <Icon v-if="same(o.value, modelValue)" name="check" :size="14" class="shrink-0 text-navy" />
                     </li>
-                    <li v-if="words.length && shown.length" class="border-t border-[#eef0f3] px-3 pt-1.5 pb-1 text-[11.5px] text-ink-3">{{ shown.length }} of {{ options.length }} {{ noun }}</li>
+                    <li v-if="words.length && shown.length" class="border-t border-rule px-3 pt-1.5 pb-1 text-[11.5px] text-ink-3">{{ shown.length }} of {{ options.length }} {{ noun }}</li>
                 </ul>
             </Transition>
         </Teleport>

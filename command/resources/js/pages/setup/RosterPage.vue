@@ -115,7 +115,7 @@ function changed(text) {
 </script>
 
 <template>
-    <PageHeader title="Agent roster" :subtitle="d ? `${num(d.counts.assigned)} assigned · ${num(d.counts.reserves)} reserves${d.counts.unassigned ? ` · ${num(d.counts.unassigned)} waiting for a unit` : ''}` : 'Polling-unit agents and reserves'" :updated-at="roster.updatedAt.value" :loading="roster.loading.value" @refresh="roster.load">
+    <PageHeader title="Agent roster" :subtitle="d ? `${num(d.counts.assigned)} assigned, ${num(d.counts.reserves)} reserves${d.counts.unassigned ? `, ${num(d.counts.unassigned)} waiting for a unit` : ''}` : 'Polling-unit agents and reserves'" :updated-at="roster.updatedAt.value" :loading="roster.loading.value" @refresh="roster.load">
         <template #actions>
             <button class="btn-outline" :disabled="d?.frozen" @click="adding = true"><Icon name="plus" :size="16" /> Add agent</button>
             <button class="btn-outline" :disabled="d?.frozen" @click="uploading = true"><Icon name="upload" :size="16" /> Upload agent list</button>
@@ -126,26 +126,30 @@ function changed(text) {
 
     <LoadState :loading="roster.loading.value && !d" :error="roster.error.value" :empty="!d">
         <FreezeNote :frozen="d.frozen" />
-        <p v-if="message" role="status" class="mb-4 rounded-xl bg-good-bg px-4 py-3 text-sm font-semibold text-good">{{ message }}</p>
-        <p v-if="error" role="alert" class="mb-4 rounded-xl bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
+        <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
+        <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-        <section class="card mb-5 p-5">
-            <h2 class="mb-3 text-[15px] font-bold">Onboarding</h2>
-            <div class="grid gap-4 sm:grid-cols-5">
-                <div v-for="st in d.stages" :key="st.label">
-                    <div class="flex items-baseline justify-between"><span class="text-sm text-ink-2">{{ st.label }}</span><b>{{ num(st.value) }}</b></div>
-                    <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e9ecf1]"><div class="bar-fill h-full rounded-full bg-navy" :style="{ width: (d.counts.assigned ? (100 * st.value) / d.counts.assigned : 0) + '%' }"></div></div>
-                </div>
-            </div>
+        <section class="card mb-4 p-5">
+            <h2 class="card-title-ruled flex flex-wrap items-baseline justify-between gap-2">Onboarding <span class="text-[12.5px] font-[400] text-ink-2 tabular-nums">of {{ num(d.counts.assigned) }} agents assigned to a unit</span></h2>
+            <ol class="grid gap-x-6 gap-y-4 sm:grid-cols-5">
+                <li v-for="st in d.stages" :key="st.label">
+                    <div class="text-[13px] text-ink-2">{{ st.label }}</div>
+                    <div class="fig mt-0.5 text-[26px] leading-none font-[700]">{{ num(st.value) }}</div>
+                    <div class="mt-2 h-1.5 rounded-[1px] bg-[#e8ebf0]"><div class="bar-fill h-full rounded-[1px] bg-navy" :style="{ width: (d.counts.assigned ? (100 * st.value) / d.counts.assigned : 0) + '%' }"></div></div>
+                </li>
+            </ol>
         </section>
 
-        <div class="grid items-start gap-5 xl:grid-cols-[1fr_330px]">
+        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section class="card overflow-hidden">
-                <div class="flex flex-wrap gap-3 p-4">
-                    <label class="sr-only" for="q">Search roster</label>
-                    <input id="q" v-model="search" class="field h-10 max-w-xs" placeholder="Search name, phone, agent ID or unit" />
+                <div class="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
+                    <div class="relative w-full sm:w-[260px]">
+                        <Icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+                        <label class="sr-only" for="q">Search roster</label>
+                        <input id="q" v-model="search" class="field h-9 w-full pl-9" placeholder="Name, phone, agent ID or unit" />
+                    </div>
                     <label class="sr-only" for="f">Show</label>
-                    <select id="f" v-model="filter" class="field h-10 w-auto">
+                    <select id="f" v-model="filter" class="field h-9 w-auto">
                         <option value="incomplete">Not fully onboarded</option>
                         <option value="all">All agents</option>
                         <option value="reserves">Reserves</option>
@@ -153,32 +157,32 @@ function changed(text) {
                         <option value="unavailable">Said they can't make it</option>
                     </select>
                     <label class="sr-only" for="roster-lga">LGA</label>
-                    <SearchSelect id="roster-lga" v-model="lgaId" class="w-full sm:w-[200px]" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
-                    <span class="self-center text-sm text-ink-2">{{ num(d.total) }} match</span>
+                    <SearchSelect id="roster-lga" v-model="lgaId" class="w-full sm:w-[200px]" size="sm" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
+                    <span class="text-[13px] text-ink-2 tabular-nums sm:ml-auto">{{ num(d.total) }} {{ d.total === 1 ? 'agent' : 'agents' }}</span>
                 </div>
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">
                     <div class="relative overflow-x-auto">
                         <TableBusy :busy="roster.busy.value" />
                         <table class="w-full min-w-[760px] text-sm">
-                            <thead class="bg-mist"><tr><th class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
+                            <thead><tr><th class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
                             <tbody>
                                 <tr v-for="a in d.data" :key="a.id" :class="picked.has(a.id) ? '!bg-[#eef2fb]' : ''">
                                     <td class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
-                                    <td class="td"><div class="font-bold">{{ a.code }}</div><div class="text-xs text-ink-2">{{ a.name }}</div></td>
-                                    <td class="td whitespace-nowrap text-ink-2">{{ a.phone }}</td>
+                                    <td class="td"><div class="fig font-[650] whitespace-nowrap">{{ a.code }}</div><div class="text-[13px] text-ink-2">{{ a.name }}</div></td>
+                                    <td class="td whitespace-nowrap text-ink-2 tabular-nums">{{ a.phone }}</td>
                                     <td class="td">
-                                        <template v-if="a.polling_unit"><div class="font-semibold">{{ a.polling_unit.code }}</div><div class="text-xs text-ink-2">{{ a.place }}</div></template>
-                                        <template v-else><Badge :tone="a.is_reserve ? 'info' : 'warn'">{{ a.is_reserve ? 'Reserve' : 'No unit' }}</Badge><div v-if="a.place" class="mt-0.5 text-xs text-ink-2">{{ a.place }}</div></template>
+                                        <template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="text-[13px] text-ink-2">{{ a.place }}</div></template>
+                                        <template v-else><Badge :tone="a.is_reserve ? 'info' : 'warn'">{{ a.is_reserve ? 'Reserve' : 'No unit' }}</Badge><div v-if="a.place" class="mt-0.5 text-[13px] text-ink-2">{{ a.place }}</div></template>
                                     </td>
                                     <td class="td">
                                         <div class="flex items-center gap-1" :aria-label="`${a.step} of 5 steps done`">
-                                            <span v-for="i in 5" :key="i" class="h-2 w-5 rounded-full" :class="i <= a.step ? 'bg-good' : 'bg-[#e1e4ea]'"></span>
+                                            <span v-for="i in 5" :key="i" class="h-1.5 w-5 rounded-[1px]" :class="i <= a.step ? 'bg-good' : 'bg-[#e1e4ea]'"></span>
                                         </div>
-                                        <div class="mt-1 text-xs font-semibold" :class="a.unavailable ? 'text-action' : a.step === 5 ? 'text-good' : 'text-[#b4470a]'">{{ a.unavailable ? "Can't make it" : stepNotes[a.step] }}{{ a.quiz_score != null && a.step < 4 ? ` · quiz ${a.quiz_score}/10` : '' }}</div>
+                                        <div class="mt-1 text-[12.5px] font-[560]" :class="a.unavailable ? 'text-action' : a.step === 5 ? 'text-good' : 'text-[#b4470a]'">{{ a.unavailable ? "Can't make it" : stepNotes[a.step] }}{{ a.quiz_score != null && a.step < 4 ? `, quiz ${a.quiz_score}/10` : '' }}</div>
                                     </td>
                                     <td class="td">
                                         <div class="flex items-center justify-end gap-2">
-                                            <button v-if="actionFor(a)" class="btn-outline h-8 px-3 text-xs" :disabled="busy === `i${a.id}`" @click="inviteOne(a)">{{ a.step ? 'Resend invite' : 'Send invite' }}</button>
+                                            <button v-if="actionFor(a)" class="btn-ghost h-8 px-3 text-[13px]" :disabled="busy === `i${a.id}`" @click="inviteOne(a)">{{ a.step ? 'Resend invite' : 'Send invite' }}</button>
                                             <AgentActions :agent="{ ...a, active: true }" can-edit :can-assign="!d.frozen" @done="changed" />
                                         </div>
                                     </td>
@@ -196,24 +200,24 @@ function changed(text) {
                 </LoadState>
             </section>
 
-            <div class="flex flex-col gap-5">
+            <div class="flex flex-col gap-4">
                 <ImportReport :report="report" :counts="[['Rows in file', 'rows', ''], ['Assigned to a unit', 'assigned', ''], ['Kept as reserves', 'reserves', 'text-good'], ['Waiting for a unit', 'unassigned', ''], ['New people', 'created', ''], ['Updated', 'updated', '']]" />
                 <AgentAppButton card />
                 <section class="card p-5">
-                    <h2 class="text-[15px] font-bold">Auto-assign</h2>
-                    <p class="mt-1 text-[13px] text-ink-2">Match agents waiting for a unit to free units in the ward they registered in. Reserves are kept back for election-day gaps.</p>
+                    <h2 class="card-title-ruled">Auto-assign</h2>
+                    <p class="text-[13px] text-ink-2">Match agents waiting for a unit to free units in the ward they registered in. Reserves are kept back for election-day gaps.</p>
                     <button class="btn-outline mt-3 w-full" :disabled="busy === 'preview' || d.frozen" @click="previewAssign">Preview assignments</button>
                     <template v-if="preview && preview.count">
-                        <ul class="mt-3 max-h-56 overflow-y-auto rounded-xl bg-mist p-3 text-[13px]">
-                            <li v-for="p in preview.pairs" :key="p.agent" class="flex justify-between gap-2 py-0.5"><span><b>{{ p.agent }}</b> {{ p.name }}</span><span>→ {{ p.unit }}</span></li>
+                        <ul class="mt-3 max-h-56 overflow-y-auto border-y border-rule text-[13px]">
+                            <li v-for="p in preview.pairs" :key="p.agent" class="flex justify-between gap-2 border-t border-rule py-1.5 first:border-0"><span><b class="fig font-[650]">{{ p.agent }}</b> {{ p.name }}</span><span class="whitespace-nowrap text-ink-2">to <span class="fig text-ink">{{ p.unit }}</span></span></li>
                         </ul>
                         <p class="mt-2 text-xs text-ink-2">{{ num(preview.count) }} to assign{{ preview.still_unassigned ? `, ${num(preview.still_unassigned)} still without a free unit in their ward` : '' }}.</p>
                         <button class="btn-navy mt-3 w-full" :disabled="busy === 'apply'" @click="applyAssign">Assign {{ num(preview.count) }} agents</button>
                     </template>
                 </section>
                 <section class="card p-5 text-[13px] text-ink-2">
-                    <h2 class="mb-1 text-[15px] font-bold text-ink">CSV columns</h2>
-                    <p><code class="text-ink">name, phone</code> are required. Add <code class="text-ink">pu_code</code> to assign a unit, or <code class="text-ink">lga_code, ward_code</code> with <code class="text-ink">reserve</code> = yes for a reserve. Rows are matched on phone, so upload a corrected file to fix mistakes.</p>
+                    <h2 class="card-title-ruled">CSV columns</h2>
+                    <p><code class="font-mono text-[12.5px] text-ink">name, phone</code> are required. Add <code class="font-mono text-[12.5px] text-ink">pu_code</code> to assign a unit, or <code class="font-mono text-[12.5px] text-ink">lga_code, ward_code</code> with <code class="font-mono text-[12.5px] text-ink">reserve</code> = yes for a reserve. Rows are matched on phone, so upload a corrected file to fix mistakes.</p>
                 </section>
             </div>
         </div>

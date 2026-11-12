@@ -76,7 +76,7 @@ final class TribunalBundle
             $lines = array_merge($lines, ['', '## Ground '.($i + 1).": {$g->label}", '', "**Claim.** {$g->claim}", '',
                 '**Our answer.** '.($g->answer ?: '_Not written yet._'), '',
                 '**Evidence.** '.($g->evidence_note ?: '–').($codes ? " Units: {$codes}." : ''), '',
-                'Status: '.($g->status === 'ready' ? 'answer ready' : 'in progress').($g->owner ? " · owner {$g->owner->name}" : '')]);
+                'Status: '.($g->status === 'ready' ? 'answer ready' : 'in progress').($g->owner ? "; owner {$g->owner->name}" : '')]);
         }
 
         return implode("\n", $lines)."\n";

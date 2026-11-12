@@ -18,20 +18,20 @@ function download() {
 
 <template>
     <section v-if="report" class="card p-5" aria-live="polite">
-        <h2 class="text-[15px] font-bold">Last upload</h2>
-        <p class="mt-0.5 text-[13px] text-ink-2">{{ report.file }} · {{ dateTime(report.at) }}</p>
+        <h2 class="text-[15px] font-[650]">Last upload</h2>
+        <p class="mt-0.5 text-[13px] text-ink-2">{{ report.file }}, {{ dateTime(report.at) }}</p>
         <dl class="mt-3">
-            <div v-for="[label, key, tone] in counts" :key="key" class="flex justify-between border-t border-[#eef0f3] py-2 text-sm">
+            <div v-for="[label, key, tone] in counts" :key="key" class="flex justify-between border-t border-rule py-2 text-sm">
                 <dt class="text-ink-2">{{ label }}</dt>
-                <dd class="font-bold" :class="tone">{{ num(report[key] ?? 0) }}</dd>
+                <dd class="font-[650]" :class="tone">{{ num(report[key] ?? 0) }}</dd>
             </div>
-            <div class="flex justify-between border-t border-[#eef0f3] py-2 text-sm">
+            <div class="flex justify-between border-t border-rule py-2 text-sm">
                 <dt class="text-ink-2">Skipped</dt>
-                <dd class="font-bold" :class="rejected.length ? 'text-action' : ''">{{ num(rejected.length) }}</dd>
+                <dd class="font-[650]" :class="rejected.length ? 'text-action' : ''">{{ num(rejected.length) }}</dd>
             </div>
         </dl>
         <template v-if="rejected.length">
-            <ul class="mt-2 max-h-48 overflow-y-auto rounded-xl bg-bad-bg/60 p-3 text-[13px]">
+            <ul class="mt-2 max-h-48 overflow-y-auto rounded-lg bg-bad-bg/60 p-3 text-[13px]">
                 <li v-for="r in rejected.slice(0, 50)" :key="r.line" class="py-0.5"><b>Line {{ r.line }}</b> {{ r.name }}: {{ r.reason }}</li>
             </ul>
             <button class="btn-outline mt-3 w-full" @click="download">Download skipped rows</button>
