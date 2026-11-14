@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Models\Incident;
 use App\Models\User;
+use App\Services\Voice\Announcer;
 
 /** Records an incident from an agent (app or USSD) and raises an alert for a high-severity one. */
 final class IncidentReporter
 {
-    public function __construct(private readonly AlertService $alerts) {}
+    public function __construct(private readonly AlertService $alerts, private readonly Announcer $voice) {}
 
     public function report(User $user, string $type, string $severity, string $description, string $occurredAt, ?float $latitude = null, ?float $longitude = null, array $mediaPaths = [], ?string $clientRef = null): Incident
     {
@@ -26,6 +27,8 @@ final class IncidentReporter
             'updates' => [],
             'client_ref' => $clientRef,
         ]);
+        // Every incident is read out in the command room; high ones also raise an alert.
+        $this->voice->incident($incident);
         if ($incident->severity === 'high') {
             $where = $user->pollingUnit?->code ?? 'Unassigned agent';
             $this->alerts->raise($user->campaign_id, 'incident', 'high', "incident:{$incident->id}",

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import PinLogo from './PinLogo.vue';
 import Icon from './Icon.vue';
 import NoticeBell from './NoticeBell.vue';
+import VoiceButton from './VoiceButton.vue';
 import AgentAppButton from './AgentAppButton.vue';
 import Toaster from './Toaster.vue';
 import { toast } from '../lib/toast';
@@ -227,6 +228,7 @@ async function logout() {
                 </div>
                 <div class="flex items-center gap-2 sm:order-last">
                     <AgentAppButton />
+                    <VoiceButton />
                     <NoticeBell />
                     <div class="relative">
                         <button

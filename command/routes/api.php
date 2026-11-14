@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UssdController;
+use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -113,6 +114,10 @@ Route::prefix('v1')->group(function () {
             Route::get('tally', TallyController::class);
             Route::get('tally/points', [TallyController::class, 'points']);
             Route::get('nav-counts', NavCountsController::class);
+            // Spoken announcements (POLLPROOF_VOICE_ENABLED). The audio link is signed by the feed.
+            Route::get('voice/feed', [VoiceController::class, 'feed']);
+            Route::get('voice/sample', [VoiceController::class, 'sample'])->middleware('throttle:10,1');
+            Route::get('voice/audio', [VoiceController::class, 'audio'])->middleware(['signed:relative', 'throttle:120,1'])->name('voice.audio');
             Route::get('units', [UnitController::class, 'index']);
             Route::get('alerts', [AlertController::class, 'index']);
             Route::get('incidents', [IncidentController::class, 'index']);

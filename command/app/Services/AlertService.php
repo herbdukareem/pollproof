@@ -4,10 +4,13 @@ namespace App\Services;
 
 use App\Jobs\NotifyAlert;
 use App\Models\Alert;
+use App\Services\Voice\Announcer;
 use Illuminate\Database\Eloquent\Model;
 
 final class AlertService
 {
+    public function __construct(private readonly Announcer $voice) {}
+
     /**
      * Raise or refresh an alert. The dedupe key keeps one live alert per problem,
      * so re-entering the same sheet updates the alert instead of creating noise.
@@ -42,6 +45,7 @@ final class AlertService
         // Only a new or reopened problem tells people; a refresh of an open one doesn't repeat the message.
         if (! $wasOpen) {
             NotifyAlert::dispatch($alert->id)->afterCommit();
+            $this->voice->alert($alert);
         }
 
         return $alert;

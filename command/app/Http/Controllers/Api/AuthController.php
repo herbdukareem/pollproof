@@ -127,6 +127,7 @@ class AuthController extends Controller
                 'ussd_code' => config('pollproof.ussd.code'),
                 'declared' => $c->isDeclared(),
                 'state_map' => config('pollproof.state_map') ?: null,
+                'voice' => (bool) config('pollproof.voice.enabled'),
             ] : null,
             'supervisor' => $this->supervisorFor($user),
             'today' => $user->role === Role::Agent ? $this->agentToday($user) : null,

@@ -37,6 +37,19 @@ return [
         'release_url' => env('POLLPROOF_AGENT_APP_RELEASE', 'https://github.com/herbdukareem/pollproof/releases/download/agent-app'),
     ],
 
+    // Spoken announcements in the command room (incidents, alerts, escalations, how the race
+    // stands), synthesised by a Kokoro TTS server. Off until POLLPROOF_VOICE_ENABLED=true.
+    'voice' => [
+        'enabled' => (bool) env('POLLPROOF_VOICE_ENABLED', false),
+        // Kokoro listening on a Unix socket (as on the Hostinger server). Leave blank to reach it
+        // over TCP at the URL instead.
+        'socket' => env('POLLPROOF_VOICE_SOCKET', ''),
+        'url' => env('POLLPROOF_VOICE_URL', 'http://localhost/tts'),
+        'voice' => env('POLLPROOF_VOICE_NAME', 'af_heart'),
+        'speed' => (float) env('POLLPROOF_VOICE_SPEED', 1.0),
+        'timeout' => (int) env('POLLPROOF_VOICE_TIMEOUT', 120),
+    ],
+
     // Agents pass training with this many correct answers out of the quiz.
     'quiz_pass_mark' => 8,
 

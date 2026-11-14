@@ -11,6 +11,8 @@ use App\Models\NotificationRule;
 use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Services\Voice\Announcer;
+use App\Services\Voice\RaceWatch;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,9 +23,9 @@ final class ElectionWatch
 {
     public const VERIFY_BACKLOG = 20;
 
-    public function __construct(private readonly AlertService $alerts) {}
+    public function __construct(private readonly AlertService $alerts, private readonly Announcer $voice, private readonly RaceWatch $race) {}
 
-    /** @return array{escalated: int, absent: int, backlog: int} */
+    /** @return array{escalated: int, absent: int, backlog: int, race: ?string} */
     public function run(Campaign $campaign, ?Carbon $now = null): array
     {
         $now ??= now();
@@ -32,6 +34,7 @@ final class ElectionWatch
             'escalated' => $this->escalate($campaign, $now),
             'absent' => $this->absentAgents($campaign, $now),
             'backlog' => $this->verifyBacklog($campaign),
+            'race' => $this->race->run($campaign, $now),
         ];
     }
 
@@ -46,6 +49,7 @@ final class ElectionWatch
         foreach ($due as $alert) {
             $alert->update(['escalated_at' => $now]);
             NotifyAlert::dispatch($alert->id, true);
+            $this->voice->alert($alert, true);
         }
 
         return $due->count();

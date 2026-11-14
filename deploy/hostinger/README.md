@@ -134,6 +134,44 @@ The overview shows a map of the campaign's state beside the 25% tracker. It has 
 - **Another state:** add `command/resources/js/maps/<state>.js` with the same exports as `niger.js` (`name`, `credit`, `mount`, and optionally `locate` for wards), list it in `maps/index.js`, and set `POLLPROOF_STATE_MAP=<state>`. Only the chosen state's map is downloaded.
 - **Niger's map** is the `@saidabdul80/inistmap` package by Said Abdulsalam. Its licence allows educational and academic use only; other use needs his permission. Its ward boundaries are GRID3 / CIESIN data under CC BY-SA 4.0, and the attribution must stay on the map.
 
+## Spoken announcements (Kokoro)
+
+The command room can read out new incidents, alerts, escalations and how the race stands. The
+sentences come from the server; the voice comes from a Kokoro TTS server on the same machine.
+
+1. Run Kokoro so it listens on a Unix socket, e.g. `/home/u388383718/kokoro-tts/kokoro.sock`.
+   PHP must be able to read and write the socket.
+2. In `command/.env`:
+
+   ```
+   POLLPROOF_VOICE_ENABLED=true
+   POLLPROOF_VOICE_SOCKET=/home/u388383718/kokoro-tts/kokoro.sock
+   POLLPROOF_VOICE_NAME=af_heart
+   POLLPROOF_VOICE_SPEED=1.0
+   ```
+
+   (To reach Kokoro over TCP instead, leave the socket blank and set `POLLPROOF_VOICE_URL`.)
+3. `php artisan migrate --force && php artisan optimize:clear`.
+4. In the command room, click the speaker beside the bell, turn on "Read out loud" and
+   "Play a sample". Each screen turns the voice on for itself.
+
+How it stays quiet:
+
+- Each problem is said once, when it is raised. It is said again only if nobody acts on it
+  before its escalation rule fires ("Still not handled. …").
+- The same sentence is never said twice within 20 minutes.
+- Anything that arrives within 5 seconds is said together: one on its own; two or three after a
+  count ("Two new alerts."); more as a count, the most urgent two, and a summary of the rest
+  by kind and place ("Also: 37 units with no agent checked in, across 9 LGAs.").
+- The race is announced only when it changes: the first lead once 5% of units have reported,
+  a change of lead, crossing (or falling back below) the 25% rule, and each quarter of units
+  reported. A change must hold for 3 minutes, and race news is at least 5 minutes apart.
+- With several tabs open in one browser, only one speaks. A screen that was asleep does not
+  read out what it missed.
+
+Audio is synthesised once per sentence and kept in `storage/app/private/voice` for three days.
+If Kokoro stops, nothing else is affected; the panel says the voice server isn't answering.
+
 ## The agent app download
 
 Every change to the agent app is built by GitHub Actions (workflow **Agent app**) and published to the
