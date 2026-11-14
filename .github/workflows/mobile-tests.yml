@@ -23,6 +23,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: the app is built and tested on this release. Flutter 3.50 deprecated
+          # package:flutter/material.dart; move to material_ui before raising this.
+          flutter-version: 3.47.9
           cache: true
       - run: flutter pub get
       - name: Check formatting
@@ -49,6 +52,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: the app is built and tested on this release. Flutter 3.50 deprecated
+          # package:flutter/material.dart; move to material_ui before raising this.
+          flutter-version: 3.47.9
           cache: true
       # The build number goes up every run, so a new APK installs over the old one.
       - run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://app.pollproof.online' }}
