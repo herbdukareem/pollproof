@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PollingUnit;
 use App\Models\User;
 use App\Services\Csv;
+use App\Services\StructureImporter;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -17,6 +18,24 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class TemplateController extends Controller
 {
+    /**
+     * The polling-unit list: every unit already set up, with its GPS and voter count, so it can be
+     * corrected and uploaded again. Before the first import it is just the header row.
+     */
+    public function units(Request $request): StreamedResponse
+    {
+        $campaign = $request->user()->campaign;
+        $units = PollingUnit::where('campaign_id', $campaign->id)->with('ward.lga')->get()
+            ->sortBy(fn ($u) => "{$u->ward->lga->code}/{$u->ward->code}/{$u->code}", SORT_NATURAL);
+
+        return $this->csv('polling-unit-template', StructureImporter::COLUMNS, function ($put) use ($units) {
+            foreach ($units as $u) {
+                $put([Csv::text($u->ward->lga->code), $u->ward->lga->name, Csv::text($u->ward->code), $u->ward->name, Csv::text($u->code), $u->name,
+                    $u->latitude, $u->longitude, $u->registered_voters]);
+            }
+        });
+    }
+
     public function supervisors(Request $request): StreamedResponse
     {
         $campaign = $request->user()->campaign;

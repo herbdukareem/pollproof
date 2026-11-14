@@ -17,6 +17,7 @@ const props = defineProps({
     endpoint: { type: String, required: true },
     template: { type: String, required: true }, // API path of the template download
     templateName: { type: String, default: 'template.csv' },
+    templateNote: { type: String, default: 'It already lists every post, with whoever holds it now. You only fill in names and phone numbers.' },
     columns: { type: Array, default: () => [] }, // [[column, what to put in it, required?]]
     tips: { type: Array, default: () => [] },
     counts: { type: Array, default: () => [] }, // [[label, key]] from the import summary
@@ -83,7 +84,7 @@ function downloadSkipped() {
                 <span class="fig w-5 shrink-0 text-[20px] leading-6 font-[700] text-ink-3">1</span>
                 <div class="min-w-0 flex-1">
                     <b class="text-[14px] font-[650]">Download the template</b>
-                    <p class="mt-0.5 text-[13px] text-ink-2">It already lists every post, with whoever holds it now. You only fill in names and phone numbers.</p>
+                    <p class="mt-0.5 text-[13px] text-ink-2">{{ templateNote }}</p>
                     <a :href="api.url(template)" :download="templateName" class="btn-outline mt-2 h-9"><Icon name="download" :size="15" /> Download template (.csv)</a>
                 </div>
             </li>
@@ -136,8 +137,8 @@ function downloadSkipped() {
                 <div v-for="[label, key] in counts" :key="key" class="flex justify-between border-t border-rule py-1.5 text-[13px]">
                     <dt class="text-ink-2">{{ label }}</dt><dd class="font-[650]">{{ num(report[key] ?? 0) }}</dd>
                 </div>
-                <div class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Left empty</dt><dd class="font-[650]">{{ num(report.blank ?? 0) }}</dd></div>
-                <div class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Skipped</dt><dd class="font-[650]" :class="report.rejected?.length ? 'text-action' : ''">{{ num(report.rejected?.length ?? 0) }}</dd></div>
+                <div v-if="'blank' in report" class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Left empty</dt><dd class="font-[650]">{{ num(report.blank ?? 0) }}</dd></div>
+                <div v-if="'rejected' in report" class="flex justify-between border-t border-rule py-1.5 text-[13px]"><dt class="text-ink-2">Skipped</dt><dd class="font-[650]" :class="report.rejected?.length ? 'text-action' : ''">{{ num(report.rejected?.length ?? 0) }}</dd></div>
             </dl>
             <template v-if="report.rejected?.length">
                 <ul class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-bad-bg/60 p-2.5 text-[12.5px]">

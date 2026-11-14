@@ -81,4 +81,34 @@ class SmsAuditImportTest extends TestCase
 
         $this->assertSame(9, $this->campaign->pollingUnits()->count());
     }
+
+    public function test_the_unit_template_lists_every_unit_and_uploads_back_unchanged(): void
+    {
+        $this->actingAsUser($this->staff(Role::Dg));
+        $this->units['PU1']->update(['registered_voters' => 750]);
+
+        $csv = $this->get('/api/v1/setup/templates/units')->assertOk()->assertHeader('Content-Type', 'text/csv; charset=UTF-8')->streamedContent();
+        $lines = preg_split('/\r?\n/', trim($csv));
+        // Excel's byte-order mark, then the header the importer asks for.
+        $this->assertSame("\xEF\xBB\xBFlga_code,lga_name,ward_code,ward_name,pu_code,pu_name,latitude,longitude,registered_voters", $lines[0]);
+        $this->assertCount(7, $lines);
+        // Codes are written so Excel keeps them as text.
+        $this->assertStringStartsWith('"=""L1""","LGA L1","=""W1""","Ward of L1","=""PU1""","Unit 1",9.6', $lines[1]);
+        $this->assertStringEndsWith(',750', $lines[1]);
+
+        // Saved as it came and uploaded again: the same six units, nothing duplicated or wiped.
+        $this->post('/api/v1/structure/import', ['file' => UploadedFile::fake()->createWithContent('polling-unit-template.csv', $csv)], ['Accept' => 'application/json'])
+            ->assertOk()->assertJson(['lgas' => 3, 'wards' => 3, 'units' => 6, 'missing_gps' => 0]);
+        $this->assertSame(6, $this->campaign->pollingUnits()->count());
+        $this->assertSame('PU1', $this->units['PU1']->fresh()->code);
+        $this->assertSame(750, $this->units['PU1']->fresh()->registered_voters);
+    }
+
+    public function test_the_unit_template_is_just_the_header_before_the_first_import(): void
+    {
+        $this->campaign->pollingUnits()->delete();
+        $this->actingAsUser($this->staff(Role::Dg));
+        $csv = $this->get('/api/v1/setup/templates/units')->assertOk()->streamedContent();
+        $this->assertSame("\xEF\xBB\xBFlga_code,lga_name,ward_code,ward_name,pu_code,pu_name,latitude,longitude,registered_voters", trim($csv));
+    }
 }

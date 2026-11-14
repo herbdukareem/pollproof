@@ -194,6 +194,7 @@ Route::prefix('v1')->group(function () {
             Route::get('setup/supervisors', [SetupController::class, 'supervisors']);
             Route::post('supervisors/import', [RosterController::class, 'importSupervisors']);
             Route::post('supervisors', [RosterController::class, 'storeSupervisor']);
+            Route::get('setup/templates/units', [TemplateController::class, 'units']);
             Route::get('setup/templates/supervisors', [TemplateController::class, 'supervisors']);
             Route::get('setup/templates/agents', [TemplateController::class, 'agents']);
             Route::get('setup/people', [PeopleController::class, 'index']);

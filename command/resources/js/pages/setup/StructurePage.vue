@@ -4,7 +4,7 @@ import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
-import CsvUpload from '../../components/CsvUpload.vue';
+import ImportModal from '../../components/ImportModal.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
@@ -92,6 +92,19 @@ async function saveRules() {
     }
 }
 
+const importing = ref(false);
+const unitColumns = [
+    ['lga_code', 'INEC LGA code, e.g. 01', true],
+    ['lga_name', 'e.g. Agaie', true],
+    ['ward_code', 'INEC ward code within the LGA, e.g. 01', true],
+    ['ward_name', 'e.g. Baro', true],
+    ['pu_code', 'Full INEC unit code, e.g. 01-01-001', true],
+    ['pu_name', 'e.g. Baro Health Centre', true],
+    ['latitude', 'Decimal degrees, e.g. 8.6012. Leave empty if unknown', false],
+    ['longitude', 'Decimal degrees, e.g. 6.4221. Leave empty if unknown', false],
+    ['registered_voters', 'From the INEC register, e.g. 500', false],
+];
+
 function imported(summary) {
     message.value = `Imported ${num(summary.units)} units in ${num(summary.wards)} wards; ${num(summary.missing_gps)} without GPS.`;
     wardId.value = null;
@@ -111,7 +124,7 @@ async function goToMissing(m) {
 <template>
     <PageHeader title="Structure" :subtitle="s ? `${s.campaign.state_name}, ${num(s.totals.lgas)} LGAs, ${num(s.totals.wards)} wards, ${num(s.totals.units)} polling units` : 'LGAs, wards and polling units'" :updated-at="structure.updatedAt.value" :loading="structure.loading.value" @refresh="structure.load">
         <template #actions>
-            <CsvUpload endpoint="structure/import" label="Import unit list" columns="lga_code, lga_name, ward_code, ward_name, pu_code, pu_name, latitude, longitude, registered_voters" :disabled="s?.frozen" @done="imported" />
+            <button class="btn-primary" :disabled="s?.frozen" :title="s?.frozen ? 'Setup is locked' : ''" @click="importing = true"><Icon name="upload" :size="16" /> Import unit list</button>
         </template>
     </PageHeader>
 
@@ -212,4 +225,19 @@ async function goToMissing(m) {
             </div>
         </div>
     </LoadState>
+
+    <ImportModal
+        :open="importing"
+        title="Import the polling-unit list"
+        subtitle="One row per polling unit, with its ward and LGA."
+        endpoint="structure/import"
+        template="setup/templates/units"
+        template-name="polling-unit-template.csv"
+        :template-note="s?.totals.units ? `It lists all ${num(s.totals.units)} units you have now, with their GPS. Correct or add rows and upload it again.` : 'The columns to fill, ready to open in Excel or Google Sheets. Add one row per polling unit.'"
+        :columns="unitColumns"
+        :tips="['Units are matched by pu_code, so uploading again updates them instead of adding them twice.', 'An empty latitude, longitude or voter count keeps what the unit already has.']"
+        :counts="[['LGAs', 'lgas'], ['Wards', 'wards'], ['Units', 'units'], ['Without GPS', 'missing_gps']]"
+        @close="importing = false"
+        @done="imported"
+    />
 </template>
