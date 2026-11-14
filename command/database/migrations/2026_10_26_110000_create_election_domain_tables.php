@@ -84,7 +84,7 @@ return new class extends Migration
             $table->string('selfie_path')->nullable();
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
-            $table->timestamp('captured_at');
+            $table->dateTime('captured_at');
             $table->timestamps();
         });
 
