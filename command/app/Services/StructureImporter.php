@@ -17,27 +17,17 @@ use Illuminate\Validation\ValidationException;
  */
 final class StructureImporter
 {
-    private const COLUMNS = ['lga_code', 'lga_name', 'ward_code', 'ward_name', 'pu_code', 'pu_name', 'latitude', 'longitude', 'registered_voters'];
+    public const COLUMNS = ['lga_code', 'lga_name', 'ward_code', 'ward_name', 'pu_code', 'pu_name', 'latitude', 'longitude', 'registered_voters'];
+
+    private const REQUIRED = ['lga_code', 'lga_name', 'ward_code', 'ward_name', 'pu_code', 'pu_name'];
 
     /** @return array{lgas: int, wards: int, units: int, missing_gps: int} */
     public function import(Campaign $campaign, string $path): array
     {
-        $handle = fopen($path, 'r');
-        $header = array_map(fn ($h) => strtolower(trim($h)), fgetcsv($handle) ?: []);
-        if (array_diff(array_slice(self::COLUMNS, 0, 6), $header)) {
-            throw ValidationException::withMessages(['file' => 'CSV header must include: '.implode(', ', self::COLUMNS)]);
-        }
-
         $lgas = $wards = [];
         $units = $missingGps = 0;
-        DB::transaction(function () use ($campaign, $handle, $header, &$lgas, &$wards, &$units, &$missingGps) {
-            $line = 1;
-            while (($cells = fgetcsv($handle)) !== false) {
-                $line++;
-                if ($cells === [null]) {
-                    continue;
-                }
-                $row = array_combine($header, array_pad(array_map('trim', $cells), count($header), ''));
+        DB::transaction(function () use ($campaign, $path, &$lgas, &$wards, &$units, &$missingGps) {
+            foreach (Csv::rows($path, self::REQUIRED) as $line => $row) {
                 foreach (['lga_code', 'ward_code', 'pu_code', 'pu_name'] as $required) {
                     if (($row[$required] ?? '') === '') {
                         throw ValidationException::withMessages(['file' => "Line {$line}: {$required} is empty."]);
@@ -68,7 +58,6 @@ final class StructureImporter
                 $units++;
             }
         });
-        fclose($handle);
 
         return ['lgas' => count($lgas), 'wards' => count($wards), 'units' => $units, 'missing_gps' => $missingGps];
     }

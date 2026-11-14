@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\Announcement;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Services\AgentAppBuild;
 use App\Services\AuditLogger;
 use App\Services\ElectionWatch;
 use App\Services\StructureImporter;
+use App\Services\Voice\Kokoro;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
@@ -33,6 +35,9 @@ Artisan::command('pollproof:watch', function (ElectionWatch $watch) {
     foreach (Campaign::all() as $campaign) {
         $r = $watch->run($campaign);
         $this->line("{$campaign->name}: escalated {$r['escalated']}, units without check-in {$r['absent']}, waiting for verification {$r['backlog']}");
+        if ($r['race']) {
+            $this->line("  Announced: {$r['race']}");
+        }
     }
 })->purpose('Escalate unanswered alerts and check election-day deadlines');
 
@@ -67,6 +72,11 @@ Artisan::command('pollproof:fetch-agent-app', function (AgentAppBuild $build) {
 })->purpose('Copy the latest agent-app build from GitHub to this server');
 
 Schedule::command('pollproof:watch')->everyMinute()->withoutOverlapping();
+// Spoken announcements are only useful for minutes; keep a week of them, and three days of audio.
+Schedule::call(function () {
+    Announcement::where('created_at', '<', now()->subDays(7))->delete();
+    app(Kokoro::class)->prune(3);
+})->daily()->name('pollproof:voice-prune')->withoutOverlapping();
 // A new agent-app build reaches this server within the hour of GitHub publishing it.
 Schedule::command('pollproof:fetch-agent-app')->hourly()->withoutOverlapping();
 

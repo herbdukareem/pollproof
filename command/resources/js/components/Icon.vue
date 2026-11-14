@@ -37,6 +37,8 @@ const paths = {
     send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
     plus: 'M12 5v14M5 12h14',
     lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+    volume: 'M4 9h4l5-4v14l-5-4H4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+    'volume-off': 'M4 9h4l5-4v14l-5-4H4zM17 9.5l5 5M22 9.5l-5 5',
     bell: 'M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16l-2-2zM10 21h4',
     phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
     copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
