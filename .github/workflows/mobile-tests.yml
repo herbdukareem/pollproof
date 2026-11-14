@@ -56,8 +56,28 @@ jobs:
           # package:flutter/material.dart; move to material_ui before raising this.
           flutter-version: 3.47.9
           cache: true
+      # The app's own signing key, from the repository's secrets. Without it every build would be
+      # signed with the runner's throwaway debug key and could never update the installed app.
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "No signing key on pull requests: building with the debug key, not published."
+              exit 0
+            fi
+            echo "::error::The ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets are missing. See 'Signing the agent app' in deploy/hostinger/README.md."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/pollproof-agent.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/pollproof-agent.jks" >> "$GITHUB_ENV"
       # The build number goes up every run, so a new APK installs over the old one.
-      - run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://app.pollproof.online' }}
+      - env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=API_URL=${{ vars.POLLPROOF_API_URL || 'https://app.pollproof.online' }}
       - uses: actions/upload-artifact@v4
         with:
           name: pollproof-agent-apk

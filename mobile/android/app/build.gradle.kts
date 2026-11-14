@@ -29,11 +29,25 @@ android {
         versionName = flutter.versionName
     }
 
+    // Every published build must be signed with the same key, or Android refuses to install it
+    // over the previous one ("package conflicts with an existing package"). CI passes the key in
+    // ANDROID_KEYSTORE_PATH and friends (from the repository's secrets). Without them, a local
+    // release build falls back to the debug key: fine for testing, never for agents.
+    val keystore = System.getenv("ANDROID_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystore != null) "release" else "debug")
         }
     }
 }

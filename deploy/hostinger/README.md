@@ -134,6 +134,27 @@ The overview shows a map of the campaign's state beside the 25% tracker. It has 
 - **Another state:** add `command/resources/js/maps/<state>.js` with the same exports as `niger.js` (`name`, `credit`, `mount`, and optionally `locate` for wards), list it in `maps/index.js`, and set `POLLPROOF_STATE_MAP=<state>`. Only the chosen state's map is downloaded.
 - **Niger's map** is the `@saidabdul80/inistmap` package by Said Abdulsalam. Its licence allows educational and academic use only; other use needs his permission. Its ward boundaries are GRID3 / CIESIN data under CC BY-SA 4.0, and the attribution must stay on the map.
 
+## Signing the agent app
+
+Android only installs a new version of the agent app over the old one if both are signed with the
+same key. The builds on GitHub are signed with the app's own key, kept in four repository secrets
+(GitHub, Settings, Secrets and variables, Actions):
+
+| Secret | What it is |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The key file (`pollproof-agent.jks`), base64-encoded on one line |
+| `ANDROID_KEYSTORE_PASSWORD` | Its password |
+| `ANDROID_KEY_ALIAS` | `pollproof` |
+| `ANDROID_KEY_PASSWORD` | Same as the keystore password |
+
+Without them the build stops rather than publish an app that can't update the installed one.
+Keep a private copy of `pollproof-agent.jks` and its password: every future version must be
+signed with it. If it is lost, every agent has to uninstall the app before installing the next one.
+
+Builds before 14 November 2026 were signed with a throwaway key, so phones with one of those
+must uninstall it once (after sending anything still waiting in the outbox), then install the
+new version. Signing in again registers the phone's new signing key; nothing else is lost.
+
 ## Spoken announcements (Kokoro)
 
 The command room can read out new incidents, alerts, escalations and how the race stands. The
