@@ -53,9 +53,7 @@ class CheckInController extends Controller
         $distance = ($unit->latitude !== null && $unit->longitude !== null)
             ? Geo::distanceMeters($data['latitude'], $data['longitude'], $unit->latitude, $unit->longitude)
             : null;
-        $inside = $distance !== null
-            && $distance <= $campaign->geofence_radius_m
-            && $data['accuracy_m'] <= $campaign->max_gps_accuracy_m;
+        $inside = $distance !== null && Geo::insideArea($distance, $data['accuracy_m'], $campaign->geofence_radius_m, $campaign->max_gps_accuracy_m);
 
         if (! $inside && ! ($data['request_review'] ?? false)) {
             return response()->json([
@@ -65,7 +63,9 @@ class CheckInController extends Controller
                 'radius_m' => $campaign->geofence_radius_m,
                 'message' => $distance === null
                     ? 'This unit has no GPS point yet. Ask your supervisor to confirm your check-in.'
-                    : "You're {$distance} m from {$unit->code}. Move closer or ask your supervisor to confirm.",
+                    : ($distance <= $campaign->geofence_radius_m
+                        ? "Your GPS is only accurate to {$data['accuracy_m']} m, so it can't tell whether you're inside the unit area. Stand in the open and try again, or ask your supervisor to confirm."
+                        : "You're {$distance} m from {$unit->code}. Move closer or ask your supervisor to confirm."),
             ], 422);
         }
 

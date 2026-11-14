@@ -33,8 +33,22 @@ class _CheckInScreenState extends State<CheckInScreen> {
   int? get distance => fix == null || unitLat == null
       ? null
       : Geo.distance(fix!.latitude, fix!.longitude, unitLat!, unitLng!);
-  bool get weak => fix != null && fix!.accuracy > maxAccuracy;
-  bool get inside => distance != null && distance! <= radius && !weak;
+  int? distanceOf(Fix f) => unitLat == null
+      ? null
+      : Geo.distance(f.latitude, f.longitude, unitLat!, unitLng!);
+  bool insideWith(Fix f) {
+    final d = distanceOf(f);
+    return d != null && Geo.insideArea(d, f.accuracy, radius, maxAccuracy);
+  }
+
+  bool get inside => fix != null && insideWith(fix!);
+  // Close enough, but the GPS is too rough to be sure: better signal will settle it.
+  bool get weak =>
+      fix != null &&
+      !inside &&
+      fix!.accuracy > maxAccuracy &&
+      distance != null &&
+      distance! <= radius + fix!.accuracy;
 
   @override
   void initState() {
@@ -49,7 +63,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
       serverRefusal = null;
     });
     try {
-      final f = await Geo.current();
+      // Keep listening while the fix sharpens; stop once it clearly puts the agent inside,
+      // or the GPS is as good as it gets.
+      final f = await Geo.settle(
+        enough: (f) => insideWith(f) || f.accuracy <= 8,
+        onFix: (f) {
+          if (mounted) setState(() => fix = f);
+        },
+      );
       setState(() => fix = f);
     } catch (e) {
       setState(() => gpsError = e.toString());
@@ -129,7 +150,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
             ..._done()
           else ...[
             Text(
-              '${unit?['code']} · ${unit?['name']}',
+              '${unit?['code']}, ${titleCase('${unit?['name'] ?? ''}')}',
               style: const TextStyle(
                 color: C.ink2,
                 fontWeight: FontWeight.w600,
@@ -138,10 +159,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
             const SizedBox(height: 12),
             _locationCard(),
             const SizedBox(height: 14),
-            if (fix != null &&
+            if (!locating &&
+                fix != null &&
                 (unitLat == null || !inside || serverRefusal != null))
               ..._outside()
-            else if (fix != null) ...[
+            else if (!locating && fix != null) ...[
               SectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,16 +224,22 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   Widget _locationCard() {
     if (locating) {
-      return const SectionCard(
+      return SectionCard(
         child: Row(
           children: [
-            SizedBox(
+            const SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
-            SizedBox(width: 12),
-            Text('Finding your location…'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                fix == null
+                    ? 'Finding your location…'
+                    : 'Sharpening your location, accurate to ${fix!.accuracy.round()} m so far…',
+              ),
+            ),
           ],
         ),
       );
@@ -259,8 +287,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 ),
                 Text(
                   ok
-                      ? '$distance m from ${app.unit?['code']} · accuracy ${fix!.accuracy.round()} m'
-                      : 'GPS accuracy ${fix!.accuracy.round()} m',
+                      ? '$distance m from ${app.unit?['code']}, GPS accurate to ${fix!.accuracy.round()} m'
+                      : 'GPS accurate to ${fix!.accuracy.round()} m',
                   style: const TextStyle(fontSize: 13, color: C.ink2),
                 ),
               ],
@@ -283,7 +311,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       )
     else if (weak)
       InfoBox(
-        'Weak GPS · ${fix!.accuracy.round()} m accuracy. Step outside or away from tall walls, then try again.',
+        "Your GPS is only accurate to ${fix!.accuracy.round()} m, so it can't yet tell whether you're inside the unit area. Stand in the open, away from walls and roofs, and try again.",
         tone: 'warn',
       )
     else

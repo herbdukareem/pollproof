@@ -58,6 +58,29 @@ class CheckInTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    public function test_rough_gps_counts_when_its_whole_margin_is_inside_the_area(): void
+    {
+        $u = $this->units['PU1'];
+        $this->campaign->update(['geofence_radius_m' => 100, 'max_gps_accuracy_m' => 30]);
+        $this->actingAsUser($this->agentFor('PU1'));
+        // About 28 m north of the unit (0.00025 degrees of latitude).
+        $near = fn (int $accuracy) => ['latitude' => $u->latitude + 0.00025, 'longitude' => $u->longitude, 'accuracy_m' => $accuracy, 'captured_at' => '2027-02-06T08:02:00Z'];
+
+        // 28 m away, accurate to 48 m: somewhere within 76 m of the unit, so inside 100 m.
+        $this->postJson('/api/v1/check-ins', $near(48))->assertCreated()->assertJsonPath('status', 'verified');
+    }
+
+    public function test_rough_gps_near_the_edge_still_asks_for_a_better_fix(): void
+    {
+        $u = $this->units['PU1'];
+        $this->campaign->update(['geofence_radius_m' => 100, 'max_gps_accuracy_m' => 30]);
+        $this->actingAsUser($this->agentFor('PU1'));
+        // About 78 m away, accurate to 48 m: could be 126 m away.
+        $this->postJson('/api/v1/check-ins', ['latitude' => $u->latitude + 0.0007, 'longitude' => $u->longitude, 'accuracy_m' => 48, 'captured_at' => '2027-02-06T08:02:00Z'])
+            ->assertUnprocessable()->assertJsonPath('status', 'outside_area')
+            ->assertJsonPath('message', "Your GPS is only accurate to 48 m, so it can't tell whether you're inside the unit area. Stand in the open and try again, or ask your supervisor to confirm.");
+    }
+
     public function test_agents_check_in_once_a_day_and_afresh_the_next_day(): void
     {
         $this->actingAsUser($this->agentFor('PU1'));

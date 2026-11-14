@@ -171,3 +171,13 @@ void toast(BuildContext context, String text) => ScaffoldMessenger.of(context)
     .showSnackBar(
       SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
     );
+
+/// INEC lists many places in capitals ("AKWANO"); show them as names ("Akwano").
+String titleCase(String s) {
+  if (s.toUpperCase() != s || !RegExp(r'[A-Z]{4,}').hasMatch(s)) return s;
+  return s
+      .toLowerCase()
+      .split(' ')
+      .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+}
