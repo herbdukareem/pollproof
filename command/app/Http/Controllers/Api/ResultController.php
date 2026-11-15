@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\ResultFlag;
 use App\Models\ResultSubmission;
 use App\Services\AuditLogger;
+use App\Services\Races;
 use App\Services\ResultRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,13 +18,18 @@ class ResultController extends Controller
 {
     public function __construct(private readonly ResultRecorder $recorder, private readonly AuditLogger $audit) {}
 
-    /** An agent submits the signed EC8A result for their unit. */
+    /**
+     * An agent submits the signed EC8A result for one race at their unit. The app names the
+     * race by its code and signs it; apps from before races existed send none, and their result
+     * goes to the unit's first race.
+     */
     public function store(Request $request): JsonResponse
     {
-        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         $unit = $user->pollingUnit;
         abort_unless($unit, 422, 'You are not assigned to a polling unit.');
+        $race = Races::forAgent($user, $unit, $request->input('election'));
+        $race->abortIfDeclared();
 
         $data = $request->validate([
             'device_id' => ['required', 'integer'],
@@ -39,6 +45,7 @@ class ResultController extends Controller
             'photo' => ['nullable', 'image', 'max:10240'],
             'supersedes_id' => ['nullable', 'integer'],
             'correction_reason' => ['required_with:supersedes_id', 'nullable', 'string', 'max:255'],
+            'election' => ['nullable', 'string', 'max:12'],
         ]);
 
         $device = Device::where('id', $data['device_id'])->where('user_id', $user->id)->first();
@@ -54,6 +61,7 @@ class ResultController extends Controller
         $result = $this->recorder->record(
             agent: $user,
             unit: $unit,
+            election: $race,
             votes: array_change_key_case($data['votes'], CASE_UPPER),
             accredited: (int) $data['accredited'],
             rejected: (int) $data['rejected'],
@@ -66,6 +74,7 @@ class ResultController extends Controller
             signature: $data['signature'],
             supersedesId: $data['supersedes_id'] ?? null,
             correctionReason: $data['correction_reason'] ?? null,
+            raceSigned: filled($data['election'] ?? null),
         );
         if ($result->wasRecentlyCreated) {
             $this->audit->log($user, $result->supersedes_id ? 'result.corrected' : 'result.submitted', $result, ['payload_hash' => $result->payload_hash], $request->ip());
@@ -77,9 +86,9 @@ class ResultController extends Controller
     /** Upload the EC8A photo later, e.g. after the figures went by SMS. The photo must match the signed fingerprint. */
     public function attachPhoto(Request $request, ResultSubmission $result): JsonResponse
     {
-        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
         abort_unless($result->user_id === $user->id, 404);
+        $result->election->abortIfDeclared();
         $request->validate(['photo' => ['required', 'image', 'max:10240']]);
         $actual = hash_file('sha256', $request->file('photo')->getRealPath());
         if ($result->photo_sha256) {
@@ -112,7 +121,9 @@ class ResultController extends Controller
             'kind' => ['nullable', 'in:flagged,corrections,review_flagged'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ]);
+        $race = Races::fromRequest($request, allowAll: true);
         $base = fn () => ResultSubmission::where('campaign_id', $request->user()->campaign_id)
+            ->when($race, fn ($q) => $q->where('election_id', $race->id))
             ->where('is_current', true)
             ->where('status', ResultSubmission::PENDING_REVIEW)
             ->when($data['lga_id'] ?? null, fn ($q, $l) => $q->whereHas('pollingUnit.ward', fn ($w) => $w->where('lga_id', $l)))
@@ -122,7 +133,7 @@ class ResultController extends Controller
             ->when(($data['kind'] ?? null) === 'flagged', fn ($q) => $q->whereJsonContains('flags', 'overvote'))
             ->when(($data['kind'] ?? null) === 'corrections', fn ($q) => $q->whereNotNull('supersedes_id'))
             ->when(($data['kind'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('reviewFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
-            ->with(['pollingUnit.ward.lga', 'votes.party', 'user:id,name,code'])
+            ->with(['pollingUnit.ward.lga', 'votes.party', 'user:id,name,code', 'election:id,name,code,type'])
             ->withCount(['reviewFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
             ->orderByRaw("CASE WHEN JSON_CONTAINS(flags, '\"overvote\"') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
@@ -146,14 +157,16 @@ class ResultController extends Controller
 
     public function approve(Request $request, ResultSubmission $result): JsonResponse
     {
-        $request->user()->campaign->abortIfDeclared();
+        abort_unless($result->campaign_id === $request->user()->campaign_id, 404);
+        $result->election->abortIfDeclared();
 
         return $this->review($request, $result, ResultSubmission::APPROVED);
     }
 
     public function sendBack(Request $request, ResultSubmission $result): JsonResponse
     {
-        $request->user()->campaign->abortIfDeclared();
+        abort_unless($result->campaign_id === $request->user()->campaign_id, 404);
+        $result->election->abortIfDeclared();
 
         return $this->review($request, $result, ResultSubmission::SENT_BACK);
     }
@@ -172,10 +185,11 @@ class ResultController extends Controller
 
     private function present(ResultSubmission $r): array
     {
-        $r->loadMissing(['votes.party', 'pollingUnit.ward.lga']);
+        $r->loadMissing(['votes.party', 'pollingUnit.ward.lga', 'election:id,name,code,type']);
 
         return [
             'id' => $r->id,
+            'election' => ['id' => $r->election->id, 'name' => $r->election->name, 'code' => $r->election->code],
             'polling_unit' => ['id' => $r->pollingUnit->id, 'code' => $r->pollingUnit->code, 'name' => $r->pollingUnit->name, 'ward' => $r->pollingUnit->ward->name, 'lga' => $r->pollingUnit->ward->lga->name],
             'agent' => $r->relationLoaded('user') ? $r->user?->only(['id', 'name', 'code']) : null,
             'channel' => $r->channel,

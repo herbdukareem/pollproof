@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CheckInController;
 use App\Http\Controllers\Api\CloseoutController;
 use App\Http\Controllers\Api\CollationEntryController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\ElectionController;
 use App\Http\Controllers\Api\IdTagController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\IrevEntryController;
@@ -113,6 +114,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
             Route::get('tally', TallyController::class);
             Route::get('tally/points', [TallyController::class, 'points']);
+            Route::get('tally/board', [TallyController::class, 'board']);
+            Route::get('elections', [ElectionController::class, 'index']);
             Route::get('nav-counts', NavCountsController::class);
             // Spoken announcements (POLLPROOF_VOICE_ENABLED). The audio link is signed by the feed.
             Route::get('voice/feed', [VoiceController::class, 'feed']);
@@ -211,6 +214,9 @@ Route::prefix('v1')->group(function () {
 
         // Admin (DG)
         Route::middleware('role:dg')->group(function () {
+            Route::post('elections', [ElectionController::class, 'store']);
+            Route::patch('elections/{election}', [ElectionController::class, 'update']);
+            Route::delete('elections/{election}', [ElectionController::class, 'destroy']);
             Route::get('campaign', [CampaignController::class, 'show']);
             Route::patch('campaign', [CampaignController::class, 'update']);
             Route::post('parties', [CampaignController::class, 'storeParty']);

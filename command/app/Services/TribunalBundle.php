@@ -40,13 +40,13 @@ final class TribunalBundle
         $units = PollingUnit::where('campaign_id', $case->campaign_id)->whereIn('id', $unitIds)->orderBy('code')->get();
         foreach ($units as $unit) {
             $dir = 'units/'.Str::slug($unit->code);
-            $add("{$dir}/evidence.json", json_encode($this->evidence->build($unit), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            foreach (ResultSubmission::where('polling_unit_id', $unit->id)->whereNotNull('photo_path')->orderBy('id')->get() as $r) {
+            $add("{$dir}/evidence.json", json_encode($this->evidence->build($unit, $case->election), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            foreach (ResultSubmission::where('polling_unit_id', $unit->id)->when($case->election_id, fn ($q, $e) => $q->where('election_id', $e))->whereNotNull('photo_path')->orderBy('id')->get() as $r) {
                 if ($disk->exists($r->photo_path)) {
                     $add("{$dir}/ec8a-result-{$r->id}.".pathinfo($r->photo_path, PATHINFO_EXTENSION), $disk->get($r->photo_path));
                 }
             }
-            foreach (IrevEntry::where('polling_unit_id', $unit->id)->whereNotNull('screenshot_path')->orderBy('id')->get() as $e) {
+            foreach (IrevEntry::where('polling_unit_id', $unit->id)->when($case->election_id, fn ($q, $e) => $q->where('election_id', $e))->whereNotNull('screenshot_path')->orderBy('id')->get() as $e) {
                 if ($disk->exists($e->screenshot_path)) {
                     $add("{$dir}/irev-{$e->id}.".pathinfo($e->screenshot_path, PATHINFO_EXTENSION), $disk->get($e->screenshot_path));
                 }

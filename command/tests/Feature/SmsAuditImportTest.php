@@ -26,9 +26,12 @@ class SmsAuditImportTest extends TestCase
     public function test_sms_format_is_parsed(): void
     {
         $this->assertSame(
-            ['unit' => '004', 'accredited' => 448, 'rejected' => 6, 'votes' => ['A' => 214, 'B' => 187, 'C' => 22, 'D' => 9]],
+            ['race' => null, 'unit' => '004', 'accredited' => 448, 'rejected' => 6, 'votes' => ['A' => 214, 'B' => 187, 'C' => 22, 'D' => 9]],
             SmsResultParser::parse('r 004 AC448 A214 B187 C22 D9 X6'),
         );
+        // A race code in front is read as the race when it is one of the campaign's.
+        $this->assertSame('HOA-1', SmsResultParser::parse('R HOA-1 PU1 AC10 A5 X0', ['GOV', 'HOA-1'])['race']);
+        $this->assertSame('PU1', SmsResultParser::parse('R HOA-1 PU1 AC10 A5 X0', ['GOV', 'HOA-1'])['unit']);
         $this->assertNull(SmsResultParser::parse('hello'));
         $this->assertNull(SmsResultParser::parse('R 004 A214'));
     }

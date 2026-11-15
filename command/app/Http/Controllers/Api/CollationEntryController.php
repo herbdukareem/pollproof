@@ -8,6 +8,7 @@ use App\Models\CollationEntry;
 use App\Models\Lga;
 use App\Models\Ward;
 use App\Services\AuditLogger;
+use App\Services\Races;
 use App\Services\Reconciler;
 use App\Support\ListSort;
 use Illuminate\Http\JsonResponse;
@@ -17,11 +18,15 @@ class CollationEntryController extends Controller
 {
     public function __construct(private readonly Reconciler $reconciler, private readonly AuditLogger $audit) {}
 
-    /** Record declared EC8B/EC8C/EC8D figures and compare them with our units straight away. */
+    /**
+     * Record a race's declared ward, LGA or final collation figures and compare them with our
+     * units straight away. ?election= names the race (apps from before races: the primary race).
+     */
     public function store(Request $request): JsonResponse
     {
-        $request->user()->campaign->abortIfDeclared();
         $user = $request->user();
+        $race = Races::fromRequest($request);
+        $race->abortIfDeclared();
         $data = $request->validate([
             'level' => ['required', 'in:ward,lga,state'],
             'scope_id' => ['required_unless:level,state', 'nullable', 'integer'],
@@ -37,21 +42,24 @@ class CollationEntryController extends Controller
         if ($data['level'] === 'ward') {
             $ward = Ward::where('campaign_id', $user->campaign_id)->findOrFail($scopeId);
             abort_if($user->hasRole(Role::CollationAgent) && $user->ward_id !== $ward->id, 403, 'This is not your collation centre.');
+            abort_unless($race->units()->where('polling_units.ward_id', $ward->id)->exists(), 422, "{$ward->name} ward is not in the {$race->name} race.");
         } elseif ($data['level'] === 'lga') {
-            Lga::where('campaign_id', $user->campaign_id)->findOrFail($scopeId);
+            $lga = Lga::where('campaign_id', $user->campaign_id)->findOrFail($scopeId);
             abort_if($user->hasRole(Role::CollationAgent) && $user->lga_id !== $scopeId, 403, 'This is not your collation centre.');
+            abort_unless(in_array($lga->id, $race->lgaIds(), true), 422, "{$lga->name} is not in the {$race->name} race.");
         } else {
-            abort_if($user->hasRole(Role::CollationAgent), 403, 'State figures are entered by the command room.');
+            abort_if($user->hasRole(Role::CollationAgent), 403, 'Final figures are entered by the command room.');
         }
 
-        $known = $user->campaign->parties()->pluck('code')->all();
+        $known = $race->parties()->pluck('code')->all();
         $votes = array_change_key_case($data['votes'], CASE_UPPER);
         $unknown = array_diff(array_keys($votes), $known);
-        abort_if($unknown, 422, 'Unknown party code: '.implode(', ', $unknown));
+        abort_if($unknown, 422, "Not on the {$race->name} ballot: ".implode(', ', $unknown));
 
         $rejected = (int) ($data['rejected'] ?? 0);
         $entry = CollationEntry::create([
             'campaign_id' => $user->campaign_id,
+            'election_id' => $race->id,
             'level' => $data['level'],
             'scope_id' => $scopeId,
             'entered_by' => $user->id,
@@ -82,7 +90,8 @@ class CollationEntryController extends Controller
             'status' => [fn ($r) => $rank($r['comparison']), 'asc'],
         ];
         $data = $request->validate(['level' => ['nullable', 'in:ward,lga,state']] + ListSort::rules($sorts));
-        $entries = CollationEntry::where('campaign_id', $campaignId)
+        $race = Races::fromRequest($request);
+        $entries = CollationEntry::where('campaign_id', $campaignId)->where('election_id', $race->id)
             ->when($data['level'] ?? null, fn ($q, $l) => $q->where('level', $l))
             ->latest('announced_at')
             ->get();

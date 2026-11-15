@@ -23,13 +23,15 @@ class AfterElectionSeeder extends Seeder
         $legal = User::where('campaign_id', $campaign->id)->where('role', Role::Legal)->firstOrFail();
         $data = User::where('campaign_id', $campaign->id)->where('role', Role::DataOfficer)->firstOrFail();
 
-        $votes = collect($tally->summary($campaign)['candidates'])->pluck('votes', 'party')->all();
+        $race = $campaign->primaryElection();
+        $votes = collect($tally->summary($race)['candidates'])->pluck('votes', 'party')->all();
         $votes['B'] += 40;
-        $campaign->update(['declared_at' => $campaign->election_date->copy()->addDay()->setTime(15, 10), 'declared_votes' => $votes]);
-        $audit->log($dg, 'closeout.declared', $campaign, ['votes' => $votes]);
+        $race->update(['declared_at' => $race->election_date->copy()->addDay()->setTime(15, 10), 'declared_votes' => $votes]);
+        $audit->log($dg, 'closeout.declared', $race, ['race' => $race->name, 'votes' => $votes]);
 
         $unit = fn ($code) => PollingUnit::where('campaign_id', $campaign->id)->where('code', $code)->value('id');
         $case = $campaign->tribunalCases()->create([
+            'election_id' => $race->id,
             'title' => 'Party B v INEC and others',
             'petitioner' => 'Party B',
             'milestones' => [

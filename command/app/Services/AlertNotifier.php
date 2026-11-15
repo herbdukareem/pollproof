@@ -113,16 +113,23 @@ final class AlertNotifier
     }
 
     /** The command-room screen where this alert is dealt with. */
+    /** Where the alert is dealt with, opened on its race when it has one. */
     public function link(Alert $alert): string
     {
-        return $this->url($alert);
+        $url = $this->url($alert);
+
+        return $alert->election_id ? $url.(str_contains($url, '?') ? '&' : '?')."race={$alert->election_id}" : $url;
     }
 
     private function url(Alert $alert): string
     {
         return match ($alert->type) {
             'collation_mismatch' => '/collation',
-            'overvote' => $alert->subject instanceof PollingUnit ? "/units/{$alert->subject_id}/evidence" : '/collation',
+            'overvote' => match (true) {
+                $alert->subject instanceof PollingUnit => "/units/{$alert->subject_id}/evidence",
+                $alert->subject instanceof ResultSubmission => "/units/{$alert->subject->polling_unit_id}/evidence",
+                default => '/collation',
+            },
             'incident' => '/incidents',
             'agent_absent', 'agent_unavailable', 'checkin_review' => '/agents',
             'irev_mismatch', 'irev_missing' => '/irev',

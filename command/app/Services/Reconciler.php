@@ -3,25 +3,29 @@
 namespace App\Services;
 
 use App\Models\CollationEntry;
+use App\Models\Election;
 use App\Models\IrevEntry;
 use App\Models\Lga;
-use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
 use App\Models\Ward;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Compares official figures (collation sheets, IReV) against the campaign's own
- * signed unit results and raises an alert for every difference.
+ * signed unit results for the same race, and raises an alert for every difference.
  */
 final class Reconciler
 {
     public function __construct(private readonly AlertService $alerts) {}
 
-    /** @return list<int> */
-    public function unitIdsInScope(int $campaignId, string $level, ?int $scopeId): array
+    /**
+     * The race's units covered by a collation sheet: a ward, an LGA, or the whole race.
+     *
+     * @return list<int>
+     */
+    public function unitIdsInScope(Election $election, string $level, ?int $scopeId): array
     {
-        $q = PollingUnit::where('polling_units.campaign_id', $campaignId);
+        $q = $election->units();
         if ($level === CollationEntry::WARD) {
             $q->where('ward_id', $scopeId);
         } elseif ($level === CollationEntry::LGA) {
@@ -37,9 +41,9 @@ final class Reconciler
      * @param  list<int>  $unitIds
      * @return array{votes: array<string,int>, rejected: int, accredited: int, total_cast: int, units_reported: int}
      */
-    public function ourFigures(int $campaignId, array $unitIds): array
+    public function ourFigures(Election $election, array $unitIds): array
     {
-        $base = ResultSubmission::where('result_submissions.campaign_id', $campaignId)
+        $base = ResultSubmission::where('result_submissions.election_id', $election->id)
             ->whereIn('result_submissions.polling_unit_id', $unitIds)
             ->where('is_current', true)
             ->where('status', '!=', ResultSubmission::SENT_BACK);
@@ -73,7 +77,8 @@ final class Reconciler
         $complete = $comparison['coverage_complete'];
         $unitCount = $comparison['units_in_scope'];
 
-        $key = "collation:{$entry->level}:".($entry->scope_id ?? 'state');
+        $election = $entry->election;
+        $key = "collation:{$entry->election_id}:{$entry->level}:".($entry->scope_id ?? 'state');
         if ($diffs) {
             $parts = collect($diffs)->map(fn ($d, $c) => sprintf('%s %+d', $c, $d))->implode(', ');
             $this->alerts->raise($entry->campaign_id, 'collation_mismatch', $complete ? 'high' : 'medium', $key,
@@ -81,17 +86,17 @@ final class Reconciler
                 $complete
                     ? "Declared minus our signed results: {$parts}."
                     : "Declared minus our results so far: {$parts}. Only {$comparison['units_reported']} of {$unitCount} units have reported, so some difference may be expected.",
-                $entry, $comparison);
+                $entry, $comparison, $election);
         } else {
             $this->alerts->clear($entry->campaign_id, $key);
         }
 
-        $overKey = "overvote:{$entry->level}:".($entry->scope_id ?? 'state');
+        $overKey = "overvote:{$entry->election_id}:{$entry->level}:".($entry->scope_id ?? 'state');
         if ($complete && $entry->total_cast > $comparison['our_accredited']) {
             $this->alerts->raise($entry->campaign_id, 'overvote', 'high', $overKey,
                 "{$label}: declared votes exceed accreditation",
                 "The sheet declares {$entry->total_cast} votes cast; our units recorded {$comparison['our_accredited']} accredited voters.",
-                $entry, $comparison);
+                $entry, $comparison, $election);
         } else {
             $this->alerts->clear($entry->campaign_id, $overKey);
         }
@@ -102,8 +107,8 @@ final class Reconciler
     /** Pure comparison with no side effects. @return array<string,mixed> */
     public function compareCollation(CollationEntry $entry): array
     {
-        $unitIds = $this->unitIdsInScope($entry->campaign_id, $entry->level, $entry->scope_id);
-        $ours = $this->ourFigures($entry->campaign_id, $unitIds);
+        $unitIds = $this->unitIdsInScope($entry->election, $entry->level, $entry->scope_id);
+        $ours = $this->ourFigures($entry->election, $unitIds);
         $complete = $ours['units_reported'] === count($unitIds);
 
         $diffs = [];
@@ -138,7 +143,7 @@ final class Reconciler
         if ($entry->not_on_irev) {
             return ['status' => 'not_on_irev'];
         }
-        $ours = $entry->pollingUnit->currentResult;
+        $ours = $entry->pollingUnit->currentResultFor($entry->election_id);
         if (! $ours) {
             return ['status' => 'no_agent_result', 'irev' => $entry->votes];
         }
@@ -162,8 +167,8 @@ final class Reconciler
     public function checkIrev(IrevEntry $entry): array
     {
         $unit = $entry->pollingUnit;
-        $missingKey = "irev_missing:unit:{$unit->id}";
-        $mismatchKey = "irev_mismatch:unit:{$unit->id}";
+        $missingKey = "irev_missing:unit:{$unit->id}:race:{$entry->election_id}";
+        $mismatchKey = "irev_mismatch:unit:{$unit->id}:race:{$entry->election_id}";
         $comparison = $this->compareIrev($entry);
 
         if ($comparison['status'] === 'not_on_irev') {
@@ -171,7 +176,7 @@ final class Reconciler
             $this->alerts->raise($entry->campaign_id, 'irev_missing', 'medium', $missingKey,
                 "{$unit->code}: result not on IReV",
                 'Checked at '.$entry->seen_at->format('g:i a').' and the result was not uploaded.',
-                $entry, ['seen_at' => $entry->seen_at->toIso8601String()]);
+                $entry, ['seen_at' => $entry->seen_at->toIso8601String()], $entry->election);
 
             return $comparison;
         }
@@ -181,7 +186,7 @@ final class Reconciler
             $parts = collect($comparison['differences'])->map(fn ($d, $c) => sprintf('%s %+d', $c, $d))->implode(', ');
             $this->alerts->raise($entry->campaign_id, 'irev_mismatch', 'high', $mismatchKey,
                 "{$unit->code}: IReV differs from our signed result",
-                "IReV minus our result: {$parts}.", $entry, $comparison);
+                "IReV minus our result: {$parts}.", $entry, $comparison, $entry->election);
         } else {
             $this->alerts->clear($entry->campaign_id, $mismatchKey);
         }
@@ -199,21 +204,21 @@ final class Reconciler
             [CollationEntry::STATE, null],
         ];
         foreach ($scopes as [$level, $scopeId]) {
-            $entry = $this->latestCollation($unit->campaign_id, $level, $scopeId);
+            $entry = $this->latestCollation($result->election, $level, $scopeId);
             if ($entry) {
                 $this->checkCollation($entry);
             }
         }
 
-        $irev = IrevEntry::where('polling_unit_id', $unit->id)->latest('seen_at')->latest('id')->first();
+        $irev = IrevEntry::where('polling_unit_id', $unit->id)->where('election_id', $result->election_id)->latest('seen_at')->latest('id')->first();
         if ($irev) {
             $this->checkIrev($irev);
         }
     }
 
-    public function latestCollation(int $campaignId, string $level, ?int $scopeId): ?CollationEntry
+    public function latestCollation(Election $election, string $level, ?int $scopeId): ?CollationEntry
     {
-        return CollationEntry::where('campaign_id', $campaignId)
+        return CollationEntry::where('election_id', $election->id)
             ->where('level', $level)
             ->when($scopeId === null, fn ($q) => $q->whereNull('scope_id'), fn ($q) => $q->where('scope_id', $scopeId))
             ->orderByDesc('announced_at')->orderByDesc('id')
@@ -229,7 +234,7 @@ final class Reconciler
                 return "{$ward->name} ({$ward->lga->name})";
             })(),
             CollationEntry::LGA => Lga::find($entry->scope_id)->name,
-            default => 'State',
+            default => $entry->election->isStatewide() ? 'State' : $entry->election->name,
         };
     }
 }

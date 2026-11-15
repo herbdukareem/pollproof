@@ -28,7 +28,7 @@ class ResultFlagTest extends TestCase
         $agent = $this->agentFor($unit);
 
         return ResultSubmission::create([
-            'campaign_id' => $this->campaign->id, 'polling_unit_id' => $agent->polling_unit_id, 'user_id' => $agent->id,
+            'campaign_id' => $this->campaign->id, 'election_id' => $this->race()->id, 'polling_unit_id' => $agent->polling_unit_id, 'user_id' => $agent->id,
             'accredited' => 300, 'rejected' => 2, 'total_valid' => 250, 'total_cast' => 252, 'captured_at' => now(), 'payload_hash' => str_repeat('a', 64),
         ]);
     }

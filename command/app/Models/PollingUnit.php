@@ -41,9 +41,17 @@ class PollingUnit extends Model
         return $this->hasMany(IrevEntry::class);
     }
 
-    public function currentResult(): HasOne
+    /** The current result for each race the unit is in. */
+    public function currentResults(): HasMany
     {
-        return $this->hasOne(ResultSubmission::class)->where('is_current', true);
+        return $this->hasMany(ResultSubmission::class)->where('is_current', true);
+    }
+
+    public function currentResultFor(int $electionId): ?ResultSubmission
+    {
+        return $this->relationLoaded('currentResults')
+            ? $this->currentResults->firstWhere('election_id', $electionId)
+            : $this->currentResults()->where('election_id', $electionId)->first();
     }
 
     public function agent(): HasOne

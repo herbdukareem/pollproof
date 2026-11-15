@@ -6,16 +6,19 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\CheckIn;
+use App\Models\Election;
 use App\Models\Incident;
 use App\Models\ResultSubmission;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
+use App\Services\Races;
 use App\Services\SignInMonitor;
 use App\Services\TwoFactor;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -118,7 +121,15 @@ class AuthController extends Controller
             ] : null,
             'ward' => $user->ward?->only(['id', 'code', 'name']),
             'lga' => ($user->lga ?? $user->ward?->lga)?->only(['id', 'code', 'name']),
-            'parties' => $user->campaign?->parties()->get(['code', 'name', 'is_ours']),
+            // The ballot of the first race, for apps from before races existed.
+            'parties' => ($primary = $this->racesFor($user)->first() ?? $user->campaign?->primaryElection())
+                ? $primary->parties()->get(['code', 'name', 'is_ours'])->map->only(['code', 'name', 'is_ours'])
+                : [],
+            'races' => $user->role->isField() ? $this->racesFor($user)->map(fn (Election $e) => [
+                'id' => $e->id, 'code' => $e->code, 'name' => $e->name, 'type' => $e->type, 'type_label' => $e->label(),
+                'election_date' => $e->election_date->toDateString(), 'declared' => $e->isDeclared(), 'final_level' => $e->finalLevel(),
+                'parties' => $e->parties->map(fn ($p) => ['code' => $p->code, 'name' => $p->name, 'is_ours' => $p->is_ours, 'candidate' => $p->pivot->candidate])->values(),
+            ])->values() : null,
             'rules' => ($c = Campaign::find($user->campaign_id)) ? [
                 'geofence_radius_m' => $c->geofence_radius_m,
                 'max_gps_accuracy_m' => $c->max_gps_accuracy_m,
@@ -126,12 +137,35 @@ class AuthController extends Controller
                 'sms_number' => config('pollproof.sms_number'),
                 'ussd_code' => config('pollproof.ussd.code'),
                 'declared' => $c->isDeclared(),
+                'races' => $c->elections()->count(),
                 'state_map' => config('pollproof.state_map') ?: null,
                 'voice' => (bool) config('pollproof.voice.enabled'),
             ] : null,
             'supervisor' => $this->supervisorFor($user),
             'today' => $user->role === Role::Agent ? $this->agentToday($user) : null,
         ]);
+    }
+
+    /**
+     * The races a field user works on today: an agent's are those covering their unit; a
+     * collation agent's or supervisor's those touching their ward or LGA.
+     *
+     * @return Collection<int, Election>
+     */
+    private function racesFor(User $user): Collection
+    {
+        if ($user->pollingUnit) {
+            return Races::atUnit($user->pollingUnit);
+        }
+        $campaign = $user->campaign;
+        if (! $campaign || (! $user->ward_id && ! $user->lga_id)) {
+            return collect();
+        }
+        $lgaId = $user->lga_id ?? $user->ward?->lga_id;
+
+        return $campaign->electionsOn($campaign->currentElectionDate())->load('areas', 'parties')
+            ->filter(fn (Election $e) => $e->isStatewide() || in_array($lgaId, $e->lgaIds(), true))
+            ->values();
     }
 
     /** Who this field user calls first: the ward supervisor, or for a ward supervisor their LGA supervisor. */
@@ -155,14 +189,21 @@ class AuthController extends Controller
     {
         // Today's check-in only: agents check in afresh each working day.
         $checkIn = $user->checkIns()->where('status', '!=', CheckIn::REPLACED)->today()->latest('id')->first();
-        $result = ResultSubmission::where('user_id', $user->id)->where('polling_unit_id', $user->polling_unit_id)->where('is_current', true)->first();
+        $results = ResultSubmission::where('user_id', $user->id)->where('polling_unit_id', $user->polling_unit_id)->where('is_current', true)
+            ->with('election:id,code')->orderBy('id')->get();
+        $present = fn (ResultSubmission $result) => [
+            'id' => $result->id, 'status' => $result->status, 'fingerprint' => $result->fingerprint(), 'total_cast' => $result->total_cast,
+            'has_photo' => $result->photo_path !== null, 'review_note' => $result->review_note, 'captured_at' => $result->captured_at, 'channel' => $result->channel,
+            'election' => $result->election?->code,
+        ];
+        $first = $this->racesFor($user)->first();
+        $result = $results->firstWhere('election_id', $first?->id) ?? $results->first();
 
         return [
             'check_in' => $checkIn ? ['id' => $checkIn->id, 'status' => $checkIn->status, 'counts' => $checkIn->counts(), 'distance_m' => $checkIn->distance_m, 'at' => $checkIn->captured_at] : null,
-            'result' => $result ? [
-                'id' => $result->id, 'status' => $result->status, 'fingerprint' => $result->fingerprint(), 'total_cast' => $result->total_cast,
-                'has_photo' => $result->photo_path !== null, 'review_note' => $result->review_note, 'captured_at' => $result->captured_at, 'channel' => $result->channel,
-            ] : null,
+            // The first race's result, for apps from before races existed; every race's in results.
+            'result' => $result ? $present($result) : null,
+            'results' => $results->map($present)->values(),
             'incidents' => $user->hasMany(Incident::class)->count(),
         ];
     }

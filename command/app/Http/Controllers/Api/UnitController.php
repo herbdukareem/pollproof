@@ -12,17 +12,24 @@ use App\Models\ResultSubmission;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EvidenceBuilder;
+use App\Services\Races;
 use App\Services\Reconciler;
+use App\Services\TallyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class UnitController extends Controller
 {
-    /** Units with their reporting status, most urgent first. */
+    /** The race's units with their reporting status for the race, most urgent first. */
     public function index(Request $request, Reconciler $reconciler): JsonResponse
     {
         $user = $request->user();
+        $race = Races::fromRequest($request);
+        $rid = $race->id;
+        // This race's current result, and review flags on it.
+        $result = fn ($extra = null) => fn ($r) => $r->where('election_id', $rid)->when($extra, $extra);
+        $openFlag = fn ($f) => $f->where('status', ResultFlag::OPEN)->whereHas('result', fn ($r) => $r->where('election_id', $rid));
         $data = $request->validate([
             'lga_id' => ['nullable', 'integer'],
             'ward_id' => ['nullable', 'integer'],
@@ -40,36 +47,36 @@ class UnitController extends Controller
         $dir = $data['dir'] ?? (in_array($sort, ['result', 'flags'], true) ? 'desc' : 'asc');
 
         // Counts for the status chips, within the chosen LGA or ward but across every status.
-        $scope = fn () => PollingUnit::where('polling_units.campaign_id', $user->campaign_id)
+        $scope = fn () => $race->units()
             ->when($data['ward_id'] ?? null, fn ($q, $w) => $q->where('ward_id', $w))
             ->when($data['lga_id'] ?? null, fn ($q, $l) => $q->whereHas('ward', fn ($w) => $w->where('lga_id', $l)));
         $counts = [
             'all' => $scope()->count(),
-            'reported' => $scope()->whereHas('currentResult')->count(),
-            'awaiting' => $scope()->whereDoesntHave('currentResult')->count(),
+            'reported' => $scope()->whereHas('currentResults', $result())->count(),
+            'awaiting' => $scope()->whereDoesntHave('currentResults', $result())->count(),
             'no_agent' => $scope()->whereDoesntHave('agent')->count(),
-            'flagged' => $scope()->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote'))->count(),
-            'review_flagged' => $scope()->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN))->count(),
+            'flagged' => $scope()->whereHas('currentResults', $result(fn ($r) => $r->whereJsonContains('flags', 'overvote')))->count(),
+            'review_flagged' => $scope()->whereHas('resultFlags', $openFlag)->count(),
         ];
 
-        $units = PollingUnit::where('polling_units.campaign_id', $user->campaign_id)
-            ->with(['ward.lga', 'currentResult.votes.party', 'agent:id,name,code,polling_unit_id'])
+        $units = $race->units()
+            ->with(['ward.lga', 'currentResults' => $result(), 'currentResults.votes.party', 'agent:id,name,code,polling_unit_id'])
             ->when($data['ward_id'] ?? null, fn ($q, $w) => $q->where('ward_id', $w))
             ->when($data['lga_id'] ?? null, fn ($q, $l) => $q->whereHas('ward', fn ($w) => $w->where('lga_id', $l)))
             ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%")))
-            ->when(($data['status'] ?? null) === 'reported', fn ($q) => $q->whereHas('currentResult'))
-            ->when(($data['status'] ?? null) === 'awaiting', fn ($q) => $q->whereDoesntHave('currentResult'))
+            ->when(($data['status'] ?? null) === 'reported', fn ($q) => $q->whereHas('currentResults', $result()))
+            ->when(($data['status'] ?? null) === 'awaiting', fn ($q) => $q->whereDoesntHave('currentResults', $result()))
             ->when(($data['status'] ?? null) === 'no_agent', fn ($q) => $q->whereDoesntHave('agent'))
-            ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResult', fn ($r) => $r->whereJsonContains('flags', 'overvote')))
-            ->when(($data['status'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('resultFlags', fn ($f) => $f->where('status', ResultFlag::OPEN)))
+            ->when(($data['status'] ?? null) === 'flagged', fn ($q) => $q->whereHas('currentResults', $result(fn ($r) => $r->whereJsonContains('flags', 'overvote'))))
+            ->when(($data['status'] ?? null) === 'review_flagged', fn ($q) => $q->whereHas('resultFlags', $openFlag))
             ->select('polling_units.*')
             ->addSelect([
                 // The newest result received, by its id: phones' clocks can't reorder it.
-                'result_seq' => ResultSubmission::select('id')->whereColumn('polling_unit_id', 'polling_units.id')->where('is_current', true)->limit(1),
+                'result_seq' => ResultSubmission::select('id')->whereColumn('polling_unit_id', 'polling_units.id')->where('election_id', $rid)->where('is_current', true)->limit(1),
                 'agent_code' => User::select('code')->whereColumn('polling_unit_id', 'polling_units.id')->where('role', Role::Agent)->whereNull('deactivated_at')->limit(1),
             ])
-            ->tap(fn ($q) => $this->moreFilters($q, $data, $user->campaign_id))
-            ->withCount(['resultFlags as open_flags' => fn ($f) => $f->where('status', ResultFlag::OPEN)])
+            ->tap(fn ($q) => $this->moreFilters($q, $data, $user->campaign_id, $rid))
+            ->withCount(['resultFlags as open_flags' => $openFlag])
             // Latest result first unless a column header asks otherwise; blanks always go last.
             ->when($sort === 'result', fn ($q) => $q->orderByRaw('result_seq is null')->orderBy('result_seq', $dir))
             ->when($sort === 'agent', fn ($q) => $q->orderByRaw('agent_code is null')->orderBy('agent_code', $dir))
@@ -82,11 +89,18 @@ class UnitController extends Controller
             ->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED])
             ->pluck('polling_unit_id')->flip();
         $showPhones = $user->role->canSeePhones();
-        $irev = IrevEntry::whereIn('polling_unit_id', $units->pluck('id'))->with('pollingUnit.currentResult.votes.party')
+        $irev = IrevEntry::whereIn('polling_unit_id', $units->pluck('id'))->where('election_id', $rid)->with('pollingUnit.currentResults.votes.party')
             ->orderByDesc('id')->get()->unique('polling_unit_id')
             ->mapWithKeys(fn (IrevEntry $e) => [$e->polling_unit_id => $reconciler->compareIrev($e)['status']]);
 
-        $units->getCollection()->transform(fn (PollingUnit $u) => [
+        $units->getCollection()->transform(fn (PollingUnit $u) => $this->row($u, $u->currentResultFor($rid), $checkedIn, $irev, $showPhones));
+
+        return response()->json($units->toArray() + ['counts' => $counts, 'election' => TallyService::race($race), 'parties' => $race->parties()->get(['code', 'name', 'is_ours'])]);
+    }
+
+    private function row(PollingUnit $u, ?ResultSubmission $r, $checkedIn, $irev, bool $showPhones): array
+    {
+        return [
             'id' => $u->id,
             'code' => $u->code,
             'name' => $u->name,
@@ -97,19 +111,17 @@ class UnitController extends Controller
             'agent_checked_in' => $checkedIn->has($u->id),
             'irev' => $irev[$u->id] ?? null,
             'open_flags' => (int) $u->open_flags,
-            'result' => $u->currentResult ? [
-                'id' => $u->currentResult->id,
-                'status' => $u->currentResult->status,
-                'total_cast' => $u->currentResult->total_cast,
-                'accredited' => $u->currentResult->accredited,
-                'rejected' => $u->currentResult->rejected,
-                'votes' => $u->currentResult->votes->mapWithKeys(fn ($v) => [$v->party->code => $v->votes]),
-                'flags' => $u->currentResult->flags ?? [],
-                'captured_at' => $u->currentResult->captured_at,
+            'result' => $r ? [
+                'id' => $r->id,
+                'status' => $r->status,
+                'total_cast' => $r->total_cast,
+                'accredited' => $r->accredited,
+                'rejected' => $r->rejected,
+                'votes' => $r->votes->mapWithKeys(fn ($v) => [$v->party->code => $v->votes]),
+                'flags' => $r->flags ?? [],
+                'captured_at' => $r->captured_at,
             ] : null,
-        ]);
-
-        return response()->json($units->toArray() + ['counts' => $counts]);
+        ];
     }
 
     /**
@@ -120,19 +132,20 @@ class UnitController extends Controller
     {
         $user = $request->user();
         abort_unless($unit->campaign_id === $user->campaign_id, 404);
-        $pack = $evidence->build($unit);
+        $pack = $evidence->build($unit, Races::fromRequest($request, allowAll: true));
         $audit->log($user, 'evidence.viewed', $unit, [], $request->ip());
 
         return response()->json($pack);
     }
 
     /** The filters under the search box: agent attendance, result review, IReV and how the result came in. */
-    private function moreFilters($q, array $data, int $campaignId): void
+    private function moreFilters($q, array $data, int $campaignId, int $raceId): void
     {
         $present = fn ($c) => $c->where('campaign_id', $campaignId)->whereIn('status', [CheckIn::VERIFIED, CheckIn::APPROVED]);
         $openAlert = fn (string $type) => fn ($w) => $w->select(DB::raw(1))->from('alerts')
             ->where('alerts.campaign_id', $campaignId)->where('alerts.status', '!=', 'resolved')
-            ->whereRaw('alerts.dedupe_key = CONCAT(?, polling_units.id)', ["{$type}:unit:"]);
+            ->whereRaw('alerts.dedupe_key = CONCAT(?, polling_units.id, ?)', ["{$type}:unit:", ":race:{$raceId}"]);
+        $result = fn ($extra = null) => fn ($r) => $r->where('election_id', $raceId)->when($extra, $extra);
 
         match ($data['agent'] ?? null) {
             'present' => $q->whereHas('agent')->whereHas('checkIns', $present),
@@ -141,21 +154,21 @@ class UnitController extends Controller
             default => null,
         };
         match ($data['result'] ?? null) {
-            'verified' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::APPROVED)),
-            'pending' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::PENDING_REVIEW)),
-            'sent_back' => $q->whereHas('currentResult', fn ($r) => $r->where('status', ResultSubmission::SENT_BACK)),
-            'none' => $q->whereDoesntHave('currentResult'),
+            'verified' => $q->whereHas('currentResults', $result(fn ($r) => $r->where('status', ResultSubmission::APPROVED))),
+            'pending' => $q->whereHas('currentResults', $result(fn ($r) => $r->where('status', ResultSubmission::PENDING_REVIEW))),
+            'sent_back' => $q->whereHas('currentResults', $result(fn ($r) => $r->where('status', ResultSubmission::SENT_BACK))),
+            'none' => $q->whereDoesntHave('currentResults', $result()),
             default => null,
         };
         match ($data['irev'] ?? null) {
             'differs' => $q->whereExists($openAlert('irev_mismatch')),
             'missing' => $q->whereExists($openAlert('irev_missing')),
-            'match' => $q->whereHas('irevEntries')->whereNotExists($openAlert('irev_mismatch'))->whereNotExists($openAlert('irev_missing')),
-            'unchecked' => $q->whereDoesntHave('irevEntries'),
+            'match' => $q->whereHas('irevEntries', $result())->whereNotExists($openAlert('irev_mismatch'))->whereNotExists($openAlert('irev_missing')),
+            'unchecked' => $q->whereDoesntHave('irevEntries', $result()),
             default => null,
         };
         if ($data['channel'] ?? null) {
-            $q->whereHas('currentResult', fn ($r) => $r->where('channel', $data['channel']));
+            $q->whereHas('currentResults', $result(fn ($r) => $r->where('channel', $data['channel'])));
         }
     }
 }

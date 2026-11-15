@@ -2,13 +2,17 @@
 
 namespace App\Services\Voice;
 
-use App\Models\Campaign;
+use App\Models\Election;
 use App\Services\TallyService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * How the race stands, said only when it changes. Runs every minute from pollproof:watch.
+ * How a race stands, said only when it changes. Runs every minute from pollproof:watch, for
+ * each race on the current election day that has announcements on.
+ *
+ * Where several races are announced, each sentence starts with the race's name.
+ *
  *
  * It speaks when the lead changes hands, when we cross (or fall back below) the 25% rule, and
  * when another quarter of the polling units has reported. A change has to hold for STEADY
@@ -26,15 +30,23 @@ final class RaceWatch
 
     public const MIN_UNITS = 10;
 
+    private string $prefix = '';
+
+    private string $raceKey = '';
+
     public function __construct(private readonly TallyService $tally, private readonly Announcer $announcer, private readonly Kokoro $kokoro) {}
 
-    public function run(Campaign $campaign, ?Carbon $now = null): ?string
+    public function run(Election $race, ?Carbon $now = null): ?string
     {
-        if (! $this->kokoro->enabled()) {
+        if (! $this->kokoro->enabled() || ! $race->announce || $race->isDeclared()) {
             return null;
         }
         $now ??= now();
-        $s = $this->tally->summary($campaign);
+        $this->prefix = Election::where('campaign_id', $race->campaign_id)->where('announce', true)
+            ->whereDate('election_date', $race->election_date)->count() > 1 ? "{$race->name}: " : '';
+        $this->raceKey = "{$race->id}:";
+        $campaignId = $race->campaign_id;
+        $s = $this->tally->summary($race);
         $enough = max(min(self::MIN_UNITS, $s['units']), (int) ceil($s['units'] * self::START_SHARE));
         if ($s['units'] === 0 || $s['units_reported'] < $enough) {
             return null;
@@ -44,13 +56,19 @@ final class RaceWatch
             return null;
         }
 
-        $key = "voice:race:{$campaign->id}";
+        $key = "voice:race:{$race->id}";
         $state = Cache::get($key, []);
         $t = $now->getTimestamp();
 
         // What the race looks like now, and how long each part has looked this way.
         $leader = $s['candidates'][0]['votes'] > 0 ? $s['candidates'][0]['party'] : null;
-        $cleared = $ours['lgas_meeting_threshold'] >= $s['lgas_required'];
+        // The line the race is won by, beyond the most votes: the 25% spread for a governor, 25%
+        // in this state for a president, nothing more for any other race.
+        $cleared = match ($s['rule']) {
+            'spread' => $ours['lgas_meeting_threshold'] >= $s['lgas_required'],
+            'state_quarter' => $ours['meets_quarter'],
+            default => null,
+        };
         foreach (['leader' => $leader, 'cleared' => $cleared] as $part => $value) {
             if (! array_key_exists("{$part}_now", $state) || $state["{$part}_now"] !== $value) {
                 $state["{$part}_now"] = $value;
@@ -63,19 +81,19 @@ final class RaceWatch
 
         $said = null;
         if ($quiet && $steady('leader') && $leader && ($state['leader_said'] ?? null) !== $leader) {
-            $said = $this->lead($campaign->id, $s, $ours, $state['leader_said'] ?? null, $t);
+            $said = $this->lead($campaignId, $s, $ours, $state['leader_said'] ?? null, $t);
             $state['leader_said'] = $leader;
-        } elseif ($quiet && $steady('cleared') && array_key_exists('cleared_said', $state) && $state['cleared_said'] !== $cleared) {
-            $said = $this->spread($campaign->id, $s, $ours, $cleared, $t);
+        } elseif ($quiet && $cleared !== null && $steady('cleared') && array_key_exists('cleared_said', $state) && $state['cleared_said'] !== $cleared) {
+            $said = $this->spread($campaignId, $s, $ours, $cleared, $t);
             $state['cleared_said'] = $cleared;
         } elseif ($quiet && array_key_exists('leader_said', $state) && $quarter >= 25 && $quarter > ($state['quarter_said'] ?? 0)) {
-            $said = $this->progress($campaign->id, $s, $ours, $quarter);
+            $said = $this->progress($campaignId, $s, $ours, $quarter);
             $state['quarter_said'] = $quarter;
             $state['cleared_said'] ??= $cleared;
         }
         // The first time we cross the line it is news; being under it when counting starts isn't.
-        if (! array_key_exists('cleared_said', $state) && $cleared && $steady('cleared') && $quiet && ! $said) {
-            $said = $this->spread($campaign->id, $s, $ours, true, $t);
+        if ($cleared && ! array_key_exists('cleared_said', $state) && $steady('cleared') && $quiet && ! $said) {
+            $said = $this->spread($campaignId, $s, $ours, true, $t);
             $state['cleared_said'] = true;
         }
         if ($said) {
@@ -103,17 +121,20 @@ final class RaceWatch
             return null; // the lead changed between two other parties: not news for us
         }
 
-        return $this->announcer->race($campaignId, 'lead', "lead:{$top['party']}:{$t}", $text)?->text;
+        return $this->announcer->race($campaignId, 'lead', "{$this->raceKey}lead:{$top['party']}:{$t}", $this->prefix.$text)?->text;
     }
 
     private function spread(int $campaignId, array $s, array $ours, bool $cleared, int $t): ?string
     {
         $n = $ours['lgas_meeting_threshold'];
-        $text = $cleared
-            ? "We now have a quarter of the vote in {$n} of {$s['lga_count']} LGAs. That clears the {$s['lgas_required']} the constitution requires."
-            : "We have fallen to {$n} LGAs with a quarter of the vote. We need {$s['lgas_required']}.";
+        $text = match (true) {
+            $s['rule'] === 'state_quarter' && $cleared => 'We now have a quarter of the vote in this state.',
+            $s['rule'] === 'state_quarter' => 'We have fallen below a quarter of the vote in this state.',
+            $cleared => "We now have a quarter of the vote in {$n} of {$s['lga_count']} LGAs. That clears the {$s['lgas_required']} the constitution requires.",
+            default => "We have fallen to {$n} LGAs with a quarter of the vote. We need {$s['lgas_required']}.",
+        };
 
-        return $this->announcer->race($campaignId, 'spread', 'spread:'.($cleared ? 'met' : 'short').":{$t}", $text)?->text;
+        return $this->announcer->race($campaignId, 'spread', "{$this->raceKey}spread:".($cleared ? 'met' : 'short').":{$t}", $this->prefix.$text)?->text;
     }
 
     private function progress(int $campaignId, array $s, array $ours, int $quarter): ?string
@@ -128,9 +149,9 @@ final class RaceWatch
         $standing = $top['party'] === $ours['party']
             ? 'We lead with '.$this->pct($ours['votes'], $s).' percent'
             : $this->name($top).' leads. We have '.$this->pct($ours['votes'], $s).' percent';
-        $spread = "a quarter of the vote in {$ours['lgas_meeting_threshold']} of {$s['lga_count']} LGAs";
+        $spread = $s['rule'] === 'spread' ? "a quarter of the vote in {$ours['lgas_meeting_threshold']} of {$s['lga_count']} LGAs" : null;
 
-        return $this->announcer->race($campaignId, 'progress', "progress:{$quarter}", "{$share} {$standing}, and {$spread}.")?->text;
+        return $this->announcer->race($campaignId, 'progress', "{$this->raceKey}progress:{$quarter}", $this->prefix."{$share} {$standing}".($spread ? ", and {$spread}" : '').'.')?->text;
     }
 
     private function pct(int $votes, array $s): int

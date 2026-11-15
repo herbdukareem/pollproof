@@ -10,6 +10,8 @@ namespace App\Services;
  *  - integers as integers; coordinates as strings with exactly 7 decimals (or null)
  *  - captured_at exactly as the phone recorded it (ISO 8601, UTC)
  *  - no whitespace, slashes and unicode unescaped
+ *  - "election" (the race's code) only when the phone names a race; apps from before races
+ *    existed leave it out, and their signatures still verify
  */
 final class ResultSigner
 {
@@ -26,11 +28,13 @@ final class ResultSigner
         ?float $longitude,
         string $capturedAt,
         ?int $supersedesId,
+        ?string $electionCode = null,
     ): string {
         ksort($votes);
         $payload = [
             'accredited' => $accredited,
             'captured_at' => $capturedAt,
+            'election' => $electionCode,
             'latitude' => $latitude === null ? null : number_format($latitude, 7, '.', ''),
             'longitude' => $longitude === null ? null : number_format($longitude, 7, '.', ''),
             'photo_sha256' => $photoSha256,
@@ -39,6 +43,9 @@ final class ResultSigner
             'supersedes' => $supersedesId,
             'votes' => array_map('intval', $votes),
         ];
+        if ($electionCode === null) {
+            unset($payload['election']);
+        }
 
         return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }

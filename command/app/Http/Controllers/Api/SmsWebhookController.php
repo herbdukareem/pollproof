@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
+use App\Models\Election;
 use App\Models\PollingUnit;
 use App\Models\User;
 use App\Services\AttendanceConfirmer;
 use App\Services\AuditLogger;
+use App\Services\Races;
 use App\Services\ResultRecorder;
 use App\Services\SmsResultParser;
 use Illuminate\Http\JsonResponse;
@@ -46,9 +48,9 @@ class SmsWebhookController extends Controller
                 : 'Thank you for telling us. Your supervisor will arrange cover.']);
         }
 
-        $parsed = SmsResultParser::parse($data['text']);
+        $parsed = SmsResultParser::parse($data['text'], Election::where('campaign_id', $agent->campaign_id)->pluck('code')->all());
         if (! $parsed) {
-            return response()->json(['reply' => 'Format not recognised. Send: R <unit> AC<accredited> A<votes> B<votes> ... X<rejected>']);
+            return response()->json(['reply' => 'Format not recognised. Send: R <race> <unit> AC<accredited> A<votes> B<votes> ... X<rejected>']);
         }
 
         $unit = PollingUnit::where('campaign_id', $agent->campaign_id)->where('code', $parsed['unit'])->first();
@@ -56,10 +58,25 @@ class SmsWebhookController extends Controller
             return response()->json(['reply' => "Unit {$parsed['unit']} is not your assigned polling unit."]);
         }
 
+        // A unit in several races needs the race code; with one race it is optional.
+        $races = Races::atUnit($unit);
+        if (! $parsed['race'] && $races->count() > 1) {
+            return response()->json(['reply' => 'Your unit has '.$races->count().' races. Start with the race code: '
+                .$races->map(fn ($e) => "R {$e->code} {$unit->code} ...")->implode(', ').'. Not saved.']);
+        }
+        $race = $parsed['race'] ? $races->firstWhere('code', $parsed['race']) : ($races->first() ?? $agent->campaign->primaryElection());
+        if (! $race) {
+            return response()->json(['reply' => "{$unit->code} is not in the {$parsed['race']} race. Not saved."]);
+        }
+        if ($race->isDeclared()) {
+            return response()->json(['reply' => "The {$race->name} result has been declared. PollProof is no longer taking results for it."]);
+        }
+
         try {
             $result = $recorder->record(
                 agent: $agent,
                 unit: $unit,
+                election: $race,
                 votes: $parsed['votes'],
                 accredited: $parsed['accredited'],
                 rejected: $parsed['rejected'],
@@ -71,6 +88,8 @@ class SmsWebhookController extends Controller
         }
         $audit->log($agent, 'result.submitted_sms', $result, ['payload_hash' => $result->payload_hash], $request->ip());
 
-        return response()->json(['reply' => "OK {$unit->code} total {$result->total_cast} ref {$result->fingerprint()}"]);
+        $label = $races->count() > 1 ? "{$race->code} " : '';
+
+        return response()->json(['reply' => "OK {$label}{$unit->code} total {$result->total_cast} ref {$result->fingerprint()}"]);
     }
 }

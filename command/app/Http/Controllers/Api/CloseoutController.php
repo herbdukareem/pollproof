@@ -10,12 +10,16 @@ use App\Models\Incident;
 use App\Models\IrevEntry;
 use App\Models\ResultSubmission;
 use App\Services\AuditLogger;
+use App\Services\Races;
 use App\Services\TallyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-/** After the declaration: the declared result against our records, and what happens to the data. */
+/**
+ * After a race's declaration: the declared result against our records. Once every race is
+ * declared: what happens to the data.
+ */
 class CloseoutController extends Controller
 {
     public const RETENTION = ['keep_until_cases_end', 'handover_then_delete', 'delete_now'];
@@ -25,10 +29,11 @@ class CloseoutController extends Controller
     public function show(Request $request, TallyService $tally): JsonResponse
     {
         $campaign = $request->user()->campaign;
-        $t = $tally->summary($campaign);
-        $parties = $campaign->parties()->get();
+        $race = Races::fromRequest($request);
+        $t = $tally->summary($race);
+        $parties = $race->parties()->get();
         $ours = collect($t['candidates'])->pluck('votes', 'party');
-        $declared = $campaign->declared_votes ?? [];
+        $declared = $race->declared_votes ?? [];
         $openCases = $campaign->tribunalCases()->where('status', 'open')->count();
 
         $rows = $parties->map(fn ($p) => [
@@ -46,14 +51,18 @@ class CloseoutController extends Controller
         $c = $campaign->id;
 
         return response()->json([
-            'declared' => $campaign->isDeclared(),
-            'declared_at' => $campaign->declared_at,
+            'election' => TallyService::race($race),
+            'declared' => $race->isDeclared(),
+            'declared_at' => $race->declared_at,
+            'all_declared' => $campaign->isDeclared(),
+            'races' => $campaign->elections()->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'declared_at' => $e->declared_at])->values(),
             'winner' => $winner ? ['party' => $winner['party'], 'name' => $winner['name'], 'is_ours' => $winner['is_ours'], 'margin' => $winner['declared'] - ($runnerUp['declared'] ?? 0)] : null,
             'rows' => $rows,
             'units' => $t['units'],
             'units_reported' => $t['units_reported'],
             'lga_count' => $t['lga_count'],
             'lgas_required' => $t['lgas_required'],
+            'rule' => $t['rule'],
             'our_lgas_meeting_threshold' => collect($t['candidates'])->firstWhere('party', $ourParty?->code)['lgas_meeting_threshold'] ?? 0,
             'stored' => [
                 'results' => ResultSubmission::where('campaign_id', $c)->count(),
@@ -70,11 +79,11 @@ class CloseoutController extends Controller
         ]);
     }
 
-    /** Record the official declaration. From then on election-day records are read-only. */
+    /** Record a race's official declaration. From then on its election-day records are read-only. */
     public function declare(Request $request, TallyService $tally): JsonResponse
     {
-        $campaign = $request->user()->campaign;
-        $codes = $campaign->parties()->pluck('code')->all();
+        $race = Races::fromRequest($request);
+        $codes = $race->parties()->pluck('code')->all();
         $data = $request->validate([
             'declared_at' => ['required', 'date', 'before_or_equal:now'],
             'votes' => ['required', 'array', 'min:1'],
@@ -82,11 +91,11 @@ class CloseoutController extends Controller
         ]);
         $votes = array_change_key_case($data['votes'], CASE_UPPER);
         if ($unknown = array_diff(array_keys($votes), $codes)) {
-            abort(422, 'Unknown party code: '.implode(', ', $unknown));
+            abort(422, "Not on the {$race->name} ballot: ".implode(', ', $unknown));
         }
-        $first = ! $campaign->isDeclared();
-        $campaign->update(['declared_at' => $data['declared_at'], 'declared_votes' => array_map('intval', $votes)]);
-        $this->audit->log($request->user(), $first ? 'closeout.declared' : 'closeout.declaration_corrected', $campaign, ['votes' => $votes, 'declared_at' => $data['declared_at']], $request->ip());
+        $first = ! $race->isDeclared();
+        $race->update(['declared_at' => $data['declared_at'], 'declared_votes' => array_map('intval', $votes)]);
+        $this->audit->log($request->user(), $first ? 'closeout.declared' : 'closeout.declaration_corrected', $race, ['race' => $race->name, 'votes' => $votes, 'declared_at' => $data['declared_at']], $request->ip());
 
         return $this->show($request, $tally);
     }

@@ -34,7 +34,7 @@ final class ElectionWatch
             'escalated' => $this->escalate($campaign, $now),
             'absent' => $this->absentAgents($campaign, $now),
             'backlog' => $this->verifyBacklog($campaign),
-            'race' => $this->race->run($campaign, $now),
+            'race' => $campaign->electionsOn($campaign->currentElectionDate())->map(fn ($race) => $this->race->run($race, $now))->filter()->implode(' '),
         ];
     }
 

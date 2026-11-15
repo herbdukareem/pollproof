@@ -28,13 +28,13 @@ class UnitFilterTest extends TestCase
         $this->agentFor('PU2');
         CheckIn::create(['campaign_id' => $this->campaign->id, 'user_id' => $a1->id, 'polling_unit_id' => $this->units['PU1']->id, 'status' => CheckIn::VERIFIED, 'captured_at' => now(), 'latitude' => 1, 'longitude' => 1, 'accuracy_m' => 5]);
         $result = fn ($unit, $agent, $status, $channel) => ResultSubmission::create([
-            'campaign_id' => $this->campaign->id, 'polling_unit_id' => $this->units[$unit]->id, 'user_id' => $agent->id, 'is_current' => true, 'status' => $status, 'channel' => $channel,
+            'campaign_id' => $this->campaign->id, 'election_id' => $this->race()->id, 'polling_unit_id' => $this->units[$unit]->id, 'user_id' => $agent->id, 'is_current' => true, 'status' => $status, 'channel' => $channel,
             'accredited' => 10, 'rejected' => 0, 'total_valid' => 10, 'total_cast' => 10, 'captured_at' => now(), 'payload_hash' => str_repeat('a', 64),
         ]);
         $result('PU1', $a1, ResultSubmission::APPROVED, 'app');
         $result('PU2', $this->units['PU2']->agent, ResultSubmission::PENDING_REVIEW, 'ussd');
-        $entry = IrevEntry::create(['campaign_id' => $this->campaign->id, 'polling_unit_id' => $this->units['PU2']->id, 'votes' => ['A' => 1], 'seen_at' => now(), 'entered_by' => $a1->id]);
-        Alert::create(['campaign_id' => $this->campaign->id, 'type' => 'irev_mismatch', 'severity' => 'high', 'dedupe_key' => 'irev_mismatch:unit:'.$this->units['PU2']->id, 'title' => 'x', 'detail' => 'x', 'status' => 'open', 'opened_at' => now()]);
+        $entry = IrevEntry::create(['campaign_id' => $this->campaign->id, 'election_id' => $this->race()->id, 'polling_unit_id' => $this->units['PU2']->id, 'votes' => ['A' => 1], 'seen_at' => now(), 'entered_by' => $a1->id]);
+        Alert::create(['campaign_id' => $this->campaign->id, 'type' => 'irev_mismatch', 'severity' => 'high', 'dedupe_key' => 'irev_mismatch:unit:'.$this->units['PU2']->id.':race:'.$this->race()->id, 'title' => 'x', 'detail' => 'x', 'status' => 'open', 'opened_at' => now()]);
         $this->actingAsUser($this->staff(Role::SituationRoom));
 
         $this->assertSame(['PU1'], $this->codes('agent=present'));

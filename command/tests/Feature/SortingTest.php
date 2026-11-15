@@ -27,7 +27,7 @@ class SortingTest extends TestCase
     {
         $agent = $this->agentFor($unit);
         $result = ResultSubmission::create([
-            'campaign_id' => $this->campaign->id, 'polling_unit_id' => $agent->polling_unit_id, 'user_id' => $agent->id, 'is_current' => true,
+            'campaign_id' => $this->campaign->id, 'election_id' => $this->race()->id, 'polling_unit_id' => $agent->polling_unit_id, 'user_id' => $agent->id, 'is_current' => true,
             'accredited' => 300, 'rejected' => 2, 'total_valid' => 250, 'total_cast' => 252, 'captured_at' => $at, 'payload_hash' => str_repeat('a', 64),
         ]);
         app(AuditLogger::class)->log($agent, 'result.submitted', $result);

@@ -54,6 +54,24 @@
             "canonical": "{\"accredited\":100,\"captured_at\":\"2027-01-20T14:00:00Z\",\"latitude\":\"-0.1000000\",\"longitude\":\"3.0000001\",\"photo_sha256\":null,\"polling_unit\":\"PRACTICE\",\"rejected\":2,\"supersedes\":null,\"votes\":{\"A\":50,\"B\":48}}",
             "sha256": "daaaa05f1424f586492c2c1aeffdc983fb04ddcade2a024c6c54092765b784ec",
             "signature": "LIUQoNoTKQVVGJRAOk7SQBljFgtyEFxgeynv4aeAHDWjFaJrImfXBmYWeBXpr3JjDHzOqf4fFZjpDXEZLJdhCA=="
+        },
+        {
+            "unit": "01-01-001",
+            "election": "HOA-BIDA1",
+            "accredited": 512,
+            "rejected": 4,
+            "votes": {
+                "B": 201,
+                "A": 288
+            },
+            "photo_sha256": null,
+            "latitude": "9.0812345",
+            "longitude": "6.0100000",
+            "captured_at": "2027-02-06T16:20:05Z",
+            "supersedes": null,
+            "canonical": "{\"accredited\":512,\"captured_at\":\"2027-02-06T16:20:05Z\",\"election\":\"HOA-BIDA1\",\"latitude\":\"9.0812345\",\"longitude\":\"6.0100000\",\"photo_sha256\":null,\"polling_unit\":\"01-01-001\",\"rejected\":4,\"supersedes\":null,\"votes\":{\"A\":288,\"B\":201}}",
+            "sha256": "be4239b15290dfd0ba3743a846fdf5bcf76b0c23618ce444ab016abfb072c4ef",
+            "signature": "PSM5S+Fo1yTKLPaBmZORMR9GemwLFWJifES7lseL4tNgMDUHcv50RsGi9W1PDFnoj7e2SYQ+aloGOP/lh0ikAw=="
         }
     ]
 }

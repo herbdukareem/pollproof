@@ -78,7 +78,7 @@ class UssdTest extends TestCase
         $this->assertScreen($this->dial('1*abc*412*210*150*30'), 'CON', 'Step 5/5: REJECTED');
         $confirm = $this->dial('1*abc*412*210*150*30*7');
         $this->assertScreen($confirm, 'CON', 'A 210, B 150, C 30');
-        $this->assertStringContainsString('Total cast 397', $confirm->getContent());
+        $this->assertStringContainsString('total cast 397', $confirm->getContent());
 
         $sent = $this->dial('1*abc*412*210*150*30*7*1');
         $this->assertScreen($sent, 'END', 'Result sent for PU1');
@@ -180,7 +180,7 @@ class UssdTest extends TestCase
         User::factory()->role(Role::Agent)->create(['campaign_id' => $this->campaign->id, 'phone' => '08030000002', 'is_reserve' => true]);
         $this->assertScreen($this->dial('', 'S5', '2348030000002'), 'END', 'reserve agent');
 
-        $this->campaign->update(['declared_at' => now()]);
+        $this->race()->update(['declared_at' => now()]);
         $this->assertScreen($this->dial('', 'S6'), 'END', 'declared');
     }
 

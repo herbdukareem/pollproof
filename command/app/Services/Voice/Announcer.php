@@ -4,6 +4,7 @@ namespace App\Services\Voice;
 
 use App\Models\Alert;
 use App\Models\Announcement;
+use App\Models\Election;
 use App\Models\Incident;
 use App\Services\AlertNotifier;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -46,6 +47,11 @@ final class Announcer
         $text = Speech::alert($alert, $escalation);
         if ($text === null) {
             return null;
+        }
+        // With several races, say which one: "Governorship. Overvote at …".
+        if ($alert->election_id && Election::where('campaign_id', $alert->campaign_id)->count() > 1
+            && ($race = Election::find($alert->election_id)) && ! str_contains($text, $race->name)) {
+            $text = Speech::plain($race->name).". {$text}";
         }
         [$lgaId, $wardId] = $this->notifier->locate($alert);
         // A reopened problem is a new announcement; a refresh of an open one is not.

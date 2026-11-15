@@ -19,7 +19,7 @@ class SigningContractTest extends TestCase
                 $c['unit'], $c['accredited'], $c['rejected'], $c['votes'], $c['photo_sha256'],
                 $c['latitude'] === null ? null : (float) $c['latitude'],
                 $c['longitude'] === null ? null : (float) $c['longitude'],
-                $c['captured_at'], $c['supersedes'],
+                $c['captured_at'], $c['supersedes'], $c['election'] ?? null,
             );
             $this->assertSame($c['canonical'], $canonical);
             $this->assertSame($c['sha256'], ResultSigner::hash($canonical));

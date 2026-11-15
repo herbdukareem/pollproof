@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\NotifyAlert;
 use App\Models\Alert;
+use App\Models\Election;
 use App\Services\Voice\Announcer;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,9 +15,15 @@ final class AlertService
     /**
      * Raise or refresh an alert. The dedupe key keeps one live alert per problem,
      * so re-entering the same sheet updates the alert instead of creating noise.
+     *
+     * An alert about one race names it when the campaign has more than one:
+     * "01-01-001, Governorship: votes cast exceed accreditation".
      */
-    public function raise(int $campaignId, string $type, string $severity, string $dedupeKey, string $title, string $detail, ?Model $subject = null, array $data = []): Alert
+    public function raise(int $campaignId, string $type, string $severity, string $dedupeKey, string $title, string $detail, ?Model $subject = null, array $data = [], ?Election $election = null): Alert
     {
+        if ($election && ! str_contains($title, $election->name) && Election::where('campaign_id', $campaignId)->count() > 1) {
+            $title = preg_match('/^([^:]+): (.+)$/s', $title, $m) ? "{$m[1]}, {$election->name}: {$m[2]}" : "{$election->name}: {$title}";
+        }
         $alert = Alert::firstOrNew(['campaign_id' => $campaignId, 'dedupe_key' => $dedupeKey]);
         $wasOpen = $alert->exists && $alert->status !== 'resolved';
         // Someone already dealt with exactly this problem: don't reopen it on a routine re-check.
@@ -29,6 +36,7 @@ final class AlertService
             'title' => $title,
             'detail' => $detail,
             'data' => $data,
+            'election_id' => $election?->id,
             'status' => 'open',
             'resolved_by' => null,
             'resolved_at' => null,

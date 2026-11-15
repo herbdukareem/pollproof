@@ -48,7 +48,7 @@ class TribunalController extends Controller
             ->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name', 'role']);
 
         return response()->json([
-            'case' => $case->only(['id', 'title', 'petitioner', 'our_role', 'status', 'milestones', 'created_at']),
+            'case' => $case->only(['id', 'title', 'petitioner', 'our_role', 'status', 'milestones', 'created_at', 'election_id']) + ['election' => $case->election?->only(['id', 'name'])],
             'grounds' => $case->grounds->map(fn ($g) => [
                 'id' => $g->id, 'label' => $g->label, 'claim' => $g->claim, 'answer' => $g->answer, 'evidence_note' => $g->evidence_note,
                 'status' => $g->status, 'owner' => $g->owner?->only(['id', 'name']),
@@ -139,6 +139,7 @@ class TribunalController extends Controller
             'milestones' => ['sometimes', 'nullable', 'array', 'max:20'],
             'milestones.*.date' => ['required', 'string', 'max:40'],
             'milestones.*.label' => ['required', 'string', 'max:120'],
+            'election_id' => ['sometimes', 'nullable', 'integer', Rule::exists('elections', 'id')->where('campaign_id', $request->user()->campaign_id)],
         ]);
     }
 

@@ -16,6 +16,11 @@ class ResultSubmission extends Model
 
     protected $guarded = ['id'];
 
+    public function election(): BelongsTo
+    {
+        return $this->belongsTo(Election::class);
+    }
+
     protected function casts(): array
     {
         return [

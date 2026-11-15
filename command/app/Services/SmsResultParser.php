@@ -4,18 +4,27 @@ namespace App\Services;
 
 /**
  * Parses the fallback SMS format agents use when there is no data:
- *   R 004 AC448 A214 B187 C22 D9 X6
- * R <unit code> AC<accredited> <party code><votes>... X<rejected>
- * Party codes are letters only; the unit code may be numeric or alphanumeric.
+ *   R GOV 004 AC448 A214 B187 C22 D9 X6
+ * R [race code] <unit code> AC<accredited> <party code><votes>... X<rejected>
+ * The race code is needed only where the unit is in more than one race. Party codes are
+ * letters only; the unit code may be numeric or alphanumeric.
  */
 final class SmsResultParser
 {
-    /** @return array{unit: string, accredited: int, rejected: int, votes: array<string,int>}|null */
-    public static function parse(string $text): ?array
+    /**
+     * @param  list<string>  $raceCodes  the campaign's race codes, so "R GOV 004 …" reads GOV as the race
+     * @return array{race: ?string, unit: string, accredited: int, rejected: int, votes: array<string,int>}|null
+     */
+    public static function parse(string $text, array $raceCodes = []): ?array
     {
         $tokens = preg_split('/\s+/', strtoupper(trim($text)));
         if (count($tokens) < 3 || $tokens[0] !== 'R') {
             return null;
+        }
+        $race = null;
+        if (count($tokens) >= 4 && in_array($tokens[1], array_map('strtoupper', $raceCodes), true)) {
+            $race = $tokens[1];
+            array_splice($tokens, 1, 1);
         }
         $unit = $tokens[1];
         $accredited = null;
@@ -36,6 +45,6 @@ final class SmsResultParser
             return null;
         }
 
-        return ['unit' => $unit, 'accredited' => $accredited, 'rejected' => $rejected, 'votes' => $votes];
+        return ['race' => $race, 'unit' => $unit, 'accredited' => $accredited, 'rejected' => $rejected, 'votes' => $votes];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Ussd;
 
 use App\Models\CheckIn;
+use App\Models\Election;
 use App\Models\Party;
 use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CheckInReview;
 use App\Services\IncidentReporter;
+use App\Services\Races;
 use App\Services\ResultRecorder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -26,6 +28,9 @@ use Illuminate\Validation\ValidationException;
  *
  * A result being typed in is also kept for 30 minutes, so an agent whose session drops can dial
  * again and carry on from where they stopped.
+ *
+ * Where the unit is in more than one race (governorship and state assembly, say), sending a
+ * result starts by choosing which race's sheet it is.
  */
 final class UssdMenu
 {
@@ -60,7 +65,13 @@ final class UssdMenu
 
     private PollingUnit $unit;
 
-    /** @var Collection<int, Party> */
+    /** @var Collection<int, Election> the races at this unit */
+    private Collection $races;
+
+    /** The race whose result is being sent or looked at. */
+    private ?Election $race = null;
+
+    /** @var Collection<int, Party> the race's ballot */
     private Collection $parties;
 
     private ?ResultSubmission $current = null;
@@ -81,8 +92,14 @@ final class UssdMenu
     {
         $this->agent = $agent;
         $this->unit = $agent->pollingUnit()->with('ward.lga')->firstOrFail();
-        $this->parties = Party::where('campaign_id', $agent->campaign_id)->orderBy('sort_order')->orderBy('code')->get()->values();
-        $this->current = ResultSubmission::where('polling_unit_id', $this->unit->id)->where('is_current', true)->first();
+        $this->races = Races::atUnit($this->unit);
+        if ($this->races->isEmpty() && ($primary = $agent->campaign->primaryElection())) {
+            $this->races = collect([$primary->load('parties')]);
+        }
+        $this->parties = collect();
+        if ($this->races->count() === 1) {
+            $this->useRace($this->races->first());
+        }
         $this->ip = $ip;
 
         // What the agent had typed in an earlier, dropped session, fixed for the whole of this one.
@@ -102,14 +119,27 @@ final class UssdMenu
             }
         }
         // Keep what has been typed once there is something to lose.
-        if ($inputs && in_array($state['screen'], self::ENTRY_SCREENS, true) && $state['screen'] !== 'acc') {
-            Cache::put($this->draftKey(), ['unit_id' => $this->unit->id, 'state' => $state + ['error' => null]], now()->addMinutes(30));
+        if ($inputs && $this->race && in_array($state['screen'], self::ENTRY_SCREENS, true) && $state['screen'] !== 'acc') {
+            Cache::put($this->draftKey(), ['unit_id' => $this->unit->id, 'race' => $this->race->id, 'state' => ['error' => null] + $state], now()->addMinutes(30));
         }
 
         return 'CON '.$this->render($state);
     }
 
     // ---- Answers -----------------------------------------------------------------------------
+
+    private function useRace(Election $race): void
+    {
+        $this->race = $race;
+        $this->parties = $race->parties->values();
+        $this->current = ResultSubmission::where('polling_unit_id', $this->unit->id)->where('election_id', $race->id)->where('is_current', true)->first();
+    }
+
+    /** After the race is known: correct the existing result, or start a new one. */
+    private function startResult(): array
+    {
+        return $this->current ? ['screen' => 'existing', 'data' => [], 'error' => null] : ['screen' => 'acc', 'data' => [], 'error' => null];
+    }
 
     private function step(array $s, string $in, bool $live): array
     {
@@ -119,9 +149,11 @@ final class UssdMenu
         switch ($s['screen']) {
             case 'main':
                 return match ($in) {
-                    '1' => $this->resume
-                        ? $this->resume['state']
-                        : ($this->current ? ['screen' => 'existing', 'data' => [], 'error' => null] : ['screen' => 'acc', 'data' => [], 'error' => null]),
+                    '1' => match (true) {
+                        (bool) $this->resume => $this->resumeDraft(),
+                        $this->races->count() > 1 => ['screen' => 'race', 'data' => [], 'error' => null],
+                        default => $this->startResult(),
+                    },
                     '2' => ['end' => $this->statusText()],
                     '3' => $this->startCheckIn(),
                     '4' => ['screen' => 'incident_type', 'data' => [], 'error' => null],
@@ -129,10 +161,25 @@ final class UssdMenu
                     default => ['error' => 'Choose 1, 2, 3 or 4.'] + $s,
                 };
 
+            case 'race':
+                if ($in === '0') {
+                    return ['screen' => 'main', 'data' => [], 'error' => null];
+                }
+                $race = $this->races->values()->get((int) $in - 1);
+                if (! ctype_digit($in) || ! $race) {
+                    return ['error' => 'Choose 1 to '.$this->races->count().'.'] + $s;
+                }
+                if ($race->isDeclared()) {
+                    return ['error' => "{$race->code} is declared. Choose another."] + $s;
+                }
+                $this->useRace($race);
+
+                return $this->startResult();
+
             case 'existing':
                 return match ($in) {
                     '1' => ['screen' => 'reason', 'data' => [], 'error' => null],
-                    '0' => ['screen' => 'main', 'data' => [], 'error' => null],
+                    '0' => ['screen' => $this->races->count() > 1 ? 'race' : 'main', 'data' => [], 'error' => null],
                     default => ['error' => 'Choose 1 or 0.'] + $s,
                 };
 
@@ -237,13 +284,15 @@ final class UssdMenu
         $n = $this->parties->count();
         $steps = $n + 2;
 
+        $race = $this->races->count() > 1 && $this->race ? "{$this->race->code} " : '';
         $screen = match ($s['screen']) {
-            'main' => "PollProof · {$this->agent->code}\n{$unit} ".Str::limit($this->unit->name, 30, '.')."\n"
-                .($this->resume ? '1. Continue '.(isset($this->resume['state']['data']['reason']) ? 'correction' : 'result').' ('.$this->doneSteps($this->resume['state']).'/'.$steps.' done)' : ($this->current ? '1. Correct my result' : '1. Send result'))
+            'main' => "PollProof, {$this->agent->code}\n{$unit} ".Str::limit($this->unit->name, 30, '.')."\n"
+                .$this->firstOption()
                 ."\n2. Result status\n3. I am at my unit\n4. Report incident\n0. Exit",
-            'existing' => "{$unit} already has a result: total {$this->current->total_cast}, ref {$this->current->fingerprint()}, ".$this->statusWord($this->current).".\n1. Send a correction\n0. Back",
+            'race' => "Which result sheet?\n".$this->races->values()->map(fn (Election $e, $i) => ($i + 1).'. '.Str::limit($e->name, 30, '.').($this->hasResult($e) ? ' (sent)' : ''))->implode("\n")."\n0. Back",
+            'existing' => "{$race}{$unit} already has a result: total {$this->current->total_cast}, ref {$this->current->fingerprint()}, ".$this->statusWord($this->current).".\n1. Send a correction\n0. Back",
             'reason' => "Why correct it?\n".collect(self::CORRECTION_REASONS)->map(fn ($r, $k) => "{$k}. {$r}")->implode("\n")."\n0. Back",
-            'acc' => 'Step 1/'.$steps.": ACCREDITED voters for {$unit}\n(copy from the EC8A)",
+            'acc' => 'Step 1/'.$steps.": ACCREDITED voters for {$race}{$unit}\n(copy from the EC8A)",
             'party' => $this->partyPrompt(count($s['data']['votes']), $steps),
             'rejected' => "Step {$steps}/{$steps}: REJECTED ballots",
             'confirm' => $this->summary($s['data']),
@@ -269,8 +318,9 @@ final class UssdMenu
         $valid = array_sum($d['votes'] ?? []);
         $cast = $valid + $d['rej'];
         $parties = collect($d['votes'] ?? [])->map(fn ($v, $c) => "{$c} {$v}")->implode(', ');
-        $head = 'Check before sending'.(isset($d['reason']) ? ' (correction)' : '').":\n{$this->unit->code} · Accredited {$d['acc']}\n";
-        $tail = "Rejected {$d['rej']} · Total cast {$cast}\n"
+        $race = $this->races->count() > 1 ? "{$this->race->code} " : '';
+        $head = 'Check before sending'.(isset($d['reason']) ? ' (correction)' : '').":\n{$race}{$this->unit->code}, accredited {$d['acc']}\n";
+        $tail = "Rejected {$d['rej']}, total cast {$cast}\n"
             .($cast > $d['acc'] ? "! Total is more than accredited\n" : '')
             ."1. Send\n2. Start again\n0. Cancel";
         $text = $head.$parties."\n".$tail;
@@ -291,6 +341,7 @@ final class UssdMenu
             $result = $this->recorder->record(
                 agent: $this->agent,
                 unit: $this->unit,
+                election: $this->race,
                 votes: $d['votes'] ?? [],
                 accredited: $d['acc'],
                 rejected: $d['rej'],
@@ -305,7 +356,9 @@ final class UssdMenu
         Cache::forget($this->draftKey());
         $this->audit->log($this->agent, isset($d['reason']) ? 'result.corrected_ussd' : 'result.submitted_ussd', $result, ['payload_hash' => $result->payload_hash], $this->ip);
 
-        return ($result->supersedes_id ? 'Correction sent' : 'Result sent')." for {$this->unit->code}.\nTotal cast {$result->total_cast}. Ref {$result->fingerprint()}\nA verifier will check it. Send the EC8A photo from the app when you have data.";
+        $race = $this->races->count() > 1 ? "{$this->race->name} " : '';
+
+        return ($result->supersedes_id ? 'Correction sent' : 'Result sent')." for {$race}{$this->unit->code}.\nTotal cast {$result->total_cast}. Ref {$result->fingerprint()}\nA verifier will check it. Send the EC8A photo from the app when you have data.";
     }
 
     private function cancel(): string
@@ -361,12 +414,22 @@ final class UssdMenu
 
     private function statusText(): string
     {
+        if ($this->races->count() > 1) {
+            // One line per race.
+            $lines = $this->races->map(function (Election $e) {
+                $r = ResultSubmission::where('polling_unit_id', $this->unit->id)->where('election_id', $e->id)->where('is_current', true)->first();
+
+                return $r ? "{$e->code}: {$r->total_cast} cast, ".$this->statusWord($r) : "{$e->code}: not sent";
+            });
+
+            return Str::limit("{$this->unit->code} results\n".$lines->implode("\n"), self::MAX_SCREEN - 4, '');
+        }
         if (! $this->current) {
             return "No result yet for {$this->unit->code}.\nDial again and choose 1 to send it.";
         }
         $r = $this->current;
         $at = $r->created_at->timezone(config('pollproof.timezone'))->format('g:i a');
-        $text = "{$this->unit->code} result\nTotal cast {$r->total_cast} · Ref {$r->fingerprint()}\nReceived {$at} by ".strtoupper($r->channel)."\nStatus: ".ucfirst($this->statusWord($r));
+        $text = "{$this->unit->code} result\nTotal cast {$r->total_cast}, ref {$r->fingerprint()}\nReceived {$at} by ".strtoupper($r->channel)."\nStatus: ".ucfirst($this->statusWord($r));
         if ($r->status === ResultSubmission::SENT_BACK) {
             $text .= "\n".Str::limit((string) $r->review_note, 60)."\nDial again, choose 1 to correct.";
         }
@@ -388,13 +451,13 @@ final class UssdMenu
         return preg_match('/^\d{1,5}$/', $in) ? (int) $in : null;
     }
 
-    private function doneSteps(array $state): int
+    private function doneSteps(array $state, int $parties): int
     {
         return match ($state['screen']) {
             'acc' => 0,
             'party' => 1 + count($state['data']['votes'] ?? []),
-            'rejected' => 1 + $this->parties->count(),
-            default => $this->parties->count() + 2,
+            'rejected' => 1 + $parties,
+            default => $parties + 2,
         };
     }
 
@@ -407,13 +470,43 @@ final class UssdMenu
     private function draft(): ?array
     {
         $draft = Cache::get($this->draftKey());
-
-        if (! $draft || $draft['unit_id'] !== $this->unit->id) {
+        $race = $draft ? $this->races->firstWhere('id', $draft['race'] ?? null) : null;
+        if (! $draft || $draft['unit_id'] !== $this->unit->id || ! $race) {
             return null;
         }
         // The unit got a result some other way (the app, or another session) after this one was started.
+        $current = ResultSubmission::where('polling_unit_id', $this->unit->id)->where('election_id', $race->id)->where('is_current', true)->value('id');
         $supersedes = $draft['state']['data']['supersedes'] ?? null;
 
-        return $supersedes === ($this->current?->id) ? $draft : null;
+        return $supersedes === $current ? $draft : null;
+    }
+
+    private function resumeDraft(): array
+    {
+        $this->useRace($this->races->firstWhere('id', $this->resume['race']));
+
+        return $this->resume['state'];
+    }
+
+    private function hasResult(Election $race): bool
+    {
+        return ResultSubmission::where('polling_unit_id', $this->unit->id)->where('election_id', $race->id)->where('is_current', true)->exists();
+    }
+
+    /** "1. Send result", "1. Correct my result", or "1. Continue result (3/6 done)". */
+    private function firstOption(): string
+    {
+        if ($this->resume) {
+            $race = $this->races->firstWhere('id', $this->resume['race']);
+            $steps = $race->parties->count() + 2;
+            $what = (isset($this->resume['state']['data']['reason']) ? 'correction' : 'result').($this->races->count() > 1 ? " {$race->code}" : '');
+
+            return "1. Continue {$what} (".$this->doneSteps($this->resume['state'], $race->parties->count()).'/'.$steps.' done)';
+        }
+        if ($this->races->count() > 1) {
+            return '1. Send a result';
+        }
+
+        return $this->current ? '1. Correct my result' : '1. Send result';
     }
 }

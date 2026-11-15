@@ -190,12 +190,12 @@ class VoiceTest extends TestCase
         $campaign = Campaign::find($this->campaign->id);
         $t = now();
 
-        $this->assertNull($race->run($campaign, $t)); // the lead must hold for a few minutes first
-        $this->assertSame('Early results are in. We lead, with 50 percent of the votes counted so far.', $race->run($campaign, $t->copy()->addMinutes(3)));
-        $this->assertNull($race->run($campaign, $t->copy()->addMinutes(4))); // race news is spaced out
-        $this->assertSame('Every polling unit has reported. We lead with 50 percent, and a quarter of the vote in 3 of 3 LGAs.', $race->run($campaign, $t->copy()->addMinutes(9)));
+        $this->assertNull($race->run($campaign->elections()->first(), $t)); // the lead must hold for a few minutes first
+        $this->assertSame('Early results are in. We lead, with 50 percent of the votes counted so far.', $race->run($campaign->elections()->first(), $t->copy()->addMinutes(3)));
+        $this->assertNull($race->run($campaign->elections()->first(), $t->copy()->addMinutes(4))); // race news is spaced out
+        $this->assertSame('Every polling unit has reported. We lead with 50 percent, and a quarter of the vote in 3 of 3 LGAs.', $race->run($campaign->elections()->first(), $t->copy()->addMinutes(9)));
         foreach ([15, 30, 60] as $m) {
-            $this->assertNull($race->run($campaign, $t->copy()->addMinutes($m)));
+            $this->assertNull($race->run($campaign->elections()->first(), $t->copy()->addMinutes($m)));
         }
         $this->assertSame(2, Announcement::where('kind', 'race')->count());
     }

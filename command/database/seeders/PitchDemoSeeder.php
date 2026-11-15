@@ -151,6 +151,7 @@ class PitchDemoSeeder extends Seeder
         }
 
         $this->electionDay();
+        $this->call(RacesDemoSeeder::class);
     }
 
     private function field(Role $role, array $attrs, string $code): User

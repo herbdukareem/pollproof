@@ -5,6 +5,7 @@ namespace Tests\Concerns;
 use App\Enums\Role;
 use App\Models\Campaign;
 use App\Models\Device;
+use App\Models\Election;
 use App\Models\Lga;
 use App\Models\Party;
 use App\Models\PollingUnit;
@@ -29,6 +30,12 @@ trait BuildsElection
     /**
      * Three LGAs, one ward each, two units per ward (PU1..PU6). Parties A (ours), B, C.
      */
+    /** The campaign's governorship race, which every campaign starts with. */
+    protected function race(): Election
+    {
+        return $this->campaign->elections()->first();
+    }
+
     protected function buildElection(): void
     {
         $this->campaign = Campaign::create(['name' => 'Test', 'state_name' => 'Test State', 'election_date' => '2027-02-06']);
@@ -80,12 +87,12 @@ trait BuildsElection
     }
 
     /** Builds the request body the agent app sends, signed with the device key. */
-    protected function signedResult(Device $device, string $secretKey, string $unitCode, array $votes, int $accredited, int $rejected = 0, ?int $supersedes = null, array $overrides = []): array
+    protected function signedResult(Device $device, string $secretKey, string $unitCode, array $votes, int $accredited, int $rejected = 0, ?int $supersedes = null, array $overrides = [], ?string $election = null): array
     {
         $capturedAt = '2027-02-06T15:41:00Z';
         $lat = 9.6;
         $lng = 6.5;
-        $canonical = ResultSigner::canonical($unitCode, $accredited, $rejected, $votes, null, $lat, $lng, $capturedAt, $supersedes);
+        $canonical = ResultSigner::canonical($unitCode, $accredited, $rejected, $votes, null, $lat, $lng, $capturedAt, $supersedes, $election);
 
         return array_merge([
             'device_id' => $device->id,
@@ -98,7 +105,7 @@ trait BuildsElection
             'longitude' => $lng,
             'supersedes_id' => $supersedes,
             'correction_reason' => $supersedes ? 'A figure was typed wrongly' : null,
-        ], $overrides);
+        ] + ($election ? ['election' => $election] : []), $overrides);
     }
 
     /** Record a valid signed result for a unit directly through the API. */
