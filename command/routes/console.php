@@ -4,12 +4,15 @@ use App\Enums\Role;
 use App\Models\Announcement;
 use App\Models\Campaign;
 use App\Models\User;
+use App\Models\VideoClip;
 use App\Services\AgentAppBuild;
 use App\Services\AuditLogger;
 use App\Services\ElectionWatch;
 use App\Services\StructureImporter;
+use App\Services\VideoChecker;
 use App\Services\Voice\Kokoro;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 
@@ -72,6 +75,15 @@ Artisan::command('pollproof:fetch-agent-app', function (AgentAppBuild $build) {
 })->purpose('Copy the latest agent-app build from GitHub to this server');
 
 Schedule::command('pollproof:watch')->everyMinute()->withoutOverlapping();
+// When the scheduler last ran, so Ask PollProof can tell whether the cron job is working.
+Schedule::call(fn () => Cache::forever('pollproof:scheduler-ran', now()->toIso8601String()))->everyMinute()->name('pollproof:heartbeat');
+
+// Result announcement videos that arrived while AI was off (or before it was set up).
+Artisan::command('pollproof:ai-check-videos', function (VideoChecker $checker) {
+    $queued = VideoClip::where('kind', 'result')->whereNotNull('completed_at')->whereDoesntHave('check')->get()
+        ->filter(fn (VideoClip $v) => $checker->queue($v))->count();
+    $this->info(config('pollproof.ai.enabled') ? "{$queued} videos queued for checking." : 'AI is off: set OPENAI_API_KEY first.');
+})->purpose('Check result announcement videos that have not been checked by the AI yet');
 // Spoken announcements are only useful for minutes; keep a week of them, and three days of audio.
 Schedule::call(function () {
     Announcement::where('created_at', '<', now()->subDays(7))->delete();

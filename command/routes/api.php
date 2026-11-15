@@ -4,7 +4,9 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AgentAppController;
 use App\Http\Controllers\Api\AgentController;
 use App\Http\Controllers\Api\AgentListController;
+use App\Http\Controllers\Api\AiCheckController;
 use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
@@ -136,6 +138,21 @@ Route::prefix('v1')->group(function () {
             Route::get('results/{result}', [ResultController::class, 'show']);
             Route::get('results/{result}/photo', [ResultController::class, 'photo']);
             Route::get('structure', [StructureController::class, 'index']);
+        });
+
+        // AI: announcement videos checked against signed results
+        Route::middleware('role:verifier,situation_room,dg,legal,data_officer')->group(function () {
+            Route::get('ai-checks', [AiCheckController::class, 'index']);
+            Route::post('ai-checks/{check}/review', [AiCheckController::class, 'review']);
+            Route::post('ai-checks/{check}/rerun', [AiCheckController::class, 'rerun'])->middleware('throttle:30,1');
+        });
+
+        // Ask PollProof, the assistant: for every command-room role
+        Route::middleware('role:dg,situation_room,verifier,data_officer,legal,lga_supervisor,ward_supervisor')->group(function () {
+            Route::get('assistant/threads', [AssistantController::class, 'threads']);
+            Route::get('assistant/threads/{thread}', [AssistantController::class, 'show']);
+            Route::delete('assistant/threads/{thread}', [AssistantController::class, 'destroy']);
+            Route::post('assistant/messages', [AssistantController::class, 'send'])->middleware('throttle:20,1');
         });
 
         // Verification

@@ -7,6 +7,8 @@ import NoticeBell from './NoticeBell.vue';
 import VoiceButton from './VoiceButton.vue';
 import AgentAppButton from './AgentAppButton.vue';
 import RaceSwitcher from './RaceSwitcher.vue';
+import AssistantPanel from './AssistantPanel.vue';
+import { ASSISTANT_ROLES, assistant } from '../lib/assistant';
 import Toaster from './Toaster.vue';
 import { toast } from '../lib/toast';
 import { session, signOut } from '../lib/session';
@@ -37,6 +39,7 @@ const active = computed(() => sections.value.find((s) => s.key === activeKey.val
 const campaign = computed(() => session.user?.campaign ?? {});
 const initials = computed(() => (session.user?.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase());
 const live = computed(() => current.value?.section === 'election');
+const canAsk = computed(() => ASSISTANT_ROLES.includes(session.user?.role));
 const title = computed(() => page.title || current.value?.label || '');
 
 const fmtDate = (d) => (d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '');
@@ -247,6 +250,14 @@ async function logout() {
                     <div id="pp-actions" class="flex flex-wrap items-center gap-2"></div>
                 </div>
                 <div class="flex items-center gap-2 sm:order-last">
+                    <button
+                        v-if="canAsk"
+                        class="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[13.5px] font-[620] transition-colors"
+                        :class="assistant.open ? 'border-navy bg-navy text-white' : 'border-line bg-white text-navy hover:border-navy'"
+                        title="Ask PollProof about the campaign"
+                        :aria-expanded="assistant.open"
+                        @click="assistant.open = !assistant.open"
+                    ><Icon name="sparkle" :size="16" /><span class="hidden sm:inline">Ask</span></button>
                     <AgentAppButton />
                     <VoiceButton />
                     <NoticeBell />
@@ -274,6 +285,7 @@ async function logout() {
                 <slot />
             </main>
             <Toaster />
+            <AssistantPanel v-if="canAsk" />
         </div>
     </div>
 </template>

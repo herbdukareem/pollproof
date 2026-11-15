@@ -19,6 +19,7 @@ const routes = [
     { path: '/verify', name: 'verify', component: () => import('./pages/VerifyPage.vue'), meta: { race: 'all', roles: roles('verify') } },
     { path: '/collation', name: 'collation', component: () => import('./pages/CollationPage.vue'), meta: { race: 'one', roles: roles('collation') } },
     { path: '/irev', name: 'irev', component: () => import('./pages/IrevPage.vue'), meta: { race: 'one', roles: roles('irev') } },
+    { path: '/ai-checks', name: 'ai', component: () => import('./pages/AiChecksPage.vue'), meta: { race: 'all', roles: roles('ai') } },
     { path: '/videos', name: 'videos', component: () => import('./pages/VideosPage.vue'), meta: { race: 'all', roles: roles('videos') } },
     { path: '/incidents', name: 'incidents', component: () => import('./pages/IncidentsPage.vue'), meta: { roles: roles('incidents') } },
     { path: '/agents', name: 'agents', component: () => import('./pages/AgentsPage.vue'), meta: { roles: roles('agents') } },

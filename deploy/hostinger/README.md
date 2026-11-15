@@ -144,6 +144,39 @@ What the server needs:
 
 Videos upload while the app is open. If an agent closes the app, the upload carries on from the same point the next time they open it.
 
+## AI: announcement videos and Ask PollProof
+
+With an OpenAI API key, PollProof does two more things:
+
+- **AI checks.** When an agent's video of a result being announced arrives, the sound is transcribed, the AI reads out the announced figures, and they are compared with the agent's signed result for the same unit and race. A difference raises an alert and waits under **Election day → AI checks** for a person to decide: flag the result (the verifiers and legal see a reviewer flag with the figures) or dismiss it (the AI misheard). The AI never changes a result.
+- **Ask PollProof.** The **Ask** button in the top bar opens an assistant that answers questions about the campaign from live data: how a race or an LGA stands, why a unit hasn't reported, why an agent can't check in, what is waiting for verification, whether the cron job is running. It only reads; supervisors only get answers about their own area. It is built with the Neuron AI package.
+
+To turn it on, add the key to the server's `.env` (or as the `OPENAI_API_KEY` GitHub secret when deploying with the workflow):
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+Optional settings, with their defaults:
+
+```
+POLLPROOF_AI_TRANSCRIBE_MODEL=gpt-transcribe
+POLLPROOF_AI_MODEL=gpt-6-luna            # reads the figures from a transcript
+POLLPROOF_AI_ASSISTANT_MODEL=gpt-6.1-sol # Ask PollProof
+POLLPROOF_AI_LANGUAGE=en
+POLLPROOF_FFMPEG=ffmpeg
+```
+
+OpenAI retires models from time to time; if checks start failing with a model error, set a current model name here. With `ffmpeg` on the server only the sound is sent to OpenAI (smaller and quicker); without it the video itself is sent, which works up to 25 MB (about three minutes from the app).
+
+Videos that arrived before the key was set can be checked with:
+
+```
+php artisan pollproof:ai-check-videos
+```
+
+The checks run in the queue, so they need the cron job.
+
 ## Polling units and their GPS from INEC
 
 `pollproof:inec-coordinates` pulls a state's LGAs, wards and polling units, with INEC's own GPS

@@ -20,6 +20,7 @@ final class ResultRecorder
     public function __construct(
         private readonly AlertService $alerts,
         private readonly Reconciler $reconciler,
+        private readonly VideoChecker $videos,
     ) {}
 
     /**
@@ -149,6 +150,8 @@ final class ResultRecorder
         }
 
         $this->reconciler->afterUnitResult($result);
+        // Announcement videos already checked against the old figures (or none) are compared again.
+        $this->videos->resultChanged($unit, $election);
 
         return $result;
     }

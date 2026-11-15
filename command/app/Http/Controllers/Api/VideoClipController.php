@@ -9,6 +9,7 @@ use App\Models\Incident;
 use App\Models\VideoClip;
 use App\Services\AuditLogger;
 use App\Services\Races;
+use App\Services\VideoChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -26,7 +27,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class VideoClipController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly VideoChecker $checker) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -192,6 +193,8 @@ class VideoClipController extends Controller
         }
         @unlink($part);
         $video->update(['path' => $path, 'completed_at' => now()]);
+        // A result being announced: the AI listens and compares it with the signed result.
+        $this->checker->queue($video);
         $this->audit->log($request->user(), 'video.received', $video, ['size' => $video->size, 'sha256' => $video->sha256], $request->ip());
     }
 

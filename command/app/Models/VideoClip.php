@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class VideoClip extends Model
 {
@@ -55,6 +56,12 @@ class VideoClip extends Model
     public function election(): BelongsTo
     {
         return $this->belongsTo(Election::class);
+    }
+
+    /** What the AI made of it, for a result announcement. */
+    public function check(): HasOne
+    {
+        return $this->hasOne(VideoCheck::class);
     }
 
     /** The file extension for the clip's type. */

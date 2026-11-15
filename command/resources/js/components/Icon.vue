@@ -45,6 +45,7 @@ const paths = {
     gavel: 'M14 4l6 6M11 7l6 6M9 9l-6 6 3 3 6-6M13 20h8',
     archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
     video: 'M3 6h12v12H3zM15 10l6-3v10l-6-3',
+    sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z',
     ballot: 'M4 10h16v10H4zM8 10V4h8v6M10 7h4M2 20h20',
 };
 </script>

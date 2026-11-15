@@ -82,6 +82,7 @@ jobs:
           MAIL_HOST: ${{ vars.MAIL_HOST || secrets.MAIL_HOST }}
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # Quote values so phpdotenv reads them back exactly: single quotes are literal; values
           # containing a single quote use double quotes with \, " and $ escaped.
@@ -117,6 +118,10 @@ jobs:
             echo "TERMII_API_KEY=$(q "$TERMII_API_KEY")"
             echo "TERMII_SENDER_ID=$(q "${TERMII_SENDER_ID:-PollProof}")"
             echo "TERMII_CHANNEL=dnd"
+            # AI features switch on when the OPENAI_API_KEY secret is set.
+            if [ -n "$OPENAI_API_KEY" ]; then
+              echo "OPENAI_API_KEY=$(q "$OPENAI_API_KEY")"
+            fi
             if [ -n "$MAIL_HOST" ]; then
               echo "MAIL_MAILER=smtp"
               echo "MAIL_HOST=$MAIL_HOST"

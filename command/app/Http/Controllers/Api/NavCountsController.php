@@ -10,6 +10,7 @@ use App\Models\Incident;
 use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Models\VideoCheck;
 use App\Models\Ward;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,11 @@ class NavCountsController extends Controller
 
         if ($user->hasRole(Role::Verifier, Role::SituationRoom, Role::Dg)) {
             $counts['verify'] = ResultSubmission::where('campaign_id', $campaign)->where('is_current', true)->where('status', ResultSubmission::PENDING_REVIEW)->count();
+        }
+
+        // Announcement videos the AI heard differently from the signed result, waiting for a person.
+        if ($user->hasRole(Role::Verifier, Role::SituationRoom, Role::Dg, Role::Legal, Role::DataOfficer)) {
+            $counts['ai'] = VideoCheck::where('campaign_id', $campaign)->where('status', 'done')->where('outcome', 'differs')->where('review', 'open')->count();
         }
 
         // Check-ins waiting for a supervisor, in the supervisor's own ward or LGA, and the newest one

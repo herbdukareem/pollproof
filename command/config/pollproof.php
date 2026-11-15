@@ -50,6 +50,26 @@ return [
         'timeout' => (int) env('POLLPROOF_VOICE_TIMEOUT', 120),
     ],
 
+    // AI, through OpenAI: reading result announcements in agents' videos and checking them
+    // against the signed results, and the Ask PollProof assistant. Off without an API key.
+    // Model names are settings because OpenAI retires them; see platform.openai.com/docs/models.
+    'ai' => [
+        'enabled' => (bool) env('POLLPROOF_AI_ENABLED', true) && filled(env('OPENAI_API_KEY')),
+        'key' => env('OPENAI_API_KEY'),
+        // Speech to text for the videos.
+        'transcribe_model' => env('POLLPROOF_AI_TRANSCRIBE_MODEL', 'gpt-transcribe'),
+        // The language most announcements are made in (ISO-639-1); a hint, not a limit.
+        'language' => env('POLLPROOF_AI_LANGUAGE', 'en'),
+        // Reads the figures out of a transcript: small and quick is enough.
+        'model' => env('POLLPROOF_AI_MODEL', 'gpt-6-luna'),
+        // Answers questions in the command room, using the tools in app/Ai/Tools.
+        'assistant_model' => env('POLLPROOF_AI_ASSISTANT_MODEL', 'gpt-6.1-sol'),
+        // ffmpeg cuts the sound out of a video so only a small audio file is sent. Without it the
+        // video itself is sent, which OpenAI accepts up to 25 MB (about three minutes from the app).
+        'ffmpeg' => env('POLLPROOF_FFMPEG', 'ffmpeg'),
+        'max_upload_bytes' => 25 * 1024 * 1024,
+    ],
+
     // Agents pass training with this many correct answers out of the quiz.
     'quiz_pass_mark' => 8,
 

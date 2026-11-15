@@ -135,6 +135,7 @@ final class AlertNotifier
             'irev_mismatch', 'irev_missing' => '/irev',
             'result_flagged' => $alert->subject instanceof ResultSubmission ? '/units?search='.$alert->subject->pollingUnit?->code : '/verify',
             'verify_backlog' => '/verify',
+            'ai_mismatch' => '/ai-checks'.($alert->data['check_id'] ?? null ? "?check={$alert->data['check_id']}" : ''),
             'failed_logins' => '/admin/users',
             default => '/overview',
         };
