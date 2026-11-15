@@ -6,12 +6,14 @@ import Icon from './Icon.vue';
 import NoticeBell from './NoticeBell.vue';
 import VoiceButton from './VoiceButton.vue';
 import AgentAppButton from './AgentAppButton.vue';
+import RaceSwitcher from './RaceSwitcher.vue';
 import Toaster from './Toaster.vue';
 import { toast } from '../lib/toast';
 import { session, signOut } from '../lib/session';
 import { itemForPath, sectionsFor } from '../lib/nav';
 import { page } from '../lib/page';
 import { api } from '../lib/api';
+import { byId, loadRaces, races, selectRace, today } from '../lib/races';
 
 const route = useRoute();
 const router = useRouter();
@@ -41,9 +43,17 @@ const fmtDate = (d) => (d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLoc
 const daysTo = (d) => (d ? Math.round((new Date(String(d).slice(0, 10) + 'T12:00:00') - new Date(new Date().toDateString() + ' 12:00')) / 86400000) : null);
 
 /** The card at the foot of the menu, about where the campaign is in its calendar. */
+/** "Niger governorship", or "5 races" on a general election day. */
+const raceWords = computed(() => {
+    const day = today.value;
+    if (day.length > 1) return `${day.length} races`;
+    const r = day[0] ?? races.list[0];
+    return r && !r.statewide ? r.name : `${campaign.value.state_name ?? ''} ${(r?.type_label ?? 'governorship').toLowerCase()}`;
+});
 const footer = computed(() => {
     const c = campaign.value;
-    const days = daysTo(c.election_date);
+    const day = races.currentDate ?? c.election_date;
+    const days = daysTo(day);
     switch (activeKey.value) {
         case 'setup': {
             const left = daysTo(c.freeze_at);
@@ -52,16 +62,19 @@ const footer = computed(() => {
                 ? { figure: left, unit: `day${left === 1 ? '' : 's'} until setup locks`, text: `On ${fmtDate(c.freeze_at)}, units, agents and supervisors stop changing.` }
                 : { title: 'Setup is locked', text: `Since ${fmtDate(c.freeze_at)}. Units, agents and supervisors no longer change.` };
         }
-        case 'after':
-            return c.declared_at
-                ? { title: 'Records locked', text: `Declared ${fmtDate(c.declared_at)}. Election-day records are read-only.` }
+        case 'after': {
+            const open = races.list.filter((r) => !r.declared_at).length;
+            if (c.declared_at) return { title: 'Records locked', text: `Declared ${fmtDate(c.declared_at)}. Election-day records are read-only.` };
+            return races.list.length > 1 && open < races.list.length
+                ? { figure: open, unit: `of ${races.list.length} races to declare`, text: 'Each race locks when its result is recorded under Close-out.' }
                 : { title: 'Declaration pending', text: 'Record the declared result under Close-out to lock election-day records.' };
+        }
         case 'admin':
             return { title: c.name ?? 'Campaign', text: "This campaign's data is kept apart from every other campaign's." };
         default:
             return days > 0
-                ? { figure: days, unit: `day${days === 1 ? '' : 's'} to election day`, text: `${c.state_name ?? ''} governorship, ${fmtDate(c.election_date)}` }
-                : { title: days === 0 ? 'Election day' : 'Situation room', text: `${c.state_name ?? ''} governorship, ${fmtDate(c.election_date)}` };
+                ? { figure: days, unit: `day${days === 1 ? '' : 's'} to election day`, text: `${raceWords.value}, ${fmtDate(day)}` }
+                : { title: days === 0 ? 'Election day' : 'Situation room', text: `${raceWords.value}, ${fmtDate(day)}` };
     }
 });
 
@@ -106,9 +119,15 @@ async function loadCounts() {
 let timer;
 onMounted(() => {
     loadCounts();
+    loadRaces();
     timer = setInterval(loadCounts, 15000);
 });
 onBeforeUnmount(() => clearInterval(timer));
+
+// A link that names a race (from an alert, a notification or a text) opens that race.
+watch(() => [route.query.race, races.loaded], ([race]) => {
+    if (race && races.loaded && byId(race)) selectRace(race);
+}, { immediate: true });
 
 watch(() => route.fullPath, () => {
     open.value = false;
@@ -220,6 +239,7 @@ async function logout() {
                     <h1 class="truncate text-[20px] leading-tight font-[720] tracking-[-0.015em] text-ink">{{ title }}</h1>
                     <p v-if="page.subtitle" class="hidden truncate text-[13px] text-ink-2 sm:block">{{ page.subtitle }}</p>
                 </div>
+                <RaceSwitcher class="order-last w-full sm:order-none sm:w-auto sm:max-w-[320px]" />
                 <div class="order-last flex w-full flex-wrap items-center gap-2 empty:hidden sm:order-none sm:w-auto">
                     <span v-if="live" class="hidden items-center gap-1.5 pr-1 text-[13px] font-[600] text-good sm:inline-flex" title="Figures refresh by themselves">
                         <span class="h-2 w-2 rounded-full bg-good"></span>Live

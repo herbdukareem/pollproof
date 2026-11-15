@@ -17,6 +17,7 @@ import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
 import { num, time } from '../lib/format';
+import { oneKey, oneRace, withRace } from '../lib/races';
 
 const route = useRoute();
 const router = useRouter();
@@ -41,7 +42,8 @@ function clearFilters() {
     Object.assign(filters, { search: '', lga_id: '', ward_id: '', agent: '', result: '', irev: '', channel: '' });
 }
 const structure = useResource(() => api.get('structure'));
-const tally = useResource(() => api.get('tally'), { refreshMs: 60000 });
+// Units, results and reporting are for the race chosen in the top bar.
+const tally = useResource(async () => api.get('tally', await withRace(() => oneRace.value)), { refreshMs: 60000, watch: oneKey });
 // Latest result first; the server sorts, so a header click reloads page 1.
 const sort = useSortState({
     result: { label: 'Our result', dir: 'desc' },
@@ -49,7 +51,7 @@ const sort = useSortState({
     agent: { label: 'Agent', dir: 'asc' },
     flags: { label: 'Flag', dir: 'desc' },
 }, { key: 'result', dir: 'desc' }, { mode: 'server' });
-const units = useResource(() => api.get('units', { ...filters, ...sort.params }), { refreshMs: 60000 });
+const units = useResource(async () => api.get('units', { ...filters, ...sort.params, ...(await withRace(() => oneRace.value)) }), { refreshMs: 60000, watch: oneKey });
 watch(() => [sort.key, sort.dir], () => { filters.page = 1; units.load(); });
 
 let debounce;
@@ -75,6 +77,14 @@ const tabs = [
     { value: 'review_flagged', key: 'review_flagged', label: 'Reviewer flags', act: true },
 ];
 const counts = computed(() => meta.value?.counts ?? {});
+const areaWord = computed(() => (tally.data.value?.area_level === 'ward' ? 'ward' : 'LGA'));
+// In a race inside one LGA the tiles are its wards.
+const tileKey = computed(() => (areaWord.value === 'ward' ? 'ward_id' : 'lga_id'));
+const tileOn = (l) => String(filters[tileKey.value]) === String(l.id);
+function pickTile(l) {
+    if (tileKey.value === 'ward_id' && oneRace.value?.lga_ids?.length === 1) filters.lga_id = oneRace.value.lga_ids[0];
+    filters[tileKey.value] = tileOn(l) ? '' : l.id;
+}
 const band = (p) => (p >= 90 ? 'high' : p >= 75 ? 'mid' : 'low');
 const allTiles = computed(() => (tally.data.value?.lgas ?? []).map((l) => ({ ...l, pct: l.units ? Math.round((l.units_reported / l.units) * 100) : 0 })));
 // The tiles can be ordered by name or by share reported, and each colour band shown or hidden from its legend.
@@ -125,29 +135,29 @@ function go(page) {
 </script>
 
 <template>
-    <PageHeader title="Units" :subtitle="counts.all != null ? `${num(counts.all)} polling units in ${allTiles.length} LGAs` : ''" :updated-at="units.updatedAt.value" :loading="units.loading.value" @refresh="units.load(); tally.load()" />
+    <PageHeader title="Units" :subtitle="counts.all != null ? `${num(counts.all)} polling units in ${allTiles.length} ${areaWord}s${oneRace ? `, ${oneRace.name}` : ''}` : ''" :updated-at="units.updatedAt.value" :loading="units.loading.value" @refresh="units.load(); tally.load()" />
 
     <Tabs v-model="filters.status" label="Status" :tabs="tabs.map((t) => ({ ...t, count: counts[t.key] }))" />
 
     <div class="grid items-start gap-4 2xl:grid-cols-[380px_1fr]">
         <section class="card">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-5 pt-4 pb-3">
-                <h2 class="card-title">Reporting by LGA</h2>
+                <h2 class="card-title">Reporting by {{ areaWord }}</h2>
                 <div class="seg" role="group" aria-label="Order LGAs">
                     <button v-for="[k, label] in tileOrders" :key="k" type="button" class="seg-btn" :class="tileOrder === k && 'seg-on'" :aria-pressed="tileOrder === k" @click="tileOrder = k">{{ label }}</button>
                 </div>
             </header>
             <div class="px-5 pt-3 pb-4">
-                <p class="text-[13px] text-ink-2">Share of units with a signed result. Pick an LGA to list only its units.</p>
+                <p class="text-[13px] text-ink-2">Share of units with a signed result. Pick {{ areaWord === 'ward' ? 'a ward' : 'an LGA' }} to list only its units.</p>
                 <p v-if="!lgaTiles.length" class="mt-4 rounded-lg bg-mist px-4 py-6 text-center text-sm text-ink-2">No LGAs in the bands you've chosen. <button class="font-[620] text-navy hover:underline" @click="hiddenBands = new Set()">Show all</button></p>
                 <TransitionGroup tag="div" name="tile" class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fill,minmax(96px,1fr))]">
                     <button
                         v-for="l in lgaTiles"
                         :key="l.id"
                         class="flex h-[52px] flex-col items-start justify-center rounded-md px-2.5 text-left transition-colors sm:h-[60px]"
-                        :class="[tileClass(l.pct), String(filters.lga_id) === String(l.id) ? 'ring-2 ring-orange ring-offset-2' : '']"
-                        :aria-pressed="String(filters.lga_id) === String(l.id)"
-                        @click="filters.lga_id = String(filters.lga_id) === String(l.id) ? '' : l.id"
+                        :class="[tileClass(l.pct), tileOn(l) ? 'ring-2 ring-orange ring-offset-2' : '']"
+                        :aria-pressed="tileOn(l)"
+                        @click="pickTile(l)"
                     >
                         <span class="w-full truncate text-[12.5px] font-[540] opacity-90">{{ l.name }}</span>
                         <span class="fig text-[20px] leading-tight font-[700]">{{ l.pct }}%</span>

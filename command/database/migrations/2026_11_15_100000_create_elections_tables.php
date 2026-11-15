@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    private const RACE_ALERTS = ['overvote', 'collation_mismatch', 'irev_missing', 'irev_mismatch', 'result_flagged'];
+
     private const RACE_TABLES = ['result_submissions', 'collation_entries', 'irev_entries', 'tribunal_cases', 'alerts', 'announcements'];
 
     public function up(): void
@@ -80,9 +82,12 @@ return new class extends Migration
             foreach (DB::table('parties')->where('campaign_id', $c->id)->orderBy('sort_order')->get() as $i => $p) {
                 DB::table('election_party')->insert(['election_id' => $id, 'party_id' => $p->id, 'sort_order' => $i]);
             }
-            foreach (self::RACE_TABLES as $name) {
+            foreach (['result_submissions', 'collation_entries', 'irev_entries', 'tribunal_cases'] as $name) {
                 DB::table($name)->where('campaign_id', $c->id)->update(['election_id' => $id]);
             }
+            // Only alerts about a result sheet belong to the race; an incident or an absent agent is about none.
+            DB::table('alerts')->where('campaign_id', $c->id)->whereIn('type', self::RACE_ALERTS)->update(['election_id' => $id]);
+            DB::table('announcements')->where('campaign_id', $c->id)->where('kind', 'race')->update(['election_id' => $id]);
         }
 
         // Results always belong to a race; alerts, announcements and cases may be about none.

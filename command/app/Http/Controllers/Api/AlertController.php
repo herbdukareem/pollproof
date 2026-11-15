@@ -27,6 +27,7 @@ class AlertController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'sort' => ['nullable', 'in:latest,severity'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'election' => ['nullable', 'integer'],
         ]);
         $status = $data['status'] ?? 'open';
         $campaign = $request->user()->campaign_id;
@@ -36,7 +37,9 @@ class AlertController extends Controller
                 ->when(! in_array('status', $skip) && $status !== 'all', fn ($q) => $status === 'open' ? $q->where('status', '!=', 'resolved') : $q->where('status', $status))
                 ->when(! in_array('severity', $skip) ? $data['severity'] ?? null : null, fn ($q, $v) => $q->where('severity', $v))
                 ->when(! in_array('type', $skip) ? $data['type'] ?? null : null, fn ($q, $v) => $q->where('type', $v))
-                ->when($data['search'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('title', 'like', "%{$v}%")->orWhere('detail', 'like', "%{$v}%")));
+                ->when($data['search'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('title', 'like', "%{$v}%")->orWhere('detail', 'like', "%{$v}%")))
+                // One race: its own alerts, and those about no race in particular (an absent agent, an incident).
+                ->when($data['election'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w->where('election_id', $v)->orWhereNull('election_id')));
         };
 
         $page = $filter()
@@ -58,6 +61,7 @@ class AlertController extends Controller
             'updated_at' => $a->updated_at,
             'resolved_at' => $a->resolved_at,
             'resolved_by' => $a->resolver?->name,
+            'election_id' => $a->election_id,
         ]);
 
         $statusCounts = $filter(['status'])->selectRaw("SUM(status != 'resolved') open_count, SUM(status = 'resolved') resolved_count, COUNT(*) all_count")->first();

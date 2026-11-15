@@ -67,11 +67,9 @@ class _AgentHomeState extends State<AgentHome> {
       final unit = app.unit;
       final today = app.today;
       final checkIn = today['check_in'] as Map?;
-      final result = today['result'] as Map?;
       // Agents check in every working day, so only today's check-in counts.
       final pendingCheckIn = _latest('check_in', todayOnly: true);
-      final pendingResult = _latest('result');
-      final pendingPhoto = _latest('photo');
+      final sheets = _sheets(today);
       final waiting = app.outbox.waiting.length;
       final step = onboarding?['step'] as int? ?? 5;
       final name = (app.me?['name'] as String? ?? '').split(' ').first;
@@ -89,27 +87,14 @@ class _AgentHomeState extends State<AgentHome> {
           : pendingCheckIn?.status == OutboxStatus.waiting
           ? 'Saved · sends when there is network'
           : 'Inside the unit area, with GPS';
-      final resultDone =
-          result != null ||
-          pendingResult != null && pendingResult.status != OutboxStatus.refused;
-      final sentBack = result?['status'] == 'sent_back';
-      final resultNote = sentBack
-          ? 'Sent back: ${result?['review_note'] ?? 'see messages'}'
-          : result != null
-          ? 'Signed · ref ${result['fingerprint']} · ${result['status'] == 'approved' ? 'verified' : 'waiting for verification'}'
-          : pendingResult != null
-          ? (pendingResult.status == OutboxStatus.refused
-                ? 'Not accepted: ${pendingResult.error}'
-                : pendingResult.status == OutboxStatus.sent
-                ? 'Signed · ref ${pendingResult.meta['fingerprint']} · sent, waiting for verification'
-                : 'Signed and saved · ref ${pendingResult.meta['fingerprint']} · waiting to send')
-          : 'Photo of the EC8A, figures, sign';
-      final photoDone =
-          result?['has_photo'] == true ||
-          pendingPhoto?.status == OutboxStatus.sent;
-      final photoNote = photoDone
+      final photosDone = sheets.where((sh) => sh.photoDone).length;
+      final photosWaiting = sheets.where((sh) => sh.photoWaiting).length;
+      final photoDone = sheets.isNotEmpty && photosDone == sheets.length;
+      final photoNote = sheets.length > 1
+          ? '$photosDone of ${sheets.length} uploaded${photosWaiting > 0 ? ' · the rest upload by themselves when data returns' : ''}'
+          : photoDone
           ? 'Uploaded'
-          : pendingPhoto != null
+          : photosWaiting > 0
           ? 'Uploads by itself when data returns'
           : 'Sent with the result';
 
@@ -119,28 +104,34 @@ class _AgentHomeState extends State<AgentHome> {
           'Check in at your unit',
           checkInNote,
           checkedIn,
-          sentBack
-              ? null
-              : (checkedIn ? null : () => go(const CheckInScreen())),
+          checkedIn ? null : () => go(const CheckInScreen()),
+          null,
         ),
-        (
-          Icons.fact_check_outlined,
-          'Submit the result',
-          resultNote,
-          resultDone && !sentBack,
-          checkedIn || resultDone
-              ? () => go(
-                  resultDone
-                      ? ResultFlow(correctionOf: result)
-                      : const ResultFlow(),
-                )
-              : null,
-        ),
+        // One result sheet per race on the unit's ballot.
+        for (final sh in sheets)
+          (
+            Icons.fact_check_outlined,
+            sheets.length > 1
+                ? '${sh.race!['name']} result'
+                : 'Submit the result',
+            sh.note,
+            sh.done && !sh.sentBack,
+            checkedIn || sh.done
+                ? () => go(
+                    ResultFlow(
+                      race: sh.race,
+                      correctionOf: sh.done ? sh.result : null,
+                    ),
+                  )
+                : null,
+            sh.race?['type'] as String?,
+          ),
         (
           Icons.photo_camera_outlined,
-          'EC8A photo sent',
+          sheets.length > 1 ? 'EC8A photos sent' : 'EC8A photo sent',
           photoNote,
           photoDone,
+          null,
           null,
         ),
         (
@@ -149,8 +140,10 @@ class _AgentHomeState extends State<AgentHome> {
           '${today['incidents'] ?? 0} reported today',
           false,
           () => go(const IncidentScreen()),
+          null,
         ),
       ];
+      final sentBack = sheets.where((sh) => sh.sentBack).toList();
 
       return Scaffold(
         body: RefreshIndicator(
@@ -268,17 +261,21 @@ class _AgentHomeState extends State<AgentHome> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                    if (sentBack) ...[
+                    for (final sh in sentBack) ...[
                       InfoBox(
-                        result?['review_note'] ??
+                        sh.result?['review_note'] ??
                             'The verifier sent your result back.',
-                        title: 'Your result was sent back',
+                        title: sheets.length > 1
+                            ? 'Your ${sh.race!['name']} result was sent back'
+                            : 'Your result was sent back',
                         tone: 'bad',
                         icon: Icons.undo,
                       ),
                       const SizedBox(height: 8),
                       FilledButton(
-                        onPressed: () => go(ResultFlow(correctionOf: result)),
+                        onPressed: () => go(
+                          ResultFlow(race: sh.race, correctionOf: sh.result),
+                        ),
                         child: const Text('Send a correction'),
                       ),
                       const SizedBox(height: 14),
@@ -294,7 +291,7 @@ class _AgentHomeState extends State<AgentHome> {
                         ),
                         const Spacer(),
                         Text(
-                          '${tasks.where((t) => t.$4).length} of 3 done',
+                          '${tasks.where((t) => t.$4).length} of ${tasks.length - 1} done',
                           style: const TextStyle(color: C.ink2, fontSize: 13),
                         ),
                       ],
@@ -312,6 +309,7 @@ class _AgentHomeState extends State<AgentHome> {
                               note: tasks[i].$3,
                               done: tasks[i].$4,
                               onTap: tasks[i].$5,
+                              raceType: tasks[i].$6,
                               n: i + 1,
                             ),
                           ],
@@ -373,6 +371,36 @@ class _AgentHomeState extends State<AgentHome> {
       );
     },
   );
+
+  /// Where each of today's result sheets stands: one per race at the unit (or the one sheet
+  /// from a server without races), from the server's record and what is still in the outbox.
+  List<_Sheet> _sheets(Map<String, dynamic> today) {
+    final races = app.races;
+    final results = [
+      for (final r in (today['results'] as List? ?? [today['result']]))
+        if (r is Map) r,
+    ];
+    final mine = app.outbox.items.where((i) => i.kind == 'result').toList();
+    final photos = app.outbox.items.where((i) => i.kind == 'photo').toList();
+    _Sheet sheet(Map<String, dynamic>? race, bool first) {
+      final code = race?['code'];
+      // Results saved before the app knew about races belong to the first race.
+      bool ours(dynamic election) =>
+          race == null || election == code || (election == null && first);
+      final result = race == null
+          ? today['result'] as Map?
+          : results.where((r) => ours(r['election'])).firstOrNull;
+      final pending = mine.where((i) => ours(i.meta['election'])).lastOrNull;
+      final photo = pending == null
+          ? null
+          : photos.where((p) => p.after == pending.id).lastOrNull;
+      return _Sheet(race, result, pending, photo);
+    }
+
+    return races.isEmpty
+        ? [sheet(null, true)]
+        : [for (var i = 0; i < races.length; i++) sheet(races[i], i == 0)];
+  }
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -482,23 +510,29 @@ class _TaskTile extends StatelessWidget {
     required this.done,
     required this.onTap,
     required this.n,
+    this.raceType,
   });
   final IconData icon;
   final String title, note;
   final bool done;
   final VoidCallback? onTap;
   final int n;
+
+  /// A result sheet's race, shown as its tag until the sheet is done.
+  final String? raceType;
   @override
   Widget build(BuildContext context) => ListTile(
     onTap: onTap,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-    leading: CircleAvatar(
-      radius: 17,
-      backgroundColor: done ? C.good : const Color(0xFFEEF0F4),
-      child: done
-          ? const Icon(Icons.check, color: Colors.white, size: 18)
-          : Icon(icon, color: C.navy, size: 18),
-    ),
+    leading: raceType != null && !done
+        ? RaceTag(raceType, size: 28)
+        : CircleAvatar(
+            radius: 17,
+            backgroundColor: done ? C.good : const Color(0xFFEEF0F4),
+            child: done
+                ? const Icon(Icons.check, color: Colors.white, size: 18)
+                : Icon(icon, color: C.navy, size: 18),
+          ),
     title: Text(
       title,
       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
@@ -586,4 +620,36 @@ class _Quick extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// One race's result sheet at the agent's unit, for the task list.
+class _Sheet {
+  _Sheet(this.race, this.result, this.pending, this.photo);
+  final Map<String, dynamic>? race;
+  final Map? result;
+  final OutboxItem? pending, photo;
+
+  bool get sentBack => result?['status'] == 'sent_back';
+  bool get done =>
+      result != null ||
+      pending != null && pending!.status != OutboxStatus.refused;
+  bool get photoDone =>
+      result?['has_photo'] == true || photo?.status == OutboxStatus.sent;
+  bool get photoWaiting => !photoDone && photo != null;
+
+  String get note {
+    final r = result, p = pending;
+    if (sentBack) return 'Sent back: ${r?['review_note'] ?? 'see messages'}';
+    if (r != null) {
+      return 'Signed · ref ${r['fingerprint']} · ${r['status'] == 'approved' ? 'verified' : 'waiting for verification'}';
+    }
+    if (p != null) {
+      return p.status == OutboxStatus.refused
+          ? 'Not accepted: ${p.error}'
+          : p.status == OutboxStatus.sent
+          ? 'Signed · ref ${p.meta['fingerprint']} · sent, waiting for verification'
+          : 'Signed and saved · ref ${p.meta['fingerprint']} · waiting to send';
+    }
+    return 'Photo of the EC8A, figures, sign';
+  }
 }

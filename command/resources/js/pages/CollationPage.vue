@@ -11,6 +11,7 @@ import { sortRows, useSortState } from '../lib/useSort';
 import { usePaged } from '../lib/usePaged';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
+import { oneKey, oneRace, withRace } from '../lib/races';
 import { hasRole } from '../lib/session';
 import { dateTime, localInputValue, num, signed } from '../lib/format';
 import Icon from '../components/Icon.vue';
@@ -26,7 +27,8 @@ const sort = useSortState({
     diff: { label: 'Difference', dir: 'desc', value: (e) => Object.values(e.comparison.differences ?? {}).reduce((t, d) => t + Math.abs(d), 0) },
     status: { label: 'Status', dir: 'asc', value: (e) => rank[status(e.comparison)[0]] },
 }, undefined, { onChange: () => entries.load() });
-const entries = useResource(() => api.get('collation-entries', { level: level.value, ...sort.params }), { refreshMs: 30000 });
+// The race chosen in the top bar: its sheets, its ballot and the places it is collated.
+const entries = useResource(async () => api.get('collation-entries', { level: level.value, ...sort.params, ...(await withRace(() => oneRace.value)) }), { refreshMs: 30000, watch: oneKey });
 const structure = useResource(() => api.get('structure'));
 watch(level, () => entries.load());
 
@@ -39,8 +41,19 @@ const matches = computed(() => rows.value.filter((e) =>
     && (!search.value || e.comparison.scope.toLowerCase().includes(search.value.toLowerCase()))));
 const sorted = computed(() => sortRows(matches.value, sort));
 const paged = usePaged(sorted, { perPage: 25, resetOn: () => [statusFilter.value, search.value, level.value, sort.key, sort.dir] });
-const levelLabel = { ward: 'Ward (EC8B)', lga: 'LGA (EC8C)', state: 'State (EC8D)' };
-const parties = computed(() => structure.data.value?.parties ?? []);
+const race = oneRace;
+const finalLabel = computed(() => (race.value?.statewide ? 'State (EC8D)' : `${race.value?.final_level ?? 'Final'} (final)`));
+const levelLabel = computed(() => ({ ward: 'Ward (EC8B)', lga: 'LGA (EC8C)', state: finalLabel.value }));
+const parties = computed(() => race.value?.parties ?? structure.data.value?.parties ?? []);
+/** The LGAs and wards this race is collated in. */
+const raceLgas = computed(() => {
+    const lgas = structure.data.value?.lgas ?? [];
+    const r = race.value;
+    if (!r || r.statewide) return lgas;
+    return lgas
+        .map((l) => (r.lga_ids.includes(l.id) ? l : { ...l, wards: l.wards.filter((w) => r.ward_ids.includes(w.id)) }))
+        .filter((l) => r.lga_ids.includes(l.id) || l.wards.length);
+});
 const canEnter = hasRole('data_officer', 'situation_room', 'dg');
 
 const form = reactive({ level: 'ward', scope_id: '', votes: {}, rejected: '', accredited: '', announced_at: localInputValue() });
@@ -50,19 +63,24 @@ const error = ref('');
 const lastComparison = ref(null);
 
 const scopes = computed(() => {
-    const lgas = structure.data.value?.lgas ?? [];
+    const lgas = raceLgas.value;
     if (form.level === 'ward') return lgas.flatMap((l) => l.wards.map((w) => ({ id: w.id, label: `${w.name}, ${l.name}` })));
     if (form.level === 'lga') return lgas.map((l) => ({ id: l.id, label: l.name }));
     return [];
 });
 watch(() => form.level, () => (form.scope_id = ''));
 
-const levels = [
-    { value: '', label: 'All' },
-    { value: 'ward', label: 'Wards (EC8B)' },
-    { value: 'lga', label: 'LGAs (EC8C)' },
-    { value: 'state', label: 'State (EC8D)' },
-];
+// A councillor is collated at the ward, a chairman at the LGA: no level above the race's own.
+const levels = computed(() => {
+    const area = race.value?.type === 'councillor' ? 'ward' : race.value?.type === 'lga_chair' ? 'lga' : 'state';
+    return [
+        { value: '', label: 'All' },
+        { value: 'ward', label: area === 'ward' ? 'Ward (final)' : 'Wards (EC8B)' },
+        area !== 'ward' && { value: 'lga', label: area === 'lga' ? 'LGA (final)' : 'LGAs (EC8C)' },
+        area === 'state' && { value: 'state', label: finalLabel.value },
+    ].filter(Boolean);
+});
+watch(oneKey, () => { form.scope_id = ''; form.votes = {}; if (!levels.value.some((l) => l.value === level.value)) level.value = ''; });
 // Filters by how a sheet compares; a mismatch is the one that needs action.
 const outcomes = computed(() => [
     { value: 'bad', label: summary.value.bad === 1 ? 'Mismatch' : 'Mismatches', n: summary.value.bad, act: true },
@@ -95,6 +113,7 @@ async function submit() {
     error.value = '';
     const fd = new FormData();
     fd.append('level', form.level);
+    if (race.value) fd.append('election', race.value.id);
     if (form.level !== 'state') fd.append('scope_id', form.scope_id);
     for (const p of parties.value) fd.append(`votes[${p.code}]`, form.votes[p.code] || 0);
     if (form.rejected !== '') fd.append('rejected', form.rejected);
@@ -117,7 +136,7 @@ async function submit() {
 </script>
 
 <template>
-    <PageHeader title="Collation checks" subtitle="Every declared sheet compared with our signed unit results." :updated-at="entries.updatedAt.value" :loading="entries.loading.value" @refresh="entries.load">
+    <PageHeader title="Collation checks" :subtitle="`${race ? race.name + ': every' : 'Every'} declared sheet compared with our signed unit results.`" :updated-at="entries.updatedAt.value" :loading="entries.loading.value" @refresh="entries.load">
         <template v-if="canEnter" #actions>
             <button class="btn-primary" @click="showForm = true; selected = null"><Icon name="plus" :size="16" /> Enter a sheet</button>
         </template>
@@ -216,7 +235,7 @@ async function submit() {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="label" for="c-level">Level</label>
-                    <select id="c-level" v-model="form.level" class="field"><option value="ward">Ward (EC8B)</option><option value="lga">LGA (EC8C)</option><option value="state">State (EC8D)</option></select>
+                    <select id="c-level" v-model="form.level" class="field"><option v-for="l in levels.filter((x) => x.value)" :key="l.value" :value="l.value">{{ l.label }}</option></select>
                 </div>
                 <div>
                     <label class="label" for="c-time">Announced at</label>

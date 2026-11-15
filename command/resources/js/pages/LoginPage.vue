@@ -47,7 +47,7 @@ async function submit() {
             </div>
             <div class="mt-10 max-w-md lg:mt-0">
                 <h1 class="text-[34px] leading-[1.1] font-[720] tracking-[-0.02em] lg:text-[46px]">Protect every vote you win.</h1>
-                <p class="mt-4 text-[16px] leading-relaxed text-[#c9d1de]">The command room for your governorship campaign, from the polling unit to the declaration.</p>
+                <p class="mt-4 text-[16px] leading-relaxed text-[#c9d1de]">The command room for your campaign, every race from the polling unit to the declaration.</p>
                 <figure class="mt-10 hidden sm:block" aria-hidden="true">
                     <div class="relative flex gap-[3px]">
                         <i v-for="n in 25" :key="n" class="h-9 flex-1 rounded-[2px]" :class="n <= 19 ? 'bg-[#3a4d72]' : 'bg-orange'"></i>

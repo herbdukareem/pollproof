@@ -181,3 +181,88 @@ String titleCase(String s) {
       .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
       .join(' ');
 }
+
+/// A race's short code on a square, coloured by tier of government: federal, state or local.
+/// The same tags as the command room's race switcher.
+class RaceTag extends StatelessWidget {
+  const RaceTag(this.type, {super.key, this.size = 30});
+  final String? type;
+  final double size;
+
+  static const _tag = {
+    'presidential': 'PRES',
+    'senate': 'SEN',
+    'reps': 'REPS',
+    'governorship': 'GOV',
+    'assembly': 'HOA',
+    'lga_chair': 'CHR',
+    'councillor': 'CLR',
+  };
+  static Color colour(String? type) => switch (type) {
+    'presidential' || 'senate' || 'reps' => C.navy,
+    'lga_chair' || 'councillor' => const Color(0xFF46705C),
+    _ => const Color(0xFF2B5A87),
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size * 1.35,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: colour(type),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      _tag[type] ?? '•',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.36,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
+}
+
+/// Which race's sheet is being filled in, kept in view through the result steps.
+class RaceBanner extends StatelessWidget {
+  const RaceBanner({super.key, required this.race});
+  final Map race;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
+    decoration: BoxDecoration(
+      color: RaceTag.colour(race['type']).withValues(alpha: 0.08),
+      border: Border.all(
+        color: RaceTag.colour(race['type']).withValues(alpha: 0.35),
+      ),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        RaceTag(race['type'] as String?),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${race['name']} result sheet',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Text(
+                'Use the EC8A for this race only.',
+                style: TextStyle(fontSize: 13, color: C.ink2),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}

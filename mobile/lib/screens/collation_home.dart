@@ -21,9 +21,23 @@ class CollationHome extends StatefulWidget {
 class _CollationHomeState extends State<CollationHome> {
   final app = AppState.instance;
   late String level = app.me?['ward'] != null ? 'ward' : 'lga';
-  late final votes = {
-    for (final p in app.parties) p['code'] as String: TextEditingController(),
-  };
+  // Each race is collated on its own sheet; the first race on today's ballot to start with.
+  late Map<String, dynamic>? race = app.races.isEmpty ? null : app.races.first;
+  List<Map<String, dynamic>> get ballot => app.ballotFor(race);
+  final votes = <String, TextEditingController>{};
+  TextEditingController _vote(String code) =>
+      votes.putIfAbsent(code, TextEditingController.new);
+
+  void _pickRace(Map<String, dynamic> r) => setState(() {
+    race = r;
+    comparison = null;
+    error = null;
+    for (final c in votes.values) {
+      c.clear();
+    }
+    rejected.clear();
+    accredited.clear();
+  });
   final rejected = TextEditingController(),
       accredited = TextEditingController();
   bool busy = false;
@@ -44,7 +58,8 @@ class _CollationHomeState extends State<CollationHome> {
         'scope_id': level == 'ward'
             ? app.me?['ward']?['id']
             : app.me?['lga']?['id'],
-        'votes': {for (final e in votes.entries) e.key: _n(e.value)},
+        if (race != null) 'election': race!['id'],
+        'votes': {for (final p in ballot) p['code']: _n(_vote(p['code']))},
         'rejected': _n(rejected),
         if (accredited.text.isNotEmpty) 'accredited': _n(accredited),
         'announced_at': Canonical.timestamp(DateTime.now()),
@@ -140,6 +155,28 @@ class _CollationHomeState extends State<CollationHome> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (app.races.length > 1) ...[
+                  const Text(
+                    'Which race is this sheet for?',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final r in app.races)
+                        ChoiceChip(
+                          avatar: RaceTag(r['type'] as String?, size: 18),
+                          label: Text('${r['name']}'),
+                          selected: race?['id'] == r['id'],
+                          showCheckmark: false,
+                          onSelected: (_) => _pickRace(r),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 if (app.me?['ward'] != null && app.me?['lga'] != null)
                   SegmentedButton<String>(
                     segments: const [
@@ -161,11 +198,8 @@ class _CollationHomeState extends State<CollationHome> {
                 SectionCard(
                   child: Column(
                     children: [
-                      for (final p in app.parties)
-                        _field(
-                          '${p['code']} · ${p['name']}',
-                          votes[p['code']]!,
-                        ),
+                      for (final p in ballot)
+                        _field('${p['code']} · ${p['name']}', _vote(p['code'])),
                       const Divider(),
                       _field('Rejected ballots', rejected),
                       _field('Accredited (if declared)', accredited),

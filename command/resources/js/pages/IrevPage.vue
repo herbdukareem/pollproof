@@ -5,9 +5,12 @@ import Badge from '../components/Badge.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { localInputValue, num, signed, time } from '../lib/format';
+import { oneRace, raceParam } from '../lib/races';
 
 const structure = useResource(() => api.get('structure'));
-const parties = computed(() => structure.data.value?.parties ?? []);
+// IReV keeps one page per race; this records the race chosen in the top bar.
+const race = oneRace;
+const parties = computed(() => race.value?.parties ?? structure.data.value?.parties ?? []);
 
 const search = ref('');
 const matches = ref([]);
@@ -16,8 +19,11 @@ let debounce;
 watch(search, (q) => {
     clearTimeout(debounce);
     if (!q || unit.value?.code === q) return (matches.value = []);
-    debounce = setTimeout(async () => (matches.value = (await api.get('units', { search: q })).data.slice(0, 8)), 250);
+    debounce = setTimeout(async () => (matches.value = (await api.get('units', { search: q, ...raceParam(race.value) })).data.slice(0, 8)), 250);
 });
+
+// Another race: its own units and its own sheet.
+watch(() => race.value?.id, () => { unit.value = null; search.value = ''; result.value = null; form.votes = {}; });
 
 function pick(u) {
     unit.value = u;
@@ -39,6 +45,7 @@ async function submit() {
     error.value = '';
     const fd = new FormData();
     fd.append('polling_unit_id', unit.value.id);
+    if (race.value) fd.append('election', race.value.id);
     fd.append('not_on_irev', form.not_on_irev ? '1' : '0');
     if (!form.not_on_irev) for (const p of parties.value) fd.append(`votes[${p.code}]`, form.votes[p.code] || 0);
     if (form.accredited !== '') fd.append('accredited', form.accredited);
@@ -83,7 +90,7 @@ const label = { match: 'Match', differs: 'Differs', not_on_irev: 'Not on IReV', 
 </script>
 
 <template>
-    <PageHeader title="IReV entry" subtitle="Record what IReV shows for a unit, or that it isn't there, so it can be compared with our signed result." />
+    <PageHeader title="IReV entry" :subtitle="`Record what IReV shows for a unit${race ? ` in ${race.name}` : ''}, or that it isn't there, so it can be compared with our signed result.`" />
 
     <div class="grid items-start gap-4 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form class="card p-5" @submit.prevent="submit">

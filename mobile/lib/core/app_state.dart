@@ -43,6 +43,21 @@ class AppState extends ChangeNotifier {
       (me?['supervisor'] as Map?)?.cast<String, dynamic>();
   Map<String, dynamic> get today =>
       (me?['today'] as Map?)?.cast<String, dynamic>() ?? {};
+
+  /// The races on this person's ballot today, each with its own parties. Empty from a server
+  /// that predates races, where [parties] is the one ballot.
+  List<Map<String, dynamic>> get races => [
+    for (final r in (me?['races'] as List? ?? [])) Map<String, dynamic>.from(r),
+  ];
+
+  /// The ballot for a race, or the one ballot when there are no races.
+  List<Map<String, dynamic>> ballotFor(Map? race) => race == null
+      ? parties
+      : [
+          for (final p in (race['parties'] as List? ?? []))
+            Map<String, dynamic>.from(p),
+        ];
+
   List<Map<String, dynamic>> get parties => [
     for (final p in (me?['parties'] as List? ?? []))
       Map<String, dynamic>.from(p),

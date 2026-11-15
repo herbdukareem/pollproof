@@ -74,7 +74,7 @@ const fmtDate = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-NG'
                         <div v-if="r.unit" class="flex justify-between gap-3 px-1 py-2.5"><dt class="text-ink-2">Polling unit</dt><dd class="text-right font-[600]">{{ r.unit.code }}<span class="block text-xs font-normal text-ink-2">{{ r.unit.name }}</span></dd></div>
                         <div v-if="r.ward" class="flex justify-between gap-3 px-1 py-2.5"><dt class="text-ink-2">Ward</dt><dd class="text-right font-[600]">{{ r.ward }}</dd></div>
                         <div v-if="r.lga" class="flex justify-between gap-3 px-1 py-2.5"><dt class="text-ink-2">LGA</dt><dd class="text-right font-[600]">{{ r.lga }}</dd></div>
-                        <div class="flex justify-between gap-3 px-1 py-2.5"><dt class="text-ink-2">Campaign</dt><dd class="text-right font-[600]">{{ r.campaign.name }}<span class="block text-xs font-normal text-ink-2">{{ r.campaign.state }} governorship, {{ fmtDate(r.campaign.election_date) }}</span></dd></div>
+                        <div class="flex justify-between gap-3 px-1 py-2.5"><dt class="text-ink-2">Campaign</dt><dd class="text-right font-[600]">{{ r.campaign.name }}<span class="block text-xs font-normal text-ink-2">{{ r.campaign.state }}, election of {{ fmtDate(r.campaign.election_date) }}</span></dd></div>
                     </dl>
                 </section>
 

@@ -27,14 +27,17 @@ class Canonical {
     String? longitude,
     required String capturedAt,
     int? supersedes,
+    String? election,
   }) {
     final sortedVotes = Map.fromEntries(
       votes.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
     );
     // Keys in alphabetical order; jsonEncode keeps insertion order.
+    // The race is signed only when one is named, so results from before races still verify.
     return jsonEncode({
       'accredited': accredited,
       'captured_at': capturedAt,
+      'election': ?election,
       'latitude': latitude,
       'longitude': longitude,
       'photo_sha256': photoSha256,

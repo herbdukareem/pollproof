@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch as watchSource } from 'vue';
 
 /**
  * Loads data on mount, exposes loading/error state, and optionally refreshes on an interval
@@ -7,8 +7,10 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
  * `busy` is true only for loads someone asked for (a new page, a sort, a filter), not the quiet
  * background refresh, so tables can show a loader without flashing every minute.
  * If loads overlap (clicking through pages quickly), only the newest one's data is kept.
+ * `watch` is a getter (the race being looked at, say): when it changes the data is loaded again,
+ * and cleared first so the old race's figures never show under the new race's name.
  */
-export function useResource(loader, { refreshMs = 0, immediate = true } = {}) {
+export function useResource(loader, { refreshMs = 0, immediate = true, watch = null } = {}) {
     const data = ref(null);
     const error = ref(null);
     const loading = ref(false);
@@ -43,6 +45,14 @@ export function useResource(loader, { refreshMs = 0, immediate = true } = {}) {
         if (refreshMs) timer = setInterval(() => run(true), refreshMs);
     });
     onBeforeUnmount(() => timer && clearInterval(timer));
+    if (watch) {
+        // From null is the source becoming known (the races arriving): the first load already used it.
+        watchSource(watch, (now, before) => {
+            if (before == null) return;
+            data.value = null;
+            load();
+        });
+    }
 
     return { data, error, loading, busy, updatedAt, load };
 }

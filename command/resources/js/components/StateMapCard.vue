@@ -14,6 +14,8 @@ const props = defineProps({
     loader: { type: Function, required: true },
     tally: { type: Object, required: true },
     ourCode: { type: String, default: null },
+    // The race the tally is for; the unit points are fetched for the same race.
+    election: { type: Number, default: null },
 });
 
 const router = useRouter();
@@ -217,7 +219,7 @@ function popover(item, where) {
 
 async function loadPoints() {
     try {
-        points.value = await api.get('tally/points');
+        points.value = await api.get('tally/points', props.election ? { election: props.election } : undefined);
     } catch {
         // The LGA view works without them; wards just show no figures.
     }

@@ -11,11 +11,14 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'outbox_screen.dart';
 
-/// Photo of the EC8A → figures → review and sign. With [correctionOf], the new record is a
-/// correction linked to the agent's current result; the first record never changes.
+/// Photo of the EC8A → figures → review and sign, for one [race]. With [correctionOf], the new
+/// record is a correction linked to the agent's current result; the first record never changes.
 class ResultFlow extends StatefulWidget {
-  const ResultFlow({super.key, this.correctionOf});
+  const ResultFlow({super.key, this.correctionOf, this.race});
   final Map? correctionOf;
+
+  /// The race this sheet is for (from /me races); null on a server without races.
+  final Map? race;
   @override
   State<ResultFlow> createState() => _ResultFlowState();
 }
@@ -27,9 +30,14 @@ class _ResultFlowState extends State<ResultFlow> {
   String? photoSha;
   final accredited = TextEditingController();
   final rejected = TextEditingController();
+  late final List<Map<String, dynamic>> ballot = app.ballotFor(widget.race);
   late final Map<String, TextEditingController> votes = {
-    for (final p in app.parties) p['code'] as String: TextEditingController(),
+    for (final p in ballot) p['code'] as String: TextEditingController(),
   };
+  String? get raceCode => widget.race?['code'] as String?;
+  String get raceName => widget.race?['name'] as String? ?? '';
+  // With one race at the unit the SMS needs no race code, as before races.
+  bool get severalRaces => app.races.length > 1;
   bool sheetSaysSo = false, confirmed = false, signing = false;
   Fix? fix;
   String? fixError;
@@ -103,6 +111,7 @@ class _ResultFlowState extends State<ResultFlow> {
       longitude: lng,
       capturedAt: capturedAt,
       supersedes: supersedes,
+      election: raceCode,
     );
     final signature = await app.key!.sign(canonical);
     fingerprint = Canonical.fingerprint(canonical);
@@ -110,7 +119,8 @@ class _ResultFlowState extends State<ResultFlow> {
     final result = await app.outbox.add(
       kind: 'result',
       path: 'results',
-      title: '${correcting ? 'Correction' : 'Result'} for ${app.unit!['code']}',
+      title:
+          '${correcting ? 'Correction' : 'Result'} for ${app.unit!['code']}${severalRaces ? ' · $raceName' : ''}',
       fields: {
         'device_id': app.deviceId,
         'signature': signature,
@@ -123,18 +133,28 @@ class _ResultFlowState extends State<ResultFlow> {
         'photo_sha256': photoSha,
         'supersedes_id': supersedes,
         'correction_reason': correcting ? reason : null,
+        'election': raceCode,
       },
       meta: {
         'fingerprint': fingerprint,
         'total_cast': totalCast,
-        'sms': smsText(app.unit!['code'], _n(accredited), v, _n(rejected)),
+        'election': raceCode,
+        'race': raceName,
+        'sms': smsText(
+          app.unit!['code'],
+          _n(accredited),
+          v,
+          _n(rejected),
+          race: severalRaces ? raceCode : null,
+        ),
       },
     );
     // The photo is larger; it follows the signed figures and is checked against the signed fingerprint.
     await app.outbox.add(
       kind: 'photo',
       path: 'results/{after.id}/photo',
-      title: 'EC8A photo for ${app.unit!['code']}',
+      title:
+          'EC8A photo for ${app.unit!['code']}${severalRaces ? ' · $raceName' : ''}',
       after: result.id,
       files: [
         {
@@ -156,9 +176,10 @@ class _ResultFlowState extends State<ResultFlow> {
     String unit,
     int accredited,
     Map<String, int> votes,
-    int rejected,
-  ) =>
-      'R $unit AC$accredited ${votes.entries.map((e) => '${e.key}${e.value}').join(' ')} X$rejected';
+    int rejected, {
+    String? race,
+  }) =>
+      'R ${race == null ? '' : '$race '}$unit AC$accredited ${votes.entries.map((e) => '${e.key}${e.value}').join(' ')} X$rejected';
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -182,7 +203,13 @@ class _ResultFlowState extends State<ResultFlow> {
         children: [
           if (step < 3) ...[
             StepBar(step: step, labels: const ['Photo', 'Figures', 'Sign']),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            // With several races on the ballot, which sheet this is stays in view at every step.
+            if (severalRaces && widget.race != null) ...[
+              RaceBanner(race: widget.race!),
+              const SizedBox(height: 14),
+            ] else
+              const SizedBox(height: 4),
           ],
           ...switch (step) {
             0 => _photo(),
@@ -356,11 +383,13 @@ class _ResultFlowState extends State<ResultFlow> {
         children: [
           _num('Accredited voters', accredited, key: const Key('accredited')),
           const Divider(),
-          for (final p in app.parties)
+          for (final p in ballot)
             _num(
               '${p['code']}',
               votes[p['code']]!,
-              sub: '${p['name']}',
+              sub: (p['candidate'] as String?)?.isNotEmpty == true
+                  ? '${p['candidate']} · ${p['name']}'
+                  : '${p['name']}',
               key: Key('votes-${p['code']}'),
             ),
           const Divider(),
@@ -472,7 +501,7 @@ class _ResultFlowState extends State<ResultFlow> {
               ],
             ),
             _row('Accredited voters', '${_n(accredited)}'),
-            for (final p in app.parties)
+            for (final p in ballot)
               _row('${p['code']} · ${p['name']}', votes[p['code']]!.text),
             _row('Rejected ballots', rejected.text),
             const Divider(),

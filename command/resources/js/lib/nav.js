@@ -6,6 +6,7 @@ const SETUP = ['dg', 'situation_room'];
 // `count` names a number from /nav-counts shown beside the item.
 export const NAV = [
     { name: 'readiness', label: 'Readiness', path: '/setup/readiness', icon: 'flag', roles: SETUP, section: 'setup' },
+    { name: 'races', label: 'Races', path: '/setup/races', icon: 'ballot', roles: SETUP, section: 'setup' },
     { name: 'structure', label: 'Structure', path: '/setup/structure', icon: 'map', roles: SETUP, section: 'setup', count: 'structure' },
     { name: 'roster', label: 'Agent roster', path: '/setup/roster', icon: 'list', roles: SETUP, section: 'setup' },
     { name: 'supervisors', label: 'Supervisors', path: '/setup/supervisors', icon: 'tree', roles: SETUP, section: 'setup', count: 'supervisors' },

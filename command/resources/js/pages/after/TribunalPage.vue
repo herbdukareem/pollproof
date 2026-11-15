@@ -7,6 +7,7 @@ import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
+import { hasSeveral, loadRaces, oneRace, races } from '../../lib/races';
 
 const route = useRoute();
 const router = useRouter();
@@ -17,7 +18,9 @@ const error = ref('');
 const message = ref('');
 const busy = ref('');
 
-const newCase = reactive({ open: false, title: '', petitioner: '', our_role: 'respondent' });
+const newCase = reactive({ open: false, title: '', petitioner: '', our_role: 'respondent', election_id: '' });
+// A petition is against one race's return.
+loadRaces().then(() => { newCase.election_id ||= oneRace.value?.id ?? ''; });
 const ground = reactive({ open: false, label: '', claim: '' });
 const task = reactive({ title: '', owner_id: '', due_on: '' });
 const milestone = reactive({ date: '', label: '' });
@@ -65,7 +68,7 @@ async function act(key, fn, done = '') {
 }
 
 async function createCase() {
-    const res = await act('case', () => api.post('tribunal-cases', { title: newCase.title, petitioner: newCase.petitioner, our_role: newCase.our_role }), 'Case created.');
+    const res = await act('case', () => api.post('tribunal-cases', { title: newCase.title, petitioner: newCase.petitioner, our_role: newCase.our_role, election_id: newCase.election_id || null }), 'Case created.');
     if (res) {
         Object.assign(newCase, { open: false, title: '', petitioner: '' });
         await cases.load();
@@ -92,7 +95,7 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
 </script>
 
 <template>
-    <PageHeader :back="route.params.id ? '/after/tribunal' : ''" title="Tribunal workspace" :subtitle="c ? `${c.case.title}, we are the ${c.case.our_role}` : 'Petitions, our answers and the reply bundle for counsel.'">
+    <PageHeader :back="route.params.id ? '/after/tribunal' : ''" title="Tribunal workspace" :subtitle="c ? `${c.case.title}${hasSeveral && c.case.election ? `, ${c.case.election.name}` : ''}, we are the ${c.case.our_role}` : 'Petitions, our answers and the reply bundle for counsel.'">
         <template #actions>
             <select v-if="cases.data.value?.length > 1" class="field h-9 w-56" aria-label="Case" :value="route.params.id" @change="router.push({ name: 'tribunal-case', params: { id: $event.target.value } })">
                 <option v-for="k in cases.data.value" :key="k.id" :value="k.id">{{ k.title }}{{ k.status === 'closed' ? ' (closed)' : '' }}</option>
@@ -105,8 +108,9 @@ const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NG'
     <p v-if="message" role="status" class="mb-4 rounded-lg bg-good-bg px-4 py-3 text-sm font-[600] text-good">{{ message }}</p>
     <p v-if="error" role="alert" class="mb-4 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{{ error }}</p>
 
-    <form v-if="newCase.open || (cases.data.value && !cases.data.value.length)" class="card mb-4 grid gap-3 p-5 md:grid-cols-[1.5fr_1fr_180px_auto]" @submit.prevent="createCase">
+    <form v-if="newCase.open || (cases.data.value && !cases.data.value.length)" class="card mb-4 grid gap-3 p-5" :class="hasSeveral ? 'md:grid-cols-[1.4fr_1fr_1fr_160px_auto]' : 'md:grid-cols-[1.5fr_1fr_180px_auto]'" @submit.prevent="createCase">
         <div><label class="label" for="t-title">Case</label><input id="t-title" v-model="newCase.title" class="field" placeholder="e.g. Party B v INEC and others" required /></div>
+        <div v-if="hasSeveral"><label class="label" for="t-race">Race</label><select id="t-race" v-model="newCase.election_id" class="field"><option v-for="r in races.list" :key="r.id" :value="r.id">{{ r.name }}</option></select></div>
         <div><label class="label" for="t-pet">Petitioner</label><input id="t-pet" v-model="newCase.petitioner" class="field" required /></div>
         <div><label class="label" for="t-role">We are the</label><select id="t-role" v-model="newCase.our_role" class="field"><option value="respondent">Respondent</option><option value="petitioner">Petitioner</option></select></div>
         <div class="flex items-end"><button class="btn-navy h-10 w-full" :disabled="busy === 'case'">Create</button></div>

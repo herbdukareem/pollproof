@@ -109,6 +109,30 @@ Push to `main` (with `HOSTINGER_AUTO_DEPLOY=true`), or press **Run workflow** wi
 
 Don't deploy on election day unless something is broken.
 
+## Races: more than one election
+
+A campaign starts with one governorship race. Add the others under **Setup → Races**: presidential, Senate, House of Reps, State Assembly, LGA chairman and councillor, and re-runs or by-elections. Each race has its own area (the whole state, chosen LGAs, or chosen wards), its own ballot with candidate names, and its own day. Results, verification, collation, IReV, alerts and the declaration are all kept per race.
+
+In the command room the race switcher in the top bar picks the race a page shows. **All races** on the Overview gives one row per race: how far ahead or behind we are, our share against the nearest rival, and how many units are in.
+
+Agents see one result task for each race at their unit, and send one signed sheet per race. They need app version 1.1.0 or later for this; older apps keep working but send every result for the unit's first race.
+
+By SMS, the race code goes before the unit code, one text per sheet:
+
+```
+R HOA-BIDA1 004 AC448 A214 B187 C22 X6
+```
+
+With only one race at the unit the race code can be left out. On USSD, an agent with several races is asked which result sheet they are sending.
+
+The deploy runs the migration for you. If you pull on the server by hand, run it once:
+
+```
+php artisan migrate --force
+```
+
+It creates the races and moves every existing result, collation sheet, IReV entry and tribunal case into the campaign's governorship race.
+
 ## Polling units and their GPS from INEC
 
 `pollproof:inec-coordinates` pulls a state's LGAs, wards and polling units, with INEC's own GPS

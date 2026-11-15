@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { hasRole } from '../lib/session';
 import { num } from '../lib/format';
+import { viewKey, viewRace, withRace } from '../lib/races';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,7 +26,8 @@ const filters = reactive({
     per_page: 25,
     page: Number(q.page) || 1,
 });
-const alerts = useResource(() => api.get('alerts', filters), { refreshMs: 30000 });
+// One race's alerts (and those about no race in particular), or every race's.
+const alerts = useResource(async () => api.get('alerts', { ...filters, ...(await withRace(() => viewRace.value)) }), { refreshMs: 30000, watch: viewKey });
 const busy = ref(null);
 
 // Keep the filters in the address so a filtered view can be shared or bookmarked.

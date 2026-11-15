@@ -29,6 +29,10 @@
     --color-warn-bg: #fbefd2;
     --color-bad: #9a3a0c;
     --color-bad-bg: #fcebe1;
+    /* Race tags: the tier of government a race is for. */
+    --color-tier-federal: #13213c;
+    --color-tier-state: #2b5a87;
+    --color-tier-local: #46705c;
 }
 
 @layer base {
@@ -175,6 +179,13 @@
 }
 @utility label {
     @apply mb-1.5 block text-[13px] font-[620] text-ink;
+}
+/* A row in the race list: a race's tag, its name and area, and how we stand. */
+@utility race-row {
+    @apply flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-ink outline-none transition-colors hover:bg-mist focus-visible:bg-mist focus-visible:ring-2 focus-visible:ring-navy/25;
+}
+@utility race-row-on {
+    @apply bg-[#eef1f6];
 }
 /* Table headings in sentence case: they name the column, they don't shout it. */
 @utility th {
@@ -372,5 +383,13 @@
     .pop-enter-from {
         opacity: 0;
         margin-top: -4px;
+    }
+    .sheet-enter-active,
+    .sheet-leave-active {
+        transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .sheet-enter-from,
+    .sheet-leave-to {
+        transform: translateY(100%);
     }
 }

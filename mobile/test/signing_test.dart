@@ -32,6 +32,7 @@ void main() {
           longitude: c['longitude'],
           capturedAt: c['captured_at'],
           supersedes: c['supersedes'],
+          election: c['election'],
         );
         expect(canonical, c['canonical']);
         expect(Canonical.sha256Hex(utf8.encode(canonical)), c['sha256']);

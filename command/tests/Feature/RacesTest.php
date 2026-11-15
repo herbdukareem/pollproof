@@ -161,6 +161,20 @@ class RacesTest extends TestCase
         $this->assertSame([$assembly->id, 'Assembly (L1): declared figures differ from our units'], [$alert->election_id, $alert->title]);
     }
 
+    public function test_alerts_filter_by_race_and_keep_those_about_no_race(): void
+    {
+        $assembly = $this->assembly();
+        $alert = fn (string $key, ?int $race) => Alert::create(['campaign_id' => $this->campaign->id, 'election_id' => $race, 'type' => 'overvote', 'severity' => 'high', 'dedupe_key' => $key, 'title' => $key, 'detail' => 'x', 'status' => 'open', 'opened_at' => now()]);
+        $alert('governorship', $this->race()->id);
+        $alert('assembly', $assembly->id);
+        $alert('incident', null);
+        $this->actingAsUser($this->staff(Role::SituationRoom));
+
+        $titles = fn (string $q) => collect($this->getJson("/api/v1/alerts{$q}")->assertOk()->json('data'))->pluck('title')->sort()->values()->all();
+        $this->assertSame(['assembly', 'governorship', 'incident'], $titles(''));
+        $this->assertSame(['assembly', 'incident'], $titles("?election={$assembly->id}"));
+    }
+
     public function test_declaring_one_race_locks_only_that_race(): void
     {
         $assembly = $this->assembly();

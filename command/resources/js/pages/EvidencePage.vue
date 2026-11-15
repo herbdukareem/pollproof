@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
@@ -9,9 +9,26 @@ import ResultFlags from '../components/ResultFlags.vue';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { dateTime, num, signed, titleCase } from '../lib/format';
+import RaceTag from '../components/RaceTag.vue';
+import { byId, loadRaces, oneRace, selectRace } from '../lib/races';
 
 const route = useRoute();
-const pack = useResource(() => api.get(`units/${route.params.id}/evidence`));
+// The pack is for one race at a time: the race in view if it is on this unit's ballot, else the
+// unit's first race with a result. Tabs switch between the unit's races.
+const raceId = ref(null);
+const pack = useResource(async () => {
+    await loadRaces();
+    const want = raceId.value ?? oneRace.value?.id;
+    let p = await api.get(`units/${route.params.id}/evidence`, want ? { election: want } : undefined);
+    if (want && !p.races.some((r) => r.id === want)) p = await api.get(`units/${route.params.id}/evidence`);
+    raceId.value = p.election?.id ?? null;
+    return p;
+});
+function showRace(id) {
+    raceId.value = id;
+    selectRace(id);
+    pack.load();
+}
 const d = computed(() => pack.data.value);
 const channelName = (c) => ({ ussd: 'USSD', sms: 'SMS', app: 'the app' })[c] ?? c;
 const current = computed(() => d.value?.results.find((r) => r.is_current) ?? null);
@@ -64,6 +81,13 @@ const headline = computed(() => {
             <button class="btn-primary print:hidden" @click="printPack"><Icon name="download" :size="16" /> Print or save as PDF</button>
         </template>
     </PageHeader>
+
+    <div v-if="d && d.races.length > 1" class="seg mb-4 max-w-full overflow-x-auto print:hidden" role="tablist" aria-label="Race">
+        <button v-for="r in d.races" :key="r.id" role="tab" :aria-selected="r.id === raceId" class="seg-btn flex items-center gap-2 whitespace-nowrap px-3 py-1.5" :class="r.id === raceId && 'seg-on'" @click="showRace(r.id)">
+            <RaceTag v-if="byId(r.id)" :race="byId(r.id)" size="sm" />{{ r.name }}<span v-if="!r.has_results" class="text-[12px] opacity-70">no result</span>
+        </button>
+    </div>
+    <p v-if="d?.election" class="mb-3 hidden text-sm font-[650] print:block">{{ d.election.name }}</p>
 
     <LoadState :loading="pack.loading.value" :error="pack.error.value" :empty="!d">
         <p class="mb-4 text-[12.5px] text-ink-2 tabular-nums">Generated {{ dateTime(d.generated_at) }}. Opening this pack is recorded in the audit log.</p>

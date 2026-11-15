@@ -14,8 +14,11 @@ class FallbackScreen extends StatelessWidget {
     final number =
         app.rules['sms_number'] as String? ?? '[campaign SMS number]';
     final ussd = app.rules['ussd_code'] as String?;
+    // With several races at the unit, the race code comes first: one text per result sheet.
+    final races = app.races;
+    final race = races.length > 1 ? '${races.first['code']} ' : '';
     final sample =
-        'R $unit AC448 ${app.parties.take(4).map((p) => '${p['code']}${[214, 187, 22, 9][app.parties.indexOf(p) % 4]}').join(' ')} X6';
+        'R $race$unit AC448 ${app.parties.take(4).map((p) => '${p['code']}${[214, 187, 22, 9][app.parties.indexOf(p) % 4]}').join(' ')} X6';
     return Scaffold(
       appBar: AppBar(title: const Text('If the app fails')),
       body: ListView(
@@ -99,7 +102,12 @@ class FallbackScreen extends StatelessWidget {
           SectionCard(
             child: Column(
               children: [
-                _row('R $unit', 'Result for $unit'),
+                _row(
+                  'R $race$unit',
+                  race.isEmpty
+                      ? 'Result for $unit'
+                      : 'Race code, then your unit',
+                ),
                 _row('AC448', 'Accredited voters'),
                 _row(
                   '${app.parties.isEmpty ? 'A' : app.parties.first['code']}214 …',
@@ -109,6 +117,21 @@ class FallbackScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (races.length > 1) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Send one text for each race. The race codes at your unit:',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            SectionCard(
+              child: Column(
+                children: [
+                  for (final r in races) _row('${r['code']}', '${r['name']}'),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           InfoBox(
             'OK $unit total 438 ref 7F2A9C1E',

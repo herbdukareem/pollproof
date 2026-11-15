@@ -8,8 +8,12 @@ import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { hasRole, session } from '../../lib/session';
 import { dateTime, localInputValue, num, signed } from '../../lib/format';
+import RaceTag from '../../components/RaceTag.vue';
+import { byId, hasSeveral, loadRaces, oneKey, oneRace, selectRace, withRace } from '../../lib/races';
 
-const res = useResource(() => api.get('closeout'));
+// Each race is declared on its own; this is the race chosen in the top bar.
+const res = useResource(async () => api.get('closeout', await withRace(() => oneRace.value)), { watch: oneKey });
+const race = computed(() => d.value?.election ?? oneRace.value);
 const d = computed(() => res.data.value);
 const isDg = hasRole('dg');
 const form = reactive({ declared_at: localInputValue(), votes: {} });
@@ -22,6 +26,8 @@ const error = ref('');
 watch(d, (v) => {
     if (!v) return;
     choice.value = v.retention.choice ?? 'keep_until_cases_end';
+    form.votes = {};
+    editing.value = false;
     v.rows.forEach((r) => (form.votes[r.party] = r.declared ?? ''));
     if (v.declared_at) form.declared_at = localInputValue(new Date(v.declared_at));
 });
@@ -32,7 +38,9 @@ const kpis = computed(() => {
     const v = d.value;
     return [
         { label: 'Declared winner', value: v.winner.name, note: `${v.winner.is_ours ? 'Our candidate' : 'Not our candidate'}, margin ${num(v.winner.margin)}` },
-        { label: 'Our LGAs at 25% or more', value: `${v.our_lgas_meeting_threshold} of ${v.lga_count}`, note: `Threshold needs ${v.lgas_required}` },
+        v.election?.rule === 'spread'
+            ? { label: 'Our LGAs at 25% or more', value: `${v.our_lgas_meeting_threshold} of ${v.lga_count}`, note: `Threshold needs ${v.lgas_required}` }
+            : { label: 'Where it was fought', value: v.election?.area ?? '', note: v.election?.final_level ? `Declared at ${v.election.final_level.toLowerCase()} level` : '' },
         { label: 'Units with our signed result', value: num(v.units_reported), note: `${v.units ? ((100 * v.units_reported) / v.units).toFixed(1) : 0}% of ${num(v.units)}` },
         { label: 'Units cited in tribunal answers', value: num(v.evidence_units), note: `${v.open_cases} open ${v.open_cases === 1 ? 'case' : 'cases'}` },
     ];
@@ -56,15 +64,15 @@ async function act(key, fn, done) {
     }
 }
 const declare = () => {
-    if (!d.value.declared && !window.confirm('Record the declaration? From then on results, collation, IReV and check-ins are read-only.')) return;
-    act('declare', () => api.post('closeout/declare', { declared_at: new Date(form.declared_at).toISOString(), votes: Object.fromEntries(Object.entries(form.votes).filter(([, n]) => n !== '' && n != null).map(([k, n]) => [k, Number(n)])) }), 'Declaration recorded.').then(() => (editing.value = false));
+    if (!d.value.declared && !window.confirm(`Record the declaration of ${race.value?.name ?? 'this race'}? From then on its results, collation and IReV entries are read-only.`)) return;
+    act('declare', () => api.post('closeout/declare', { ...(race.value ? { election: race.value.id } : {}), declared_at: new Date(form.declared_at).toISOString(), votes: Object.fromEntries(Object.entries(form.votes).filter(([, n]) => n !== '' && n != null).map(([k, n]) => [k, Number(n)])) }), 'Declaration recorded.').then(() => { editing.value = false; loadRaces(true); });
 };
 const saveChoice = () => act('retention', () => api.post('closeout/retention', { choice: choice.value }), 'Choice saved. Ashlab confirms with the DG before anything is deleted.');
 const printReport = () => window.print();
 </script>
 
 <template>
-    <PageHeader title="Close-out" subtitle="Final figures, the campaign report, and what happens to the data." :updated-at="res.updatedAt.value" :loading="res.loading.value" @refresh="res.load">
+    <PageHeader title="Close-out" :subtitle="`${hasSeveral && race ? race.name + ': final' : 'Final'} figures, the campaign report, and what happens to the data.`" :updated-at="res.updatedAt.value" :loading="res.loading.value" @refresh="res.load">
         <template #actions>
             <button v-if="d?.declared" class="btn-primary print:hidden" @click="printReport"><Icon name="download" :size="16" /> Campaign report (PDF)</button>
         </template>
@@ -76,12 +84,29 @@ const printReport = () => window.print();
 
         <div v-if="d.declared" class="mb-4 flex items-center gap-3 rounded-[10px] bg-navy px-5 py-3 text-sm text-white">
             <Icon name="lock" :size="18" />
-            <span><b class="font-[650]">Records locked.</b> Election-day data is read-only since the declaration on {{ dateTime(d.declared_at) }}.</span>
+            <span><b class="font-[650]">{{ hasSeveral ? `${race?.name} records locked.` : 'Records locked.' }}</b> Its election-day data is read-only since the declaration on {{ dateTime(d.declared_at) }}.</span>
         </div>
         <div class="mb-6 hidden print:block">
             <h1 class="text-2xl font-[700]">{{ session.user?.campaign?.name }}: campaign report</h1>
-            <p class="text-sm">{{ session.user?.campaign?.state_name }} governorship election, generated {{ dateTime(new Date()) }}</p>
+            <p class="text-sm">{{ race?.name ?? 'Election' }}, {{ race?.area === 'Whole state' ? session.user?.campaign?.state_name : race?.area }}, generated {{ dateTime(new Date()) }}</p>
         </div>
+
+        <!-- Every race and whether it is declared: one click to the next one to close out. -->
+        <nav v-if="d.races?.length > 1" class="mb-4 flex flex-wrap gap-2 print:hidden" aria-label="Races to declare">
+            <button
+                v-for="r in d.races"
+                :key="r.id"
+                class="chip h-10 gap-2 pr-3.5 pl-1.5"
+                :class="r.id === race?.id && 'chip-on'"
+                :aria-current="r.id === race?.id ? 'true' : null"
+                @click="selectRace(r.id)"
+            >
+                <RaceTag v-if="byId(r.id)" :race="byId(r.id)" size="sm" />
+                {{ r.name }}
+                <Icon v-if="r.declared_at" name="lock" :size="13" :class="r.id === race?.id ? 'text-white/80' : 'text-good'" />
+            </button>
+            <span class="self-center text-[13px] text-ink-2">{{ d.races.filter((r) => r.declared_at).length }} of {{ d.races.length }} declared</span>
+        </nav>
 
         <dl v-if="kpis.length" class="card mb-4 grid overflow-hidden sm:grid-cols-2 xl:grid-cols-4">
             <div v-for="k in kpis" :key="k.label" class="border-rule px-5 py-4 max-xl:[&:nth-child(n+2)]:border-t sm:max-xl:[&:nth-child(2)]:border-t-0 sm:max-xl:[&:nth-child(even)]:border-l xl:[&:not(:first-child)]:border-l">
@@ -122,7 +147,7 @@ const printReport = () => window.print();
                     <div><label class="label" for="dat">Declared at</label><input id="dat" v-model="form.declared_at" type="datetime-local" class="field h-10" required /></div>
                     <button class="btn-navy h-10" :disabled="busy === 'declare'">{{ d.declared ? 'Save correction' : 'Record the declaration' }}</button>
                     <button v-if="editing" type="button" class="btn-outline h-10" @click="editing = false">Cancel</button>
-                    <p v-if="!d.declared" class="w-full text-xs text-ink-2">Recording the declaration locks results, collation, IReV and check-ins. The tribunal workspace stays open.</p>
+                    <p v-if="!d.declared" class="w-full text-xs text-ink-2">Recording the declaration locks this race's results, collation and IReV entries. Other races stay open, and so does the tribunal workspace.</p>
                 </form>
             </section>
 

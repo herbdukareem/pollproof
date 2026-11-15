@@ -13,12 +13,16 @@ import SearchSelect from '../components/SearchSelect.vue';
 import { useResource } from '../lib/useResource';
 import { session } from '../lib/session';
 import { ago, dateTime, minutesSince, num, time } from '../lib/format';
+import RaceTag from '../components/RaceTag.vue';
+import { byId, hasSeveral, viewKey, viewRace, withRace } from '../lib/races';
 
 const kind = ref('');
 const search = ref('');
 const lgaId = ref('');
 const page = ref(1);
-const queue = useResource(() => api.get('results-queue', { kind: kind.value, search: search.value, lga_id: lgaId.value, page: page.value, per_page: 20 }), { refreshMs: 20000 });
+// One race's sheets, or every race's when All races is chosen; each sheet is tagged with its race.
+const queue = useResource(async () => api.get('results-queue', { kind: kind.value, search: search.value, lga_id: lgaId.value, page: page.value, per_page: 20, ...(await withRace(() => viewRace.value)) }), { refreshMs: 20000, watch: viewKey });
+const raceOf = (r) => byId(r.election_id ?? r.election?.id) ?? r.election ?? null;
 const structure = useResource(() => api.get('structure'));
 const items = computed(() => queue.data.value?.data ?? []);
 const counts = computed(() => queue.data.value?.counts ?? {});
@@ -112,10 +116,13 @@ const ageClass = (r) => {
                         >
                             <span v-if="selected?.id === r.id" class="absolute inset-y-0 left-0 w-[3px] bg-navy"></span>
                             <span class="flex items-baseline justify-between gap-2">
-                                <b class="fig text-[15px] font-[650]">{{ r.polling_unit.code }}</b>
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <RaceTag v-if="hasSeveral && raceOf(r)" :race="raceOf(r)" size="sm" />
+                                    <b class="fig text-[15px] font-[650]">{{ r.polling_unit.code }}</b>
+                                </span>
                                 <span class="text-[12.5px] whitespace-nowrap tabular-nums" :class="ageClass(r)" :title="`Received ${dateTime(r.received_at)}`">{{ age(r) }}</span>
                             </span>
-                            <span class="block truncate text-[13px] text-ink-2">{{ r.polling_unit.ward }}, {{ r.polling_unit.lga }}</span>
+                            <span class="block truncate text-[13px] text-ink-2"><template v-if="hasSeveral && !viewRace && raceOf(r)">{{ raceOf(r).name }}, </template>{{ r.polling_unit.ward }}, {{ r.polling_unit.lga }}</span>
                             <span v-if="r.flags.includes('overvote')" class="mt-1 block text-[12.5px] font-[620] text-action">Votes exceed accreditation</span>
                             <span v-else-if="r.supersedes_id" class="mt-1 block text-[12.5px] font-[620] text-warn">Correction</span>
                             <span v-if="r.open_flags" class="mt-1 flex items-center gap-1 text-[12.5px] font-[620] text-action"><Icon name="flag" :size="13" /> {{ r.open_flags }} reviewer flag{{ r.open_flags === 1 ? '' : 's' }}</span>
@@ -128,6 +135,7 @@ const ageClass = (r) => {
             <section v-if="selected" class="card">
                 <header class="flex flex-wrap items-start justify-between gap-3 border-b border-rule px-5 pt-4 pb-3.5">
                     <div class="min-w-0">
+                        <p v-if="hasSeveral && raceOf(selected)" class="mb-1.5 flex items-center gap-2 text-[13px] font-[620] text-ink"><RaceTag :race="raceOf(selected)" size="sm" />{{ raceOf(selected).name }} result sheet</p>
                         <h2 class="text-[20px] leading-tight font-[700]"><span class="fig">{{ selected.polling_unit.code }}</span> {{ selected.polling_unit.name }}</h2>
                         <p class="mt-0.5 text-[13px] text-ink-2">{{ selected.polling_unit.ward }}, {{ selected.polling_unit.lga }}. Sent by agent <span class="tabular-nums">{{ selected.agent?.code }}</span> at {{ time(selected.captured_at) }}.</p>
                     </div>

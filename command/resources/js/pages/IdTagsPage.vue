@@ -75,7 +75,7 @@ const year = (d) => (d ? new Date(`${d}T12:00:00`).getFullYear() : '');
                         <span>Scan to verify</span>
                     </div>
                 </div>
-                <footer class="tag-foot">{{ t.campaign.state }} governorship {{ year(t.campaign.election_date) }}. Valid only while the QR check says VALID.</footer>
+                <footer class="tag-foot">{{ t.campaign.state }} elections {{ year(t.campaign.election_date) }}. Valid only while the QR check says VALID.</footer>
             </article>
         </div>
     </div>

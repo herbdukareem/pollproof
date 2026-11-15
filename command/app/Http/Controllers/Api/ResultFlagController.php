@@ -49,7 +49,7 @@ class ResultFlagController extends Controller
         ]);
         $unit = $result->pollingUnit;
         $this->alerts->raise($result->campaign_id, 'result_flagged', ResultFlag::REASONS[$data['reason']][1], "result_flag:{$flag->id}",
-            "{$unit->code}: result flagged, ".strtolower($flag->label()), "{$user->name}: {$flag->note}", $result, ['flag_id' => $flag->id]);
+            "{$unit->code}: result flagged, ".strtolower($flag->label()), "{$user->name}: {$flag->note}", $result, ['flag_id' => $flag->id], $result->election);
         $this->audit->log($user, 'result.flagged', $result, ['flag_id' => $flag->id, 'reason' => $data['reason'], 'note' => $flag->note], $request->ip());
 
         return response()->json($flag->present(), 201);
@@ -87,7 +87,7 @@ class ResultFlagController extends Controller
         } else {
             $unit = $flag->pollingUnit;
             $this->alerts->raise($flag->campaign_id, 'result_flagged', ResultFlag::REASONS[$flag->reason][1], "result_flag:{$flag->id}",
-                "{$unit->code}: flag reopened, ".strtolower($flag->label()), $flag->note, $flag->result, ['flag_id' => $flag->id, 'reopened' => now()->toIso8601String()]);
+                "{$unit->code}: flag reopened, ".strtolower($flag->label()), $flag->note, $flag->result, ['flag_id' => $flag->id, 'reopened' => now()->toIso8601String()], $flag->result->election);
         }
         $this->audit->log($user, $clearing ? 'result.flag_cleared' : 'result.flag_reopened', $flag->result, ['flag_id' => $flag->id, 'note' => $data['note'] ?? null], $request->ip());
 
