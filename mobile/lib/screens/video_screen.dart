@@ -439,8 +439,9 @@ class _RecorderScreenState extends State<RecorderScreen>
       cameras[cameraIndex],
       ResolutionPreset.medium,
       enableAudio: true,
-      // Enough to read a result sheet held up to the camera, small enough for a weak network.
-      videoBitrate: 1200 * 1000,
+      // Enough to read a result sheet held up to the camera, small enough for a weak network,
+      // and three minutes stays under the 25 MB the AI checks can send without ffmpeg.
+      videoBitrate: 1000 * 1000,
       audioBitrate: 64 * 1000,
     );
     try {
