@@ -10,6 +10,7 @@ use App\Models\IrevEntry;
 use App\Models\PollingUnit;
 use App\Models\ResultFlag;
 use App\Models\ResultSubmission;
+use App\Models\VideoClip;
 
 /**
  * Everything held about one polling unit in one race, as used in the evidence pack and in
@@ -71,6 +72,10 @@ final class EvidenceBuilder
             'check_ins' => CheckIn::where('polling_unit_id', $unit->id)->orderBy('id')->get(['id', 'user_id', 'channel', 'status', 'distance_m', 'accuracy_m', 'captured_at', 'reviewed_by']),
             'incidents' => Incident::where('polling_unit_id', $unit->id)->orderBy('occurred_at')->get(['id', 'type', 'severity', 'description', 'status', 'occurred_at']),
             'collation' => $collation,
+            // Videos recorded at the unit: the result being announced, incidents, anything else.
+            'videos' => VideoClip::where('polling_unit_id', $unit->id)->whereNotNull('completed_at')
+                ->with(['user', 'pollingUnit', 'ward', 'lga', 'incident', 'election'])->orderBy('captured_at')->get()
+                ->map->present()->values(),
             'flags' => ResultFlag::where('polling_unit_id', $unit->id)->whereIn('result_submission_id', $results->pluck('id'))->orderBy('id')->get()->map->present(),
         ];
     }

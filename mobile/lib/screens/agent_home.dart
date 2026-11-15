@@ -7,6 +7,7 @@ import '../widgets/common.dart';
 import '../widgets/logo.dart';
 import 'checkin.dart';
 import 'fallback.dart';
+import 'video_screen.dart';
 import 'incident.dart';
 import 'messages.dart';
 import 'onboarding.dart';
@@ -326,9 +327,9 @@ class _AgentHomeState extends State<AgentHome> {
                       childAspectRatio: 2.3,
                       children: [
                         _Quick(
-                          Icons.report_outlined,
-                          'Report incident',
-                          () => go(const IncidentScreen()),
+                          Icons.videocam_outlined,
+                          'Record video',
+                          () => go(const VideoScreen()),
                           tone: C.action,
                         ),
                         _Quick(

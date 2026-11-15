@@ -7,6 +7,7 @@ import '../core/signing.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/logo.dart';
+import 'video_screen.dart';
 import 'incident.dart';
 import 'messages.dart';
 import 'settings.dart';
@@ -233,6 +234,17 @@ class _CollationHomeState extends State<CollationHome> {
                   child: Text(busy ? 'Checking…' : 'Compare with our units'),
                 ),
                 const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VideoScreen(kind: 'collation'),
+                    ),
+                  ),
+                  icon: const Icon(Icons.videocam_outlined),
+                  label: const Text('Record the announcement'),
+                ),
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => Navigator.push(
                     context,

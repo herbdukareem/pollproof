@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader.vue';
 import LoadState from '../components/LoadState.vue';
 import Badge from '../components/Badge.vue';
 import Icon from '../components/Icon.vue';
+import VideoPlayer from '../components/VideoPlayer.vue';
 import Pagination from '../components/Pagination.vue';
 import TableBusy from '../components/TableBusy.vue';
 import Tabs from '../components/Tabs.vue';
@@ -105,7 +106,7 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
                             <span class="min-w-0 flex-1">
                                 <span class="flex items-baseline justify-between gap-2"><b class="text-[14px] font-[650]">{{ typeLabel[i.type] }}</b><span class="text-[12.5px] whitespace-nowrap text-ink-2 tabular-nums">{{ dateTime(i.occurred_at) }}</span></span>
                                 <span class="block truncate text-[13px] text-ink-2">{{ i.polling_unit ? `${i.polling_unit.code}, ${i.polling_unit.name}` : 'No unit' }}<template v-if="i.user?.code">, by {{ i.user.code }}</template></span>
-                                <span class="mt-1.5 flex gap-1.5"><Badge :tone="sevTone[i.severity]">{{ i.severity }}</Badge><Badge v-if="i.status !== status" :tone="statusTone[i.status]">{{ i.status }}</Badge></span>
+                                <span class="mt-1.5 flex gap-1.5"><Badge :tone="sevTone[i.severity]">{{ i.severity }}</Badge><Badge v-if="i.status !== status" :tone="statusTone[i.status]">{{ i.status }}</Badge><span v-if="i.videos?.length" class="inline-flex items-center gap-1 rounded-md bg-mist px-1.5 text-[12px] font-[600] text-ink-2"><Icon name="video" :size="13" />{{ i.videos.length > 1 ? `${i.videos.length} videos` : 'Video' }}</span></span>
                             </span>
                         </button>
                     </li>
@@ -119,6 +120,12 @@ const statusTone = { open: 'warn', handling: 'info', resolved: 'good' };
                 <p class="mt-1 text-[13.5px] text-ink-2">{{ selected.polling_unit ? `${selected.polling_unit.code}, ${selected.polling_unit.name}` : 'No unit' }}, reported by {{ selected.user?.name }} ({{ selected.user?.code }}), {{ dateTime(selected.occurred_at) }}</p>
                 <div v-if="selected.media_paths?.length" class="mt-4 grid grid-cols-3 gap-2.5">
                     <div v-for="(m, k) in selected.media_paths" :key="k" class="flex h-24 flex-col items-center justify-center gap-1 rounded-lg bg-[#e6e9ee] text-[12.5px] text-ink-2"><Icon name="image" :size="20" />Photo {{ k + 1 }}</div>
+                </div>
+                <div v-if="selected.videos?.length" class="mt-4 grid gap-2.5" :class="selected.videos.length > 1 && 'sm:grid-cols-2'">
+                    <figure v-for="v in selected.videos" :key="v.id">
+                        <VideoPlayer :video="v" />
+                        <figcaption class="mt-1 text-[12.5px] text-ink-2 tabular-nums">Recorded {{ dateTime(v.captured_at) }}<template v-if="v.duration_s">, {{ Math.floor(v.duration_s / 60) }}:{{ String(v.duration_s % 60).padStart(2, '0') }}</template></figcaption>
+                    </figure>
                 </div>
                 <blockquote class="mt-4 border-l-[3px] border-navy py-1 pl-4 text-[15.5px] leading-relaxed">{{ selected.description }}</blockquote>
                 <p v-if="selected.assigned_to" class="mt-3 text-sm"><span class="text-ink-2">Assigned to</span> <b class="font-[620]">{{ selected.assigned_to }}</b></p>

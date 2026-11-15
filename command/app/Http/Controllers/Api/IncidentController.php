@@ -62,7 +62,7 @@ class IncidentController extends Controller
             ->when($data['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->whereLike('description', "%{$s}%")
                 ->orWhereHas('pollingUnit', fn ($u) => $u->whereLike('code', "%{$s}%")->orWhereLike('name', "%{$s}%"))));
         $incidents = $scope()
-            ->with(['pollingUnit:id,code,name', 'user:id,name,code'])
+            ->with(['pollingUnit:id,code,name', 'user:id,name,code', 'videos:id,incident_id,duration_s,captured_at,completed_at'])
             ->when(($data['sort'] ?? 'latest') === 'severity', fn ($q) => $q->orderByRaw("CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"))
             ->latest('id') // latest reported first
             ->paginate((int) ($data['per_page'] ?? 25));

@@ -7,8 +7,10 @@ import '../core/app_state.dart';
 import '../core/geo.dart';
 import '../core/outbox.dart';
 import '../core/signing.dart';
+import '../core/video_files.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'video_screen.dart';
 
 class IncidentScreen extends StatefulWidget {
   const IncidentScreen({super.key});
@@ -29,7 +31,28 @@ class _IncidentScreenState extends State<IncidentScreen> {
   String severity = 'medium';
   final description = TextEditingController();
   Uint8List? photo;
+  RecordedVideo? video;
   bool sending = false;
+
+  Future<void> recordVideo() async {
+    final v = await Navigator.push<RecordedVideo>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const RecorderScreen(label: 'Incident'),
+      ),
+    );
+    if (v == null || !mounted) return;
+    if (video != null) await VideoFiles.delete(video!.path);
+    setState(() => video = v);
+  }
+
+  @override
+  void dispose() {
+    // Left without sending: the recording is not kept.
+    if (video != null && !sending) VideoFiles.delete(video!.path);
+    super.dispose();
+  }
 
   Future<void> addPhoto() async {
     final x = await ImagePicker().pickImage(
@@ -73,6 +96,15 @@ class _IncidentScreenState extends State<IncidentScreen> {
               },
             ],
     );
+    // The video follows the report, so the report is never held up by it.
+    if (video != null) {
+      await queueVideo(
+        video!,
+        kind: 'incident',
+        note: description.text,
+        afterIncident: item.id,
+      );
+    }
     await app.outbox.flush();
     if (!mounted) return;
     final sent = app.outbox.byId(item.id)?.status == OutboxStatus.sent;
@@ -148,10 +180,43 @@ class _IncidentScreenState extends State<IncidentScreen> {
             borderRadius: BorderRadius.circular(12),
             child: Image.memory(photo!, height: 160, fit: BoxFit.cover),
           ),
-        OutlinedButton.icon(
-          onPressed: addPhoto,
-          icon: const Icon(Icons.add_a_photo_outlined),
-          label: Text(photo == null ? 'Add a photo' : 'Change photo'),
+        if (video != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.videocam, color: C.navy),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Video ${mmss(video!.duration)} · ${videoSize(video!.bytes)} · uploads after the report',
+                    style: const TextStyle(fontSize: 13, color: C.ink2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: addPhoto,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: Text(photo == null ? 'Add a photo' : 'Change photo'),
+              ),
+            ),
+            if (VideoFiles.supported) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: sending ? null : recordVideo,
+                  icon: const Icon(Icons.videocam_outlined),
+                  label: Text(video == null ? 'Record video' : 'Record again'),
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 10),
         Text(

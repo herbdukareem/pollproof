@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'api.dart';
 import 'store.dart';
+import 'video_files.dart';
 
 enum OutboxStatus { waiting, sent, refused }
 
@@ -30,7 +31,7 @@ class OutboxItem {
   }) : createdAt = createdAt ?? DateTime.now();
 
   final String id;
-  final String kind; // check_in, result, photo, incident, confirm
+  final String kind; // check_in, result, photo, incident, confirm, video
   String path; // may contain {after.id}
   final String title;
   final Map<String, dynamic> fields;
@@ -182,7 +183,12 @@ class Outbox extends ChangeNotifier {
     _running = true;
     notifyListeners();
     try {
-      for (final item in waiting) {
+      // Small records first: a result or an incident never waits behind a video.
+      final queue = [
+        ...waiting.where((i) => i.kind != 'video'),
+        ...waiting.where((i) => i.kind == 'video'),
+      ];
+      for (final item in queue) {
         final dep = item.after == null ? null : byId(item.after!);
         if (dep != null && dep.status != OutboxStatus.sent) {
           if (dep.status == OutboxStatus.refused) {
@@ -201,6 +207,29 @@ class Outbox extends ChangeNotifier {
           ..lastTry = DateTime.now();
         lastAttempt = DateTime.now();
         try {
+          if (item.kind == 'video') {
+            // An incident's video names the incident once the incident has been sent.
+            final depId = dep?.response?['id'];
+            final fields = item.fields.map(
+              (k, v) => MapEntry(k, v == '{after.id}' ? depId : v),
+            );
+            if (!await _sendVideo(item, path, fields)) {
+              // Paused for something newer and smaller; it carries on from here next time.
+              await _save();
+              notifyListeners();
+              break;
+            }
+            item
+              ..status = OutboxStatus.sent
+              ..sentAt = DateTime.now()
+              ..error = null
+              ..response = {'id': item.meta['remote_id']};
+            online = true;
+            await VideoFiles.delete(item.meta['file'] as String);
+            await _save();
+            notifyListeners();
+            continue;
+          }
           final files = <UploadFile>[];
           for (final f in item.files) {
             final bytes = await blob(f['blob']!);
@@ -224,6 +253,10 @@ class Outbox extends ChangeNotifier {
           online = false;
           item.error = 'No connection';
           break; // no point trying the rest right now
+        } on _VideoGone {
+          item
+            ..status = OutboxStatus.refused
+            ..error = 'The video is no longer on this phone.';
         } on ApiException catch (e) {
           online = true;
           if (e.retryable) {
@@ -249,8 +282,90 @@ class Outbox extends ChangeNotifier {
     }
   }
 
+  static const _minChunk = 64 * 1024;
+  static const _maxChunk = 1024 * 1024;
+
+  /// True when a check-in, result or incident is waiting behind the video being sent.
+  bool get _urgent => _again && waiting.any((i) => i.kind != 'video');
+
+  /// Sends a video in pieces from wherever the last attempt stopped. The piece size follows the
+  /// network: bigger while pieces go through quickly, smaller after a slow one or a drop.
+  /// Returns false if it paused so something more urgent can go first.
+  Future<bool> _sendVideo(
+    OutboxItem item,
+    String path,
+    Map<String, dynamic> fields,
+  ) async {
+    final m = item.meta;
+    final file = m['file'] as String;
+    if (!await VideoFiles.exists(file)) throw _VideoGone();
+    if (m['remote_id'] == null) {
+      final res = await _api().post(path, fields);
+      m['remote_id'] = res['id'];
+      m['received'] = res['received'] ?? 0;
+      if (res['complete'] == true) return true;
+      await _save();
+      notifyListeners();
+    }
+    var chunk = (m['chunk'] as int?) ?? 256 * 1024;
+    final size = m['size'] as int;
+    while (true) {
+      if (_urgent) return false;
+      final offset = (m['received'] as num).toInt();
+      final bytes = await VideoFiles.read(file, offset, chunk);
+      final started = DateTime.now();
+      Map res;
+      try {
+        res = await _api().postBytes(
+          'videos/${m['remote_id']}/chunk',
+          bytes,
+          headers: {'Upload-Offset': '$offset'},
+        );
+      } on NetworkException {
+        m['chunk'] = chunk > _minChunk ? chunk ~/ 2 : chunk;
+        rethrow;
+      } on ApiException catch (e) {
+        if (e.status == 409 && e.body?['received'] != null) {
+          m['received'] = e.body!['received']; // a piece lost or sent twice
+          continue;
+        }
+        if (e.status == 413 && chunk > _minChunk) {
+          m['chunk'] = chunk = chunk ~/ 2; // the host takes smaller pieces
+          continue;
+        }
+        rethrow;
+      }
+      online = true;
+      final received = (res['received'] as num).toInt();
+      if (res['complete'] == true) {
+        m['received'] = size;
+        return true;
+      }
+      if (received < offset) {
+        // The server found the whole file damaged and started it over.
+        m['restarts'] = ((m['restarts'] as int?) ?? 0) + 1;
+        if (m['restarts'] > 2) {
+          throw ApiException(422, "The video didn't arrive intact.");
+        }
+      }
+      m['received'] = received;
+      final secs = DateTime.now().difference(started).inMilliseconds / 1000;
+      if (secs < 6 && chunk < _maxChunk) chunk *= 2;
+      if (secs > 30 && chunk > _minChunk) chunk ~/= 2;
+      m['chunk'] = chunk;
+      item.error = null;
+      await _save();
+      notifyListeners();
+    }
+  }
+
   /// After a refused item is dealt with (e.g. a check-in sent again for review), it can be dropped.
+  /// A video dropped this way is deleted from the phone too.
   Future<void> dismiss(String id) async {
+    final item = byId(id);
+    if (item?.kind == 'video' && item?.meta['file'] is String) {
+      await VideoFiles.delete(item!.meta['file'] as String);
+    }
     _items.removeWhere((i) => i.id == id);
     await _save();
     notifyListeners();
@@ -271,3 +386,5 @@ class Outbox extends ChangeNotifier {
     super.dispose();
   }
 }
+
+class _VideoGone implements Exception {}

@@ -133,6 +133,17 @@ php artisan migrate --force
 
 It creates the races and moves every existing result, collation sheet, IReV entry and tribunal case into the campaign's governorship race.
 
+## Videos from the field
+
+Agents, collation agents and supervisors can record videos in the app: a result being announced, an incident, a collation centre. A video is kept on the phone and sent in pieces of up to 1 MB, so a dropped connection carries on where it stopped instead of starting over. Results and incidents always go before a video. The command room shows them under **Election day → Videos**, on the incident they belong to, and in each unit's evidence pack.
+
+What the server needs:
+
+- **Space.** At the app's quality a minute of video is about 10 MB. Videos are kept with the other evidence (`POLLPROOF_EVIDENCE_DISK`, the server's own storage by default). Check the free space in hPanel before election day.
+- **Request size.** Each piece is at most 1 MB, so PHP's default `post_max_size` (8 MB) is enough. If a host sets it lower than 2 MB, the app halves the piece size by itself.
+
+Videos upload while the app is open. If an agent closes the app, the upload carries on from the same point the next time they open it.
+
 ## Polling units and their GPS from INEC
 
 `pollproof:inec-coordinates` pulls a state's LGAs, wards and polling units, with INEC's own GPS

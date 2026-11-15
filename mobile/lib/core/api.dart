@@ -79,6 +79,25 @@ class Api {
     ),
   );
 
+  /// Raw bytes as the request body: one piece of a video. [timeout] allows for a slow network.
+  Future<dynamic> postBytes(
+    String path,
+    List<int> bytes, {
+    Map<String, String> headers = const {},
+    Duration timeout = const Duration(seconds: 90),
+  }) => _send(
+    () => _client.post(
+      _uri(path),
+      headers: {
+        ..._headers,
+        'Content-Type': 'application/octet-stream',
+        ...headers,
+      },
+      body: bytes,
+    ),
+    timeout: timeout,
+  );
+
   /// Multipart form: nested values like votes[A] are flattened PHP-style.
   Future<dynamic> multipart(
     String path,
@@ -107,7 +126,10 @@ class Api {
     return http.Response.fromStream(await _client.send(req));
   });
 
-  Future<dynamic> _send(Future<http.Response> Function() call) async {
+  Future<dynamic> _send(
+    Future<http.Response> Function() call, {
+    Duration timeout = Api.timeout,
+  }) async {
     http.Response res;
     try {
       res = await call().timeout(timeout);

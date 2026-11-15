@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
 import { dateTime, num, signed, titleCase } from '../lib/format';
 import RaceTag from '../components/RaceTag.vue';
+import VideoPlayer from '../components/VideoPlayer.vue';
 import { byId, loadRaces, oneRace, selectRace } from '../lib/races';
 
 const route = useRoute();
@@ -53,6 +54,7 @@ const timeline = computed(() => {
         ev.push({ at: f.at, text: `Flagged by ${f.by?.name}: ${f.label.toLowerCase()}`, kind: 'bad' });
         if (f.cleared_at) ev.push({ at: f.cleared_at, text: `Flag cleared by ${f.cleared_by}`, kind: 'ok' });
     }
+    for (const v of d.value.videos ?? []) ev.push({ at: v.captured_at, text: `Video recorded: ${v.kind_label.toLowerCase()}`, kind: 'info' });
     for (const c of d.value.collation) ev.push({ at: c.announced_at, text: `${titleCase(c.comparison.level)} sheet ${Object.keys(c.comparison.differences).length ? 'differs from our units' : 'matches our units'}`, kind: Object.keys(c.comparison.differences).length ? 'bad' : 'ok' });
     return ev.filter((e) => e.at).sort((a, b) => new Date(a.at) - new Date(b.at));
 });
@@ -127,6 +129,21 @@ const headline = computed(() => {
 
         <section v-if="current" class="card mb-4 p-5">
             <ResultFlags :result-id="current.id" @changed="pack.load" />
+        </section>
+
+        <!-- Videos recorded at the unit: every race's, since one announcement often covers several sheets. -->
+        <section v-if="d.videos?.length" class="card mb-4 p-5 print:hidden">
+            <h2 class="card-title-ruled">Videos from this unit</h2>
+            <div class="grid gap-4 md:grid-cols-2">
+                <figure v-for="v in d.videos" :key="v.id">
+                    <VideoPlayer :video="v" />
+                    <figcaption class="mt-1.5 text-[13px] text-ink-2"><b class="font-[620] text-ink">{{ v.kind_label }}</b><template v-if="v.election">, {{ v.election.name }}</template>. Recorded {{ dateTime(v.captured_at) }} by {{ v.by?.name }} ({{ v.by?.code }}).<template v-if="v.note"> “{{ v.note }}”</template></figcaption>
+                </figure>
+            </div>
+        </section>
+        <section v-if="d.videos?.length" class="mb-4 hidden print:block">
+            <h2 class="text-base font-[700]">Videos from this unit</h2>
+            <p v-for="v in d.videos" :key="v.id" class="text-sm">{{ v.kind_label }}, recorded {{ dateTime(v.captured_at) }} by {{ v.by?.name }} ({{ v.by?.code }}), video #{{ v.id }}.</p>
         </section>
 
         <div class="mb-4 grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">

@@ -3,6 +3,9 @@
     <!-- Location is read only when the agent checks in or signs a result, never in the background. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Recording videos of result announcements and incidents. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:label="PollProof"
         android:allowBackup="false"

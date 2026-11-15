@@ -180,22 +180,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       hintText: '000000',
                     ),
                   ),
-                  // Wraps on narrow phones rather than cutting off "Change number".
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
                     children: [
-                      const Text(
-                        "Didn't get it?",
-                        style: TextStyle(color: C.ink2),
-                      ),
                       TextButton(
                         onPressed: wait > 0 || busy ? null : send,
                         child: Text(
                           wait > 0
                               ? 'Resend in 0:${wait.toString().padLeft(2, '0')}'
-                              : 'Resend code',
+                              : "Didn't get it? Resend",
                         ),
                       ),
+                      const Spacer(),
                       TextButton(
                         onPressed: () => setState(() {
                           sent = false;

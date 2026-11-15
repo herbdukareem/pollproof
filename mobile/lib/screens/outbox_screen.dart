@@ -5,6 +5,7 @@ import '../core/app_state.dart';
 import '../core/outbox.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'video_screen.dart';
 
 /// Opens the phone's SMS app with the result in the fallback format, to the campaign's number.
 Future<void> sendResultBySms(BuildContext context, OutboxItem result) async {
@@ -80,7 +81,37 @@ class OutboxScreen extends StatelessWidget {
                   ),
                 ),
               for (final i in waiting)
-                _tile(i, Icons.schedule, C.warn, i.error ?? 'Waiting'),
+                _tile(
+                  i,
+                  i.kind == 'video' ? Icons.videocam_outlined : Icons.schedule,
+                  C.warn,
+                  i.error ?? 'Waiting',
+                  // A video waiting to go can be deleted, e.g. to free space or data.
+                  onDismiss: i.kind == 'video'
+                      ? () async {
+                          final ok = await showDialog<bool>(
+                            context: context,
+                            builder: (c) => AlertDialog(
+                              title: const Text('Delete this video?'),
+                              content: const Text(
+                                "It hasn't been fully sent. Deleting removes it from this phone and it won't reach the command room.",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(c, false),
+                                  child: const Text('Keep it'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(c, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok == true) await outbox.dismiss(i.id);
+                        }
+                      : null,
+                ),
               if (refused.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 _section('Not accepted · ${refused.length}', null),
@@ -157,10 +188,15 @@ class OutboxScreen extends StatelessWidget {
         i.title,
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
       ),
-      subtitle: Text(
-        '${hhmm(i.createdAt)} · $note',
-        style: const TextStyle(fontSize: 12.5),
-      ),
+      subtitle: i.kind == 'video' && i.status != OutboxStatus.refused
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: VideoProgress(item: i),
+            )
+          : Text(
+              '${hhmm(i.createdAt)} · $note',
+              style: const TextStyle(fontSize: 12.5),
+            ),
       trailing: onDismiss == null
           ? null
           : IconButton(

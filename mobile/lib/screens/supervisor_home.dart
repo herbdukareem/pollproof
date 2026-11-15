@@ -7,6 +7,7 @@ import '../core/geo.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/logo.dart';
+import 'video_screen.dart';
 import 'incident.dart';
 import 'messages.dart';
 import 'settings.dart';
@@ -239,15 +240,34 @@ class _SupervisorHomeState extends State<SupervisorHome> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: C.action,
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const IncidentScreen()),
-        ),
-        icon: const Icon(Icons.report_outlined),
-        label: const Text('Report incident'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'video',
+            backgroundColor: Colors.white,
+            foregroundColor: C.navy,
+            tooltip: 'Record video',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VideoScreen()),
+            ),
+            child: const Icon(Icons.videocam_outlined),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'incident',
+            backgroundColor: C.action,
+            foregroundColor: Colors.white,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IncidentScreen()),
+            ),
+            icon: const Icon(Icons.report_outlined),
+            label: const Text('Report incident'),
+          ),
+        ],
       ),
     );
   }

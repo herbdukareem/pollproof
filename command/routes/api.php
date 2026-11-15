@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UssdController;
+use App\Http\Controllers\Api\VideoClipController;
 use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Support\Facades\Route;
 
@@ -80,6 +81,11 @@ Route::prefix('v1')->group(function () {
             Route::post('results/{result}/photo', [ResultController::class, 'attachPhoto']);
         });
         Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->post('incidents', [IncidentController::class, 'store']);
+        // Videos from the field, sent in 1 MB pieces that resume after a dropped connection.
+        Route::middleware(['role:agent,collation_agent,ward_supervisor,lga_supervisor', 'throttle:600,1'])->group(function () {
+            Route::post('videos', [VideoClipController::class, 'store']);
+            Route::post('videos/{video}/chunk', [VideoClipController::class, 'chunk']);
+        });
 
         // Agent onboarding: practice run, quiz, eve-of-election confirmation
         Route::middleware('role:agent,collation_agent,ward_supervisor,lga_supervisor')->group(function () {
@@ -124,6 +130,8 @@ Route::prefix('v1')->group(function () {
             Route::get('units', [UnitController::class, 'index']);
             Route::get('alerts', [AlertController::class, 'index']);
             Route::get('incidents', [IncidentController::class, 'index']);
+            Route::get('videos', [VideoClipController::class, 'index']);
+            Route::get('videos/{video}/file', [VideoClipController::class, 'file']);
             Route::get('collation-entries', [CollationEntryController::class, 'index']);
             Route::get('results/{result}', [ResultController::class, 'show']);
             Route::get('results/{result}/photo', [ResultController::class, 'photo']);
