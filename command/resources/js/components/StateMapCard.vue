@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from './Icon.vue';
+import { partyColour } from '../lib/parties';
 import { api } from '../lib/api';
 import { num, pct } from '../lib/format';
 
@@ -47,7 +48,6 @@ function along(stops, t) {
 const shareHeat = (share, line) => (share < line ? along(BELOW_STOPS, share / line) : along(ABOVE_STOPS, (share - line) / (TOP - line)));
 /** The leader's colour, paler for a narrow lead and full for a lead of 30 points or more. */
 const leadHeat = (color, margin) => mix('#ffffff', color, 0.3 + 0.7 * Math.min(1, margin / 0.3));
-const RIVALS = ['#b5002b', '#d99a00', '#2f7d4a', '#6b4fbb', '#0e7c86', '#8a5a44', '#c2185b'];
 const VIEWS = [
     { key: 'share', label: '25% line', sub: 'Our share of valid votes.' },
     { key: 'reporting', label: 'Reporting', sub: 'Polling units that have reported.' },
@@ -55,10 +55,8 @@ const VIEWS = [
 ];
 
 const parties = computed(() => props.tally.candidates ?? []);
-const partyColor = computed(() => {
-    let i = 0;
-    return Object.fromEntries([...parties.value].sort((a, b) => (a.party > b.party ? 1 : -1)).map((c) => [c.party, c.is_ours ? NAVY : RIVALS[i++ % RIVALS.length]]));
-});
+// The same colour for each party as everywhere else in the command room.
+const partyColor = computed(() => Object.fromEntries(parties.value.map((c) => [c.party, partyColour(c.party, parties.value)])));
 const partyName = (code) => parties.value.find((c) => c.party === code)?.name ?? code;
 
 /**

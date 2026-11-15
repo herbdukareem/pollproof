@@ -11,6 +11,7 @@ import { useResource } from '../lib/useResource';
 import { hasRole, session } from '../lib/session';
 import { num, pct } from '../lib/format';
 import { loadRaces, raceParam, ruleText, viewKey, viewRace } from '../lib/races';
+import { partyColour } from '../lib/parties';
 
 // One race, or (with several races and none chosen) the board of every race.
 const race = viewRace;
@@ -246,13 +247,13 @@ async function resolve(alert) {
                         <div v-for="c in t.candidates" :key="c.party" class="mb-3.5 last:mb-0">
                             <div class="mb-1.5 flex items-baseline justify-between gap-3 text-[14px]">
                                 <span class="min-w-0" :class="c.is_ours ? 'font-[650]' : 'text-ink-2'">
-                                    {{ c.candidate || c.name }}<span v-if="c.is_ours" class="ml-1.5 rounded bg-[#eceff3] px-1.5 py-px text-[11.5px] font-[600] text-ink-2">ours</span>
+                                    <i class="mr-1.5 inline-block h-2.5 w-2.5 rounded-[2px] align-[-1px]" :style="{ background: partyColour(c.party, t.candidates) }"></i>{{ c.candidate || c.name }}<span v-if="c.is_ours" class="ml-1.5 rounded bg-[#eceff3] px-1.5 py-px text-[11.5px] font-[600] text-ink-2">ours</span>
                                     <span v-if="c.candidate" class="block text-[12.5px] font-[450] text-ink-3">{{ c.name }}</span>
                                 </span>
                                 <span class="fig shrink-0 font-[680]">{{ num(c.votes) }} <span class="ml-1 inline-block w-10 text-right text-[12.5px] font-[500] text-ink-3">{{ totalVotes ? pct(c.votes / totalVotes) : '' }}</span></span>
                             </div>
                             <div class="h-1.5 rounded-[1px] bg-[#e8ebf0]">
-                                <div class="bar-fill h-full rounded-[1px]" :class="c.is_ours ? 'bg-navy' : 'bg-[#9aa3b2]'" :style="{ width: (c.votes / maxVotes) * 100 + '%' }"></div>
+                                <div class="bar-fill h-full rounded-[1px]" :style="{ width: (c.votes / maxVotes) * 100 + '%', background: partyColour(c.party, t.candidates) }"></div>
                             </div>
                         </div>
                         <p v-if="top && top.votes && isSpread" class="mt-4 text-[13px] text-ink-2">

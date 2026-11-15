@@ -166,7 +166,8 @@ final class TallyService
                 'units_reported' => (int) ($reported[$e->id]->n ?? 0),
                 'waiting' => (int) ($reported[$e->id]->waiting ?? 0),
                 'votes_counted' => $all,
-                'candidates' => $ballot->take(3)->all(),
+                // Every party on the ballot, most votes first, so the board can show them all.
+                'candidates' => $ballot->all(),
                 'ours' => $ours,
                 'standing' => match (true) {
                     $all === 0 || ! $ours => 'none',
