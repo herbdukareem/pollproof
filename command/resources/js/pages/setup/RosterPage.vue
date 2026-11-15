@@ -19,6 +19,8 @@ import SearchSelect from '../../components/SearchSelect.vue';
 import SortTh from '../../components/SortTh.vue';
 import { useSortState } from '../../lib/useSort';
 import AgentActions from '../../components/AgentActions.vue';
+import PlaceCard from '../../components/PlaceCard.vue';
+import { usePlaceHover } from '../../lib/usePlaceHover';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { num } from '../../lib/format';
@@ -28,6 +30,7 @@ const filter = ref(['incomplete', 'all', 'reserves', 'unassigned', 'unavailable'
 const page = ref(1);
 const perPage = ref(50);
 const lgaId = ref('');
+const wardId = ref('');
 // Newest agents first; the server sorts, so a header click reloads page 1.
 const sort = useSortState({
     latest: { label: 'newest', dir: 'desc' },
@@ -36,7 +39,7 @@ const sort = useSortState({
     unit: { label: 'Unit', dir: 'asc' },
     step: { label: 'Onboarding', dir: 'asc' },
 }, undefined, { mode: 'server' });
-const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, page: page.value, per_page: perPage.value, ...sort.params }));
+const roster = useResource(() => api.get('setup/roster', { search: search.value, filter: filter.value, lga_id: lgaId.value, ward_id: wardId.value, page: page.value, per_page: perPage.value, ...sort.params }));
 watch(() => [sort.key, sort.dir], () => { page.value = 1; roster.load(); });
 const structure = useResource(() => api.get('structure'));
 const d = computed(() => roster.data.value);
@@ -44,7 +47,13 @@ const notInstalled = computed(() => (d.value ? d.value.counts.assigned - d.value
 const report = ref(null);
 const uploading = ref(false);
 const adding = ref(false);
-const printTags = () => window.open(`/id-tags${lgaId.value ? `?lga_id=${lgaId.value}` : ''}`, '_blank');
+const printTags = () => window.open(`/id-tags${wardId.value ? `?ward_id=${wardId.value}` : lgaId.value ? `?lga_id=${lgaId.value}` : ''}`, '_blank');
+// The ward filter appears once an LGA is chosen, with that LGA's wards.
+const wardOptions = computed(() => (structure.data.value?.lgas ?? []).find((l) => l.id === Number(lgaId.value))?.wards.map((w) => ({ value: w.id, label: w.name, hint: `${w.units} units` })) ?? []);
+watch(lgaId, () => (wardId.value = ''));
+
+// Pointing at a row shows the agent's unit, ward and LGA.
+const { hover, show: showPlace, hide: hidePlace } = usePlaceHover();
 const rosterColumns = [
     ['name', 'Agent’s full name', true],
     ['phone', 'Their mobile number, e.g. 0803 123 4567', true],
@@ -63,7 +72,7 @@ watch(search, () => {
     clearTimeout(t);
     t = setTimeout(() => { page.value = 1; roster.load(); }, 300);
 });
-watch([filter, lgaId], () => { page.value = 1; roster.load(); });
+watch([filter, lgaId, wardId], () => { page.value = 1; roster.load(); });
 
 const stepNotes = ['Not invited', 'Not installed', 'No practice result', 'Training due', 'Not confirmed', 'Ready'];
 const actionFor = (a) => (a.step <= 1 ? 'Send invite' : null);
@@ -158,6 +167,10 @@ function changed(text) {
                     </select>
                     <label class="sr-only" for="roster-lga">LGA</label>
                     <SearchSelect id="roster-lga" v-model="lgaId" class="w-full sm:w-[200px]" size="sm" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
+                    <template v-if="lgaId">
+                        <label class="sr-only" for="roster-ward">Ward</label>
+                        <SearchSelect id="roster-ward" v-model="wardId" class="w-full sm:w-[200px]" size="sm" all-label="All wards" noun="wards" :options="wardOptions" />
+                    </template>
                     <span class="text-[13px] text-ink-2 tabular-nums sm:ml-auto">{{ num(d.total) }} {{ d.total === 1 ? 'agent' : 'agents' }}</span>
                 </div>
                 <LoadState :empty="!d.data.length" :empty-text="filter === 'incomplete' ? 'Everyone assigned is fully onboarded.' : 'Nobody here.'">
@@ -166,13 +179,22 @@ function changed(text) {
                         <table class="w-full min-w-[760px] text-sm">
                             <thead><tr><th class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="phone">Phone</SortTh><SortTh :sort="sort" k="unit">Unit</SortTh><SortTh :sort="sort" k="step">Onboarding</SortTh><th class="th text-right">Actions</th></tr></thead>
                             <tbody>
-                                <tr v-for="a in d.data" :key="a.id" :class="picked.has(a.id) ? '!bg-[#eef2fb]' : ''">
+                                <tr
+                                    v-for="a in d.data"
+                                    :key="a.id"
+                                    class="transition-colors hover:bg-[#f8f9fb]"
+                                    :class="picked.has(a.id) ? '!bg-[#eef2fb]' : ''"
+                                    @mouseenter="showPlace(a, $event)"
+                                    @mouseleave="hidePlace"
+                                    @focusin="showPlace(a, $event)"
+                                    @focusout="hidePlace"
+                                >
                                     <td class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
                                     <td class="td"><div class="fig font-[650] whitespace-nowrap">{{ a.code }}</div><div class="text-[13px] text-ink-2">{{ a.name }}</div></td>
                                     <td class="td whitespace-nowrap text-ink-2 tabular-nums">{{ a.phone }}</td>
-                                    <td class="td">
-                                        <template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="text-[13px] text-ink-2">{{ a.place }}</div></template>
-                                        <template v-else><Badge :tone="a.is_reserve ? 'info' : 'warn'">{{ a.is_reserve ? 'Reserve' : 'No unit' }}</Badge><div v-if="a.place" class="mt-0.5 text-[13px] text-ink-2">{{ a.place }}</div></template>
+                                    <td class="td max-w-[280px]" data-place>
+                                        <template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="truncate text-[13px] text-ink-2">{{ a.polling_unit.name }}</div></template>
+                                        <template v-else><Badge :tone="a.is_reserve ? 'info' : 'warn'">{{ a.is_reserve ? 'Reserve' : 'No unit' }}</Badge><div v-if="a.ward" class="mt-0.5 truncate text-[13px] text-ink-2">{{ a.ward }} ward</div></template>
                                     </td>
                                     <td class="td">
                                         <div class="flex items-center gap-1" :aria-label="`${a.step} of 5 steps done`">
@@ -243,4 +265,5 @@ function changed(text) {
             <button class="btn-primary" :disabled="busy === 'bulk'" @click="bulkAgents(bulkConfirm)">{{ busy === 'bulk' ? 'Working…' : bulkConfirm === 'deactivate' ? 'Deactivate' : 'Release' }}</button>
         </template>
     </Modal>
+    <PlaceCard :hover="hover" />
 </template>

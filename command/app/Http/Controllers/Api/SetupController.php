@@ -66,6 +66,7 @@ class SetupController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
             'lga_id' => ['nullable', 'integer'],
+            'ward_id' => ['nullable', 'integer'],
             'sort' => ['nullable', 'in:latest,code,phone,unit,step'],
             'dir' => ['nullable', 'in:asc,desc'],
         ]);
@@ -87,6 +88,7 @@ class SetupController extends Controller
                 default => true,
             })
             ->filter(fn ($a) => empty($data['lga_id']) || (int) (($a->pollingUnit?->ward ?? $a->ward)?->lga_id ?? $a->lga_id) === (int) $data['lga_id'])
+            ->filter(fn ($a) => empty($data['ward_id']) || (int) ($a->pollingUnit?->ward_id ?? $a->ward_id) === (int) $data['ward_id'])
             ->filter(fn ($a) => $search === '' || str_contains(strtolower("{$a->code} {$a->name} {$a->phone} {$a->pollingUnit?->code}"), $search))
             // Newest agents first unless a column header asks otherwise; blanks always go last.
             ->sortBy(fn ($a) => match ($sort) {
@@ -129,6 +131,8 @@ class SetupController extends Controller
                     'phone' => $showPhones ? $a->phone : Phone::masked($a->phone),
                     'polling_unit' => $a->pollingUnit?->only(['id', 'code', 'name']),
                     'place' => $ward ? "{$ward->name}, {$ward->lga->name}" : null,
+                    'ward' => $ward?->name,
+                    'lga' => $ward?->lga->name,
                     'is_reserve' => $a->is_reserve,
                     'step' => $a->step,
                     'step_label' => User::ONBOARDING_STEPS[$a->step],

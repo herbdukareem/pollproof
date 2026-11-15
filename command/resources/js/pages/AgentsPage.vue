@@ -16,6 +16,8 @@ import SortTh from '../components/SortTh.vue';
 import { sortRows, ts, useSortState } from '../lib/useSort';
 import AgentActions from '../components/AgentActions.vue';
 import CallButton from '../components/CallButton.vue';
+import PlaceCard from '../components/PlaceCard.vue';
+import { usePlaceHover } from '../lib/usePlaceHover';
 import { callOrCopy } from '../lib/call';
 import { api } from '../lib/api';
 import { useResource } from '../lib/useResource';
@@ -28,6 +30,7 @@ const router = useRouter();
 const filter = ref(route.query.status ?? '');
 const search = ref(route.query.search ?? '');
 const lgaId = ref(route.query.lga_id ? Number(route.query.lga_id) : '');
+const wardId = ref(route.query.ward_id ? Number(route.query.ward_id) : '');
 // Latest first: the most recent check-in or result at the top; agents with neither go last.
 const statusRank = { absent: 0, outside_area: 1, present: 2, reserve: 3, deactivated: 4 };
 const sort = useSortState({
@@ -37,7 +40,7 @@ const sort = useSortState({
     status: { label: 'Status', dir: 'asc', value: (a) => statusRank[a.status] },
     result: { label: 'Result', dir: 'desc', value: (a) => ts(a.result?.at) },
 }, undefined, { onChange: () => agents.load() });
-const agents = useResource(() => api.get('agents', { search: search.value, lga_id: lgaId.value, status: filter.value === 'deactivated' ? 'deactivated' : '', ...sort.params }), { refreshMs: 30000 });
+const agents = useResource(() => api.get('agents', { search: search.value, lga_id: lgaId.value, ward_id: wardId.value, status: filter.value === 'deactivated' ? 'deactivated' : '', ...sort.params }), { refreshMs: 30000 });
 const pending = useResource(() => api.get('check-ins'), { refreshMs: 15000 });
 
 // Newest first; a card that arrived since the last look glows briefly so it is noticed.
@@ -75,9 +78,18 @@ const structure = useResource(() => api.get('structure'));
 
 let t;
 watch(search, () => { clearTimeout(t); t = setTimeout(agents.load, 300); });
-watch(lgaId, () => agents.load());
+watch(lgaId, (now, before) => {
+    // A ward belongs to one LGA: changing the LGA clears it (and the ward's watcher reloads).
+    if (before !== undefined && wardId.value) wardId.value = '';
+    else agents.load();
+});
+watch(wardId, () => agents.load());
+const wardOptions = computed(() => (structure.data.value?.lgas ?? []).find((l) => l.id === Number(lgaId.value))?.wards.map((w) => ({ value: w.id, label: w.name, hint: `${w.units} units` })) ?? []);
+
+// Pointing at a row shows the agent's unit, ward and LGA.
+const { hover, show: showPlace, hide: hidePlace } = usePlaceHover();
 watch(filter, (now, before) => (now === 'deactivated' || before === 'deactivated') && agents.load());
-watch([filter, search, lgaId], ([status, q, lga]) => router.replace({ query: { ...(status ? { status } : {}), ...(q ? { search: q } : {}), ...(lga ? { lga_id: lga } : {}) } }));
+watch([filter, search, lgaId, wardId], ([status, q, lga, ward]) => router.replace({ query: { ...(status ? { status } : {}), ...(q ? { search: q } : {}), ...(lga ? { lga_id: lga } : {}), ...(ward ? { ward_id: ward } : {}) } }));
 
 const summary = computed(() => agents.data.value?.summary ?? {});
 const matching = computed(() => agents.data.value?.matching ?? {});
@@ -125,7 +137,7 @@ async function reviewPicked(decision) {
         busy.value = null;
     }
 }
-const filtered = computed(() => !!(search.value || lgaId.value));
+const filtered = computed(() => !!(search.value || lgaId.value || wardId.value));
 const busy = ref(null);
 const message = ref('');
 const error = ref('');
@@ -201,7 +213,11 @@ async function send(agent) {
                 </div>
                 <label class="sr-only" for="agent-lga">LGA</label>
                 <SearchSelect id="agent-lga" v-model="lgaId" class="w-full sm:w-[200px]" size="sm" all-label="All LGAs" noun="LGAs" :options="(structure.data.value?.lgas ?? []).map((l) => ({ value: l.id, label: l.name }))" />
-                <button v-if="filter || filtered" class="link text-[13px]" @click="() => { filter = ''; search = ''; lgaId = ''; }">Clear filters</button>
+                <template v-if="lgaId">
+                    <label class="sr-only" for="agent-ward">Ward</label>
+                    <SearchSelect id="agent-ward" v-model="wardId" class="w-full sm:w-[200px]" size="sm" all-label="All wards" noun="wards" :options="wardOptions" />
+                </template>
+                <button v-if="filter || filtered" class="link text-[13px]" @click="() => { filter = ''; search = ''; lgaId = ''; wardId = ''; }">Clear filters</button>
             </div>
             <LoadState :loading="agents.loading.value" :error="agents.error.value" :empty="!rows.length" :empty-text="filtered || filter ? 'No agents match these filters.' : 'No agents yet.'">
                 <div class="relative overflow-x-auto">
@@ -209,10 +225,19 @@ async function send(agent) {
                     <table class="w-full min-w-[680px] text-sm">
                         <thead><tr><th v-if="canEdit" class="th w-10 !pr-0"><input type="checkbox" class="checkbox" aria-label="Tick every agent on this page" :checked="picked.allOn(pageIds)" :indeterminate.prop="picked.someOn(pageIds)" @change="picked.setMany(pageIds, $event.target.checked)" /></th><SortTh :sort="sort" k="code">Agent</SortTh><SortTh :sort="sort" k="unit">Polling unit</SortTh><SortTh :sort="sort" k="status">Status</SortTh><SortTh :sort="sort" k="result">Result</SortTh><th class="th text-right">Actions</th></tr></thead>
                         <tbody>
-                            <tr v-for="a in rows" :key="a.id" :class="[a.active === false ? 'opacity-60' : '', picked.has(a.id) ? '!bg-[#eef2fb]' : '']">
+                            <tr
+                                v-for="a in rows"
+                                :key="a.id"
+                                class="transition-colors hover:bg-[#f8f9fb]"
+                                :class="[a.active === false ? 'opacity-60' : '', picked.has(a.id) ? '!bg-[#eef2fb]' : '']"
+                                @mouseenter="showPlace(a, $event)"
+                                @mouseleave="hidePlace"
+                                @focusin="showPlace(a, $event)"
+                                @focusout="hidePlace"
+                            >
                                 <td v-if="canEdit" class="td w-10 !pr-0"><input type="checkbox" class="checkbox" :aria-label="`Tick ${a.code}`" :checked="picked.has(a.id)" @change="picked.toggle(a.id)" /></td>
                                 <td class="td"><div class="fig font-[650] whitespace-nowrap">{{ a.code }}</div><div class="text-[13px] text-ink-2">{{ a.name }}</div><div v-if="a.phone"><a :href="`tel:${a.phone}`" class="text-[12.5px] text-ink-3 tabular-nums hover:text-navy hover:underline" title="Call (copies the number on a computer)" @click="callOrCopy($event, a.phone, a.name || a.code)">{{ a.phone }}</a></div></td>
-                                <td class="td"><template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="text-[13px] text-ink-2">{{ a.polling_unit.ward }}, {{ a.polling_unit.lga }}</div></template><span v-else class="text-xs text-ink-2">{{ a.area ?? '–' }}</span></td>
+                                <td class="td max-w-[280px]" data-place><template v-if="a.polling_unit"><div class="fig font-[600] whitespace-nowrap">{{ a.polling_unit.code }}</div><div class="truncate text-[13px] text-ink-2">{{ a.polling_unit.name }}</div></template><span v-else class="text-xs text-ink-2">{{ a.ward ? `${a.ward} ward` : '–' }}</span></td>
                                 <td class="td">
                                     <Badge :tone="tone[a.status]">{{ label[a.status] }}</Badge>
                                     <div v-if="a.check_in" class="mt-1 text-[12.5px] whitespace-nowrap text-ink-2 tabular-nums">{{ sameDay(a.check_in.at) ? 'In' : 'Last in' }} {{ timeOrDate(a.check_in.at) }}<template v-if="a.check_in.distance_m != null">, {{ a.check_in.distance_m }} m</template></div>
@@ -287,4 +312,5 @@ async function send(agent) {
             <button class="btn-primary" :disabled="busy === 'bulk'" @click="bulk(bulkConfirm)">{{ busy === 'bulk' ? 'Working…' : bulkConfirm === 'deactivate' ? 'Deactivate' : 'Release' }}</button>
         </template>
     </Modal>
+    <PlaceCard :hover="hover" />
 </template>

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { api } from '../lib/api';
 import { session } from '../lib/session';
+import { usePopover } from '../lib/usePopover';
 
 /**
  * Reads new incidents, alerts and race news out loud on this screen (POLLPROOF_VOICE_ENABLED).
@@ -22,7 +23,7 @@ const store = `pp:voice:${session.user?.id ?? 0}`;
 
 const router = useRouter();
 const available = computed(() => !!session.user?.rules?.voice);
-const open = ref(false);
+const { open, anchor, style: panelStyle, toggle: togglePanel } = usePopover(340);
 const settings = reactive(read(store, { on: false, kinds: KINDS.map(([k]) => k) }));
 const saying = ref(null); // the clip playing now
 const last = ref(null); // the last clip played, for the panel
@@ -202,20 +203,23 @@ onBeforeUnmount(() => {
 <template>
     <div v-if="available" class="relative">
         <button
+            ref="anchor"
             class="btn-ghost relative h-9 w-9 !px-0"
             :class="settings.on ? 'text-navy' : 'text-ink-3'"
             :aria-label="settings.on ? 'Voice announcements on' : 'Voice announcements off'"
             :aria-expanded="open"
             :title="saying ? saying.text : settings.on ? 'Voice announcements on' : 'Voice announcements off'"
-            @click="open = !open"
+            @click="togglePanel"
         >
             <Icon :name="settings.on ? 'volume' : 'volume-off'" :size="18" />
             <span v-if="saying" class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-orange motion-safe:animate-pulse"></span>
         </button>
-        <div v-if="open" class="fixed inset-0 z-30" @click="open = false"></div>
-        <div v-if="open" class="float absolute right-0 z-40 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden" role="dialog" aria-label="Voice announcements">
+        <Teleport to="body">
+        <div v-if="open" class="fixed inset-0 z-[55]" @click="open = false"></div>
+        <Transition name="pop">
+        <div v-if="open" class="float fixed z-[56] flex flex-col overflow-hidden" :style="panelStyle" role="dialog" aria-label="Voice announcements">
             <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-                <b class="text-sm font-[650]">Read out loud</b>
+                <b class="text-sm font-[650] whitespace-nowrap">Read out loud</b>
                 <button
                     type="button"
                     role="switch"
@@ -228,11 +232,11 @@ onBeforeUnmount(() => {
                     <span class="sr-only">Read announcements out loud on this screen</span>
                 </button>
             </div>
-            <div class="px-4 py-3">
-                <p class="text-[13px] text-ink-2">This screen says new incidents and alerts as they come in, and when the race changes. Each one is said once; several at the same moment are said together.</p>
+            <div class="overflow-y-auto px-4 py-3">
+                <p class="text-[13px] leading-relaxed text-ink-2">This screen says new incidents and alerts as they come in, and when the race changes. Each one is said once; several at the same moment are said together.</p>
                 <fieldset class="mt-3" :disabled="!settings.on">
                     <legend class="sr-only">What to read out</legend>
-                    <label v-for="[k, label] in KINDS" :key="k" class="flex items-center gap-2.5 py-1 text-sm" :class="!settings.on && 'opacity-60'">
+                    <label v-for="[k, label] in KINDS" :key="k" class="flex cursor-pointer items-center gap-2.5 py-1.5 text-sm" :class="!settings.on && 'opacity-60'">
                         <input v-model="settings.kinds" type="checkbox" class="checkbox" :value="k" />
                         {{ label }}
                     </label>
@@ -247,5 +251,7 @@ onBeforeUnmount(() => {
                 <button v-if="settings.on" type="button" class="link mt-3 text-[13px]" @click="sample">Play a sample</button>
             </div>
         </div>
+        </Transition>
+        </Teleport>
     </div>
 </template>

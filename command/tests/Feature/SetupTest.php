@@ -188,6 +188,16 @@ class SetupTest extends TestCase
             ->assertJsonPath('data.0.code', 'AG-PU3')
             ->assertJsonPath('data.0.step_label', 'Not invited')
             ->assertJsonPath('data.1.step_label', 'Practice sent');
+        // Each agent's ward and LGA come apart, and the list narrows to one ward.
+        $this->getJson('/api/v1/setup/roster?filter=all&ward_id='.$this->wards['L2']->id)->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.code', 'AG-PU3')
+            ->assertJsonPath('data.0.ward', 'Ward of L2')
+            ->assertJsonPath('data.0.lga', 'LGA L2');
+        $this->getJson('/api/v1/agents?ward_id='.$this->wards['L2']->id)->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.polling_unit.name', 'Unit 3')
+            ->assertJsonPath('data.0.ward', 'Ward of L2');
 
         Queue::fake();
         $this->postJson('/api/v1/readiness/remind', ['group' => 'not_confirmed'])->assertOk()->assertJson(['sent' => 2]);

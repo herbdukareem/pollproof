@@ -4,10 +4,11 @@ import { useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { api } from '../lib/api';
 import { dateTime } from '../lib/format';
+import { usePopover } from '../lib/usePopover';
 
 // Notifications for the signed-in person. Checks every 30 seconds.
 const router = useRouter();
-const open = ref(false);
+const { open, anchor, style: panelStyle, toggle } = usePopover(380);
 const data = ref({ unread: 0, data: [] });
 let timer;
 
@@ -37,12 +38,14 @@ const tone = { high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' };
 
 <template>
     <div class="relative">
-        <button class="btn-ghost relative h-9 w-9 !px-0" :aria-label="`Notifications, ${data.unread} unread`" :aria-expanded="open" @click="open = !open">
+        <button ref="anchor" class="btn-ghost relative h-9 w-9 !px-0" :aria-label="`Notifications, ${data.unread} unread`" :aria-expanded="open" @click="toggle">
             <Icon name="bell" :size="18" />
             <span v-if="data.unread" class="fig absolute -top-1.5 -right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded bg-action px-1 text-[11px] font-[650] text-white">{{ data.unread > 99 ? '99+' : data.unread }}</span>
         </button>
-        <div v-if="open" class="fixed inset-0 z-30" @click="open = false"></div>
-        <div v-if="open" class="absolute right-0 z-40 mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-[10px] border border-line bg-white shadow-[0_12px_32px_rgba(19,33,60,0.14)]" role="dialog" aria-label="Notifications">
+        <Teleport to="body">
+        <div v-if="open" class="fixed inset-0 z-[55]" @click="open = false"></div>
+        <Transition name="pop">
+        <div v-if="open" class="float fixed z-[56] flex flex-col overflow-hidden" :style="panelStyle" role="dialog" aria-label="Notifications">
             <div class="flex items-center justify-between border-b border-line px-4 py-3">
                 <b class="text-sm">Notifications</b>
                 <button v-if="data.unread" class="text-xs font-[600] text-navy hover:underline" @click="markRead()">Mark all read</button>
@@ -61,5 +64,7 @@ const tone = { high: 'bg-action', medium: 'bg-[#d99a00]', low: 'bg-ink-3' };
                 </li>
             </ul>
         </div>
+        </Transition>
+        </Teleport>
     </div>
 </template>

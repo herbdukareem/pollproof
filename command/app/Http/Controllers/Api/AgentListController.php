@@ -23,6 +23,7 @@ class AgentListController extends Controller
         $data = $request->validate([
             'status' => ['nullable', 'in:present,absent,outside_area,reserve,deactivated'],
             'lga_id' => ['nullable', 'integer'],
+            'ward_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:60'],
         ] + ListSort::rules(self::sorts()));
 
@@ -60,8 +61,11 @@ class AgentListController extends Controller
                 'active' => $a->isActive(),
                 'has_photo' => $a->photo_path !== null,
                 'lga_id' => $a->pollingUnit?->ward->lga_id ?? $a->ward?->lga_id ?? $a->lga_id,
+                'ward_id' => $a->pollingUnit?->ward_id ?? $a->ward_id,
+                'ward' => ($a->pollingUnit?->ward ?? $a->ward)?->name,
+                'lga' => ($a->pollingUnit?->ward ?? $a->ward)?->lga?->name,
                 'area' => $a->pollingUnit ? null : (trim(($a->ward?->name ?? '').($a->ward?->lga ? ', '.$a->ward->lga->name : ''), ' ,') ?: null),
-                'polling_unit' => $a->pollingUnit ? ['id' => $a->pollingUnit->id, 'code' => $a->pollingUnit->code, 'ward' => $a->pollingUnit->ward->name, 'lga' => $a->pollingUnit->ward->lga->name] : null,
+                'polling_unit' => $a->pollingUnit ? ['id' => $a->pollingUnit->id, 'code' => $a->pollingUnit->code, 'name' => $a->pollingUnit->name, 'ward' => $a->pollingUnit->ward->name, 'lga' => $a->pollingUnit->ward->lga->name] : null,
                 'check_in' => $c ? ['id' => $c->id, 'status' => $c->status, 'distance_m' => $c->distance_m, 'at' => $c->captured_at] : null,
                 'result' => ($r = $results->get($a->id)) ? ['id' => $r->id, 'status' => $r->status, 'at' => $r->captured_at] : null,
                 'activity' => $activity->get($a->id),
@@ -72,6 +76,7 @@ class AgentListController extends Controller
         $search = strtolower(trim($data['search'] ?? ''));
         $list = $rows
             ->when($data['lga_id'] ?? null, fn ($c, $l) => $c->where('lga_id', (int) $l))
+            ->when($data['ward_id'] ?? null, fn ($c, $w) => $c->where('ward_id', (int) $w))
             ->when($search !== '', fn ($c) => $c->filter(fn ($r) => str_contains(strtolower("{$r['code']} {$r['name']} {$r['phone']} ".($r['polling_unit']['code'] ?? '').' '.($r['polling_unit']['ward'] ?? '')), $search)));
         $list = ListSort::apply($list, $data, self::sorts());
 
