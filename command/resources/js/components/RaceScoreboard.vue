@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import HelpTip from './HelpTip.vue';
+import HoverCard from './HoverCard.vue';
 import Icon from './Icon.vue';
 import { num, pct } from '../lib/format';
 import { partyColour } from '../lib/parties';
@@ -87,6 +88,68 @@ const stage = computed(() => (reportedShare.value >= 1 ? 'Every unit is in.' : r
 const blocks = computed(() => Array.from({ length: count.value }, (_, i) => (i < met.value ? 'reached' : i < required.value ? 'needed' : 'extra')));
 const leader = computed(() => Math.max(1, ...candidates.value.map((c) => c.votes)));
 const points = computed(() => Math.abs(share(ours.value) - share(rival.value)) * 100);
+
+/**
+ * Any party's own "to win" report, for the card over its vote-share row: the same conditions
+ * as ours, measured for that party.
+ */
+function reportFor(c) {
+    const others = candidates.value.filter((x) => x.party !== c.party);
+    const best = others.reduce((m, x) => (x.votes > (m?.votes ?? -1) ? x : m), null);
+    const gap = c.votes - (best?.votes ?? 0);
+    const votesMet = counted.value && gap > 0;
+    const rows = [{
+        label: 'Most votes',
+        met: counted.value ? votesMet : null,
+        value: !counted.value ? '–' : gap === 0 ? `Level with ${name(best)}` : `${gap > 0 ? '+' : '−'}${num(Math.abs(gap))} vs ${name(best)}`,
+    }];
+    let ruleMet = true;
+    if (rule.value === 'spread') {
+        const m = c.lgas_meeting_threshold ?? 0;
+        ruleMet = m >= required.value && required.value > 0;
+        rows.push({ label: `25% in ${required.value} LGAs`, met: counted.value ? ruleMet : null, value: ruleMet ? `${m} of ${count.value}` : `${m} of ${required.value} · ${required.value - m} to go`, blocks: { met: m } });
+    } else if (rule.value === 'state_quarter') {
+        ruleMet = share(c) >= 0.25;
+        rows.push({ label: '25% in this state', met: counted.value ? ruleMet : null, value: pct(share(c), 1) });
+    } else {
+        const led = (t.value.lgas ?? []).filter((l) => {
+            const v = l.votes ?? {};
+            const mine = v[c.party] ?? 0;
+            return mine > 0 && Object.entries(v).every(([p, n]) => p === c.party || n < mine);
+        }).length;
+        rows.push({ label: `${areaWord.value === 'ward' ? 'Wards' : 'LGAs'} led`, met: null, value: `${led} of ${count.value}` });
+    }
+    const title = !counted.value ? 'No results yet'
+        : votesMet && ruleMet ? (second.value ? 'Winning' : 'Leading')
+        : votesMet ? 'Ahead, not winning yet'
+        : gap === 0 ? 'Level'
+        : second.value && ruleMet ? 'Behind on votes' : 'Behind';
+    const tone = !counted.value ? 'bg-[#eef0f4] text-ink-2' : votesMet && ruleMet ? 'bg-[#e3f4ea] text-good' : votesMet || gap === 0 ? 'bg-[#fdf3dc] text-[#7a3d0b]' : 'bg-[#fdece3] text-bad';
+    return { title, tone, rows };
+}
+
+// The report card follows the row under the pointer or keyboard; a tap pins it on phones.
+const hovered = ref(null);
+let pinned = false;
+const showFor = (c, e) => (hovered.value = { c, rect: e.currentTarget.getBoundingClientRect(), report: reportFor(c) });
+function leave() {
+    if (!pinned) hovered.value = null;
+}
+function onAway(e) {
+    if (!e.target.closest?.('[data-party-row]')) unpin();
+}
+function unpin() {
+    pinned = false;
+    hovered.value = null;
+    document.removeEventListener('pointerdown', onAway);
+}
+function tapRow(c, e) {
+    if (pinned && hovered.value?.c.party === c.party) return unpin();
+    pinned = true;
+    showFor(c, e);
+    document.addEventListener('pointerdown', onAway);
+}
+onBeforeUnmount(unpin);
 const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole state' ? props.race.area : 'Whole state'));
 </script>
 
@@ -209,7 +272,21 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
             <span class="text-[13px] text-ink-2 tabular-nums">{{ num(total) }} votes</span>
         </div>
         <ul class="flex flex-col gap-0.5">
-            <li v-for="c in candidates" :key="c.party" class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-3 py-2 @lg:grid-cols-[150px_minmax(0,1fr)_56px_72px] @lg:gap-x-4" :class="c.is_ours && 'bg-[#f1f3f7]'">
+            <li
+                v-for="c in candidates"
+                :key="c.party"
+                data-party-row
+                tabindex="0"
+                :aria-label="`${c.candidate || c.name}: ${pct(share(c), 1)}, ${num(c.votes)} votes. ${reportFor(c).title}.`"
+                class="grid cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-3 py-2 transition-colors outline-none @lg:grid-cols-[150px_minmax(0,1fr)_56px_72px] @lg:gap-x-4 focus-visible:ring-2 focus-visible:ring-navy/40"
+                :class="c.is_ours ? 'bg-[#f1f3f7] hover:bg-[#e9ecf2]' : hovered?.c.party === c.party ? 'bg-[#f6f7f9]' : 'hover:bg-[#f6f7f9]'"
+                @mouseenter="showFor(c, $event)"
+                @mouseleave="leave"
+                @focus="showFor(c, $event)"
+                @blur="leave"
+                @click="tapRow(c, $event)"
+                @keydown.esc="unpin"
+            >
                 <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-[14.5px]" :class="c.is_ours ? 'font-[720] text-ink' : 'text-ink'">{{ c.candidate || c.name }}</span>
                     <span v-if="c.is_ours" class="shrink-0 rounded-full bg-navy px-2 py-0.5 text-[10.5px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
@@ -221,6 +298,42 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 <span class="fig hidden text-right text-[13.5px] text-ink-2 @lg:order-4 @lg:block">{{ num(c.votes) }}</span>
             </li>
         </ul>
+
+        <!-- One party's "to win" report, over its row. -->
+        <HoverCard :anchor="hovered?.rect ?? null" :width="290">
+            <template v-if="hovered">
+                <div class="flex min-w-0 items-center gap-2">
+                    <i class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: partyColour(hovered.c.party, candidates) }"></i>
+                    <span class="truncate text-[14px] font-[700] text-ink">{{ hovered.c.candidate || hovered.c.name }}</span>
+                    <span v-if="hovered.c.is_ours" class="shrink-0 rounded-full bg-navy px-1.5 py-px text-[10px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between gap-3">
+                    <span class="rounded-full px-2 py-0.5 text-[11.5px] font-[700]" :class="hovered.report.tone">{{ hovered.report.title }}</span>
+                    <span class="text-[12px] text-ink-3 tabular-nums">{{ pct(share(hovered.c), 1) }} · {{ num(hovered.c.votes) }}</span>
+                </div>
+                <p class="mt-3 mb-1.5 text-[10.5px] font-[700] tracking-[0.08em] text-ink-3 uppercase">{{ second ? 'To win, both' : 'To win' }}</p>
+                <ul class="flex flex-col gap-2">
+                    <li v-for="r in hovered.report.rows" :key="r.label">
+                        <div class="flex items-center gap-2">
+                            <span
+                                class="grid h-4 w-4 shrink-0 place-items-center rounded-full text-white"
+                                :class="r.met === true ? 'bg-good' : r.met === false ? 'bg-action' : 'bg-[#c9cfd9]'"
+                            ><Icon v-if="r.met !== null" :name="r.met ? 'check' : 'x'" :size="10" /></span>
+                            <span class="text-[12.5px] text-ink-2">{{ r.label }}</span>
+                            <span class="ml-auto text-right text-[12.5px] font-[650] text-ink tabular-nums">{{ r.value }}</span>
+                        </div>
+                        <div v-if="r.blocks" class="mt-1.5 ml-6 flex gap-px">
+                            <span
+                                v-for="i in count"
+                                :key="i"
+                                class="h-1.5 min-w-0 flex-1 rounded-[1px]"
+                                :class="i <= r.blocks.met ? 'bg-navy' : i <= required ? 'bg-[#e7c9a4]' : 'bg-[#e4e7ec]'"
+                            ></span>
+                        </div>
+                    </li>
+                </ul>
+            </template>
+        </HoverCard>
     </section>
 </template>
 
