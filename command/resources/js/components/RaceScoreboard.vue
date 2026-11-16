@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import HelpTip from './HelpTip.vue';
 import HoverCard from './HoverCard.vue';
 import Icon from './Icon.vue';
+import PartyMark from './PartyMark.vue';
 import { num, pct } from '../lib/format';
 import { partyColour } from '../lib/parties';
 
@@ -172,9 +173,20 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 <span class="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#e8ebf0]"><span class="block h-full rounded-full bg-navy transition-[width]" :style="{ width: reportedShare * 100 + '%' }"></span></span>
             </div>
         </div>
-        <h2 class="mt-3 text-[26px] leading-[1.1] font-[760] tracking-[-0.02em] @lg:text-[32px]" :class="verdictTone">{{ verdict.title }}</h2>
-        <p v-if="verdict.html" class="mt-1.5 text-[15px] leading-snug text-ink-2 [&_b]:font-[700] [&_b]:text-ink" v-html="verdict.html"></p>
-        <p v-else class="mt-1.5 text-[15px] leading-snug text-ink-2">{{ verdict.text }}</p>
+        <div class="mt-3 flex items-center gap-4">
+            <div class="min-w-0 flex-1">
+                <h2 class="text-[26px] leading-[1.1] font-[760] tracking-[-0.02em] @lg:text-[32px]" :class="verdictTone">{{ verdict.title }}</h2>
+                <p v-if="verdict.html" class="mt-1.5 text-[15px] leading-snug text-ink-2 [&_b]:font-[700] [&_b]:text-ink" v-html="verdict.html"></p>
+                <p v-else class="mt-1.5 text-[15px] leading-snug text-ink-2">{{ verdict.text }}</p>
+            </div>
+            <!-- Our party's logo, uploaded under Admin, Campaign. -->
+            <img
+                v-if="ours?.logo"
+                :src="ours.logo"
+                :alt="`${ours.name} logo`"
+                class="h-16 w-16 shrink-0 rounded-2xl border border-line bg-white object-contain p-1 @lg:h-[76px] @lg:w-[76px]"
+            />
+        </div>
 
         <!-- Each condition the race is won by. -->
         <template v-if="ours">
@@ -278,7 +290,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 data-party-row
                 tabindex="0"
                 :aria-label="`${c.candidate || c.name}: ${pct(share(c), 1)}, ${num(c.votes)} votes. ${reportFor(c).title}.`"
-                class="grid cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-3 py-2 transition-colors outline-none @lg:grid-cols-[150px_minmax(0,1fr)_56px_72px] @lg:gap-x-4 focus-visible:ring-2 focus-visible:ring-navy/40"
+                class="grid cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-3 py-2 transition-colors outline-none @lg:grid-cols-[170px_minmax(0,1fr)_56px_72px] @lg:gap-x-4 focus-visible:ring-2 focus-visible:ring-navy/40"
                 :class="c.is_ours ? 'bg-[#f1f3f7] hover:bg-[#e9ecf2]' : hovered?.c.party === c.party ? 'bg-[#f6f7f9]' : 'hover:bg-[#f6f7f9]'"
                 @mouseenter="showFor(c, $event)"
                 @mouseleave="leave"
@@ -288,6 +300,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 @keydown.esc="unpin"
             >
                 <span class="flex min-w-0 items-center gap-2">
+                    <PartyMark :code="c.party" :name="c.name" :logo="c.logo" :colour="partyColour(c.party, candidates)" :size="22" />
                     <span class="truncate text-[14.5px]" :class="c.is_ours ? 'font-[720] text-ink' : 'text-ink'">{{ c.candidate || c.name }}</span>
                     <span v-if="c.is_ours" class="shrink-0 rounded-full bg-navy px-2 py-0.5 text-[10.5px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
                 </span>
@@ -303,7 +316,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
         <HoverCard :anchor="hovered?.rect ?? null" :width="290">
             <template v-if="hovered">
                 <div class="flex min-w-0 items-center gap-2">
-                    <i class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: partyColour(hovered.c.party, candidates) }"></i>
+                    <PartyMark :code="hovered.c.party" :name="hovered.c.name" :logo="hovered.c.logo" :colour="partyColour(hovered.c.party, candidates)" :size="24" />
                     <span class="truncate text-[14px] font-[700] text-ink">{{ hovered.c.candidate || hovered.c.name }}</span>
                     <span v-if="hovered.c.is_ours" class="shrink-0 rounded-full bg-navy px-1.5 py-px text-[10px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
                 </div>

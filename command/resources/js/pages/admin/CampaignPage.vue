@@ -4,6 +4,7 @@ import PageHeader from '../../components/PageHeader.vue';
 import LoadState from '../../components/LoadState.vue';
 import Badge from '../../components/Badge.vue';
 import Icon from '../../components/Icon.vue';
+import PartyMark from '../../components/PartyMark.vue';
 import FreezeNote from '../../components/FreezeNote.vue';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
@@ -45,6 +46,23 @@ const save = () => act('save', () => api.patch('campaign', { ...form, freeze_at:
 const addParty = () => act('party', () => api.post('parties', { ...party }), `Added ${party.code.toUpperCase()}.`).then(() => !error.value && Object.assign(party, { code: '', name: '', is_ours: false }));
 const startEdit = (p) => { editing.value = p.id; Object.assign(edit, { name: p.name, is_ours: p.is_ours }); };
 const saveParty = (p) => act(`p${p.id}`, () => api.patch(`parties/${p.id}`, { ...edit }), `Saved ${p.code}.`).then(() => !error.value && (editing.value = null));
+// A party's logo or photo: pick a file for the party clicked, upload it straight away.
+const fileInput = ref(null);
+const logoFor = ref(null);
+function pickLogo(p) {
+    logoFor.value = p;
+    fileInput.value.value = '';
+    fileInput.value.click();
+}
+function uploadLogo(e) {
+    const file = e.target.files?.[0];
+    const p = logoFor.value;
+    if (!file || !p) return;
+    const body = new FormData();
+    body.append('logo', file);
+    act(`l${p.id}`, () => api.post(`parties/${p.id}/logo`, body), `Saved the ${p.code} logo.`);
+}
+const removeLogo = (p) => act(`l${p.id}`, () => api.delete(`parties/${p.id}/logo`), `Removed the ${p.code} logo.`);
 const removeParty = (p) => act(`d${p.id}`, () => api.delete(`parties/${p.id}`), `Removed ${p.code}.`);
 </script>
 
@@ -75,25 +93,40 @@ const removeParty = (p) => act(`d${p.id}`, () => api.delete(`parties/${p.id}`), 
 
             <section class="card p-5">
                 <h2 class="card-title-ruled">Parties on the ballot</h2>
-                <p class="text-[13px] text-ink-2">Codes are what agents type in the app and in SMS results, so keep them as on the ballot. A party can't be removed once results include it.</p>
+                <p class="text-[13px] text-ink-2">Codes are what agents type in the app and in SMS results, so keep them as on the ballot. A party can't be removed once results include it. Click the circle to add a party's logo.</p>
                 <ul class="mt-3">
                     <li v-for="p in d.parties" :key="p.id" class="border-t border-rule py-2.5 first:border-t-0">
                         <div v-if="editing !== p.id" class="flex items-center gap-3">
-                            <span class="fig w-16 font-[650]">{{ p.code }}</span>
+                            <button
+                                type="button"
+                                class="group relative shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-navy/40 focus-visible:outline-none"
+                                :title="p.logo ? `Change the ${p.code} logo` : `Add a logo for ${p.code}`"
+                                :aria-label="p.logo ? `Change the ${p.code} logo` : `Add a logo for ${p.code}`"
+                                :disabled="busy === `l${p.id}`"
+                                @click="pickLogo(p)"
+                            >
+                                <PartyMark v-if="p.logo" :code="p.code" :name="p.name" :logo="p.logo" :size="36" />
+                                <span v-else class="grid h-9 w-9 place-items-center rounded-full border border-dashed border-ink-3 text-ink-3 group-hover:border-ink group-hover:text-ink"><Icon name="image" :size="15" /></span>
+                                <span v-if="p.logo" class="absolute -right-0.5 -bottom-0.5 grid h-4 w-4 place-items-center rounded-full bg-navy text-white opacity-0 transition-opacity group-hover:opacity-100"><Icon name="edit" :size="9" /></span>
+                            </button>
+                            <span class="fig w-12 font-[650]">{{ p.code }}</span>
                             <span class="flex-1 text-sm">{{ p.name }}</span>
                             <Badge v-if="p.is_ours" tone="navy">Ours</Badge>
                             <button v-if="!d.frozen" class="btn-ghost h-8 px-3 text-[13px]" @click="startEdit(p)">Edit</button>
                             <button v-if="!d.frozen && !p.has_votes" class="btn-ghost h-8 w-8 !px-0" :aria-label="`Remove ${p.code}`" :disabled="busy === `d${p.id}`" @click="removeParty(p)"><Icon name="x" :size="14" /></button>
                         </div>
                         <form v-else class="flex flex-wrap items-center gap-2" @submit.prevent="saveParty(p)">
-                            <span class="fig w-16 font-[650]">{{ p.code }}</span>
+                            <span class="w-9 shrink-0"></span>
+                            <span class="fig w-12 font-[650]">{{ p.code }}</span>
                             <input v-model="edit.name" class="field h-9 flex-1" aria-label="Party name" required />
                             <label class="flex items-center gap-2 text-sm"><input v-model="edit.is_ours" type="checkbox" class="checkbox" /> Ours</label>
                             <button class="btn-navy h-9" :disabled="busy === `p${p.id}`">Save</button>
                             <button type="button" class="btn-outline h-9" @click="editing = null">Cancel</button>
+                            <button v-if="p.logo" type="button" class="btn-ghost h-9 text-[13px] text-bad" :disabled="busy === `l${p.id}`" @click="removeLogo(p)">Remove logo</button>
                         </form>
                     </li>
                 </ul>
+                <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="uploadLogo" />
                 <form v-if="!d.frozen" class="mt-3 grid gap-2 border-t border-rule pt-3 sm:grid-cols-[90px_1fr_auto_auto]" @submit.prevent="addParty">
                     <input v-model="party.code" class="field fig h-9 uppercase placeholder:normal-case" placeholder="Code" aria-label="Party code" maxlength="10" required />
                     <input v-model="party.name" class="field h-9" placeholder="Party name" aria-label="Party name" required />

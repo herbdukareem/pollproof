@@ -123,6 +123,7 @@ Route::prefix('v1')->group(function () {
             Route::get('tally', TallyController::class);
             Route::get('tally/points', [TallyController::class, 'points']);
             Route::get('tally/board', [TallyController::class, 'board']);
+            Route::get('parties/{party}/logo', [CampaignController::class, 'logo']);
             Route::get('elections', [ElectionController::class, 'index']);
             Route::get('nav-counts', NavCountsController::class);
             // Spoken announcements (POLLPROOF_VOICE_ENABLED). The audio link is signed by the feed.
@@ -247,6 +248,8 @@ Route::prefix('v1')->group(function () {
             Route::post('parties', [CampaignController::class, 'storeParty']);
             Route::patch('parties/{party}', [CampaignController::class, 'updateParty']);
             Route::delete('parties/{party}', [CampaignController::class, 'destroyParty']);
+            Route::post('parties/{party}/logo', [CampaignController::class, 'uploadLogo']);
+            Route::delete('parties/{party}/logo', [CampaignController::class, 'removeLogo']);
             Route::get('users', [UserController::class, 'index']);
             Route::post('users', [UserController::class, 'store']);
             Route::patch('users/{user}', [UserController::class, 'update']);
