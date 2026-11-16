@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import HelpTip from './HelpTip.vue';
 import HoverCard from './HoverCard.vue';
 import Icon from './Icon.vue';
@@ -151,18 +151,38 @@ function tapRow(c, e) {
     document.addEventListener('pointerdown', onAway);
 }
 onBeforeUnmount(unpin);
+
+// Full screen, for the command room's big screen. Esc or the button leaves it.
+const card = ref(null);
+const full = ref(false);
+const canFull = typeof document !== 'undefined' && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+function toggleFull() {
+    if (document.fullscreenElement ?? document.webkitFullscreenElement) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document);
+    else (card.value.requestFullscreen ?? card.value.webkitRequestFullscreen)?.call(card.value);
+}
+const onFullChange = () => (full.value = (document.fullscreenElement ?? document.webkitFullscreenElement) === card.value);
+onMounted(() => {
+    document.addEventListener('fullscreenchange', onFullChange);
+    document.addEventListener('webkitfullscreenchange', onFullChange);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('fullscreenchange', onFullChange);
+    document.removeEventListener('webkitfullscreenchange', onFullChange);
+});
 const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole state' ? props.race.area : 'Whole state'));
 </script>
 
 <template>
-    <section class="@container card p-5 sm:p-6" aria-label="Where we stand">
+    <section ref="card" class="@container card p-5 sm:p-6" :class="full && 'pp-score-full'" aria-label="Where we stand">
+        <div class="pp-score-inner">
         <!-- The race, how far the count has got, and the verdict. -->
         <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <p class="flex flex-wrap items-center gap-2.5 text-[13.5px] text-ink-2">
                 <span class="rounded-md bg-navy px-2.5 py-1 text-[11.5px] font-[700] tracking-[0.08em] text-white uppercase">{{ TYPE[race?.type] ?? race?.type_label ?? 'Race' }}</span>
                 {{ areaLabel }} · {{ count }} {{ areaWord }}{{ count === 1 ? '' : 's' }}
             </p>
-            <div class="w-full @md:w-48">
+            <div class="flex w-full items-center gap-3 @md:w-auto">
+            <div class="min-w-0 flex-1 @md:w-48 @md:flex-none">
                 <span class="flex items-center justify-between gap-3 text-[13px] text-ink-2">
                     <span class="inline-flex items-center gap-1.5">
                         <RouterLink to="/units?status=reported" class="hover:text-ink hover:underline">Units in</RouterLink>
@@ -171,6 +191,15 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                     <span class="fig text-[15px] font-[750] text-ink">{{ pct(reportedShare) }}</span>
                 </span>
                 <span class="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#e8ebf0]"><span class="block h-full rounded-full bg-navy transition-[width]" :style="{ width: reportedShare * 100 + '%' }"></span></span>
+            </div>
+                <button
+                    v-if="canFull"
+                    type="button"
+                    class="btn-ghost h-8 w-8 shrink-0 justify-center px-0"
+                    :title="full ? 'Leave full screen (Esc)' : 'Show the scoreboard full screen'"
+                    :aria-label="full ? 'Leave full screen' : 'Show the scoreboard full screen'"
+                    @click="toggleFull"
+                ><Icon :name="full ? 'shrink' : 'expand'" :size="15" /></button>
             </div>
         </div>
         <div class="mt-3 flex items-center gap-4">
@@ -184,7 +213,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 v-if="ours?.logo"
                 :src="ours.logo"
                 :alt="`${ours.name} logo`"
-                class="h-16 w-16 shrink-0 object-contain @lg:h-[76px] @lg:w-[76px]"
+                class="mt-3 h-16 w-16 shrink-0 self-start rounded-full object-cover @lg:mt-4 @lg:h-[76px] @lg:w-[76px]"
             />
         </div>
 
@@ -347,10 +376,31 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 </ul>
             </template>
         </HoverCard>
+        </div>
     </section>
 </template>
 
 <style scoped>
+/* Full screen: the card fills the screen on white, its content centred and enlarged. */
+.pp-score-full {
+    display: flex;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    padding: 4vh 4vw;
+}
+.pp-score-full .pp-score-inner {
+    width: 100%;
+    max-width: 1080px;
+    margin: auto;
+    zoom: 1.25;
+}
+@media (min-width: 1700px) {
+    .pp-score-full .pp-score-inner {
+        zoom: 1.5;
+    }
+}
 .pill {
     display: inline-flex;
     flex-shrink: 0;

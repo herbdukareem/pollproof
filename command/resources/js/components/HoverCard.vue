@@ -7,6 +7,8 @@ import { computed } from 'vue';
  * to hide). It sits below the anchor, or above it near the bottom of the screen.
  */
 const props = defineProps({ anchor: { type: Object, default: null }, width: { type: Number, default: 260 } });
+// Inside a full-screen card only that card is drawn, so the card goes there instead of the body.
+const target = computed(() => (props.anchor && typeof document !== 'undefined' && (document.fullscreenElement ?? document.webkitFullscreenElement)) || 'body');
 const style = computed(() => {
     const r = props.anchor;
     if (!r) return null;
@@ -20,7 +22,7 @@ const style = computed(() => {
 </script>
 
 <template>
-    <Teleport to="body">
+    <Teleport :to="target">
         <Transition name="pop">
             <div v-if="anchor" class="float pointer-events-none fixed z-[57] px-3.5 py-3 text-[13px]" :style="style" role="tooltip">
                 <slot />
