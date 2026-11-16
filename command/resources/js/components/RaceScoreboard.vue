@@ -202,7 +202,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 ><Icon :name="full ? 'shrink' : 'expand'" :size="15" /></button>
             </div>
         </div>
-        <div class="mt-3 flex items-center gap-4">
+        <div class="mt-3 flex items-start gap-4">
             <div class="min-w-0 flex-1">
                 <h2 class="text-[26px] leading-[1.1] font-[760] tracking-[-0.02em] @lg:text-[32px]" :class="verdictTone">{{ verdict.title }}</h2>
                 <p v-if="verdict.html" class="mt-1.5 text-[15px] leading-snug text-ink-2 [&_b]:font-[700] [&_b]:text-ink" v-html="verdict.html"></p>
@@ -213,7 +213,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 v-if="ours?.logo"
                 :src="ours.logo"
                 :alt="`${ours.name} logo`"
-                class="mt-3 h-16 w-16 shrink-0 self-start rounded-full object-cover @lg:mt-4 @lg:h-[76px] @lg:w-[76px]"
+                class="relative mt-3 -mb-5 h-20 w-20 shrink-0 rounded-full object-cover @lg:-mb-6 @lg:h-[88px] @lg:w-[88px]"
             />
         </div>
 
