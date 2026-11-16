@@ -184,7 +184,7 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 v-if="ours?.logo"
                 :src="ours.logo"
                 :alt="`${ours.name} logo`"
-                class="h-16 w-16 shrink-0 rounded-2xl border border-line bg-white object-contain p-1 @lg:h-[76px] @lg:w-[76px]"
+                class="h-16 w-16 shrink-0 object-contain @lg:h-[76px] @lg:w-[76px]"
             />
         </div>
 
