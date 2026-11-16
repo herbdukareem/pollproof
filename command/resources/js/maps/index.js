@@ -7,7 +7,8 @@
  *
  *   name         'Niger State'
  *   credit       one line of attribution shown under the map
- *   mount(el, { title, regions, wards, onOpen, popover }) -> { ready, update(regions, wards), destroy() }
+ *   mount(el, { title, regions, wards, onOpen, popover, focus }) -> { ready, update(regions, wards), destroy() }
+ *     (focus: an LGA name to open on its wards, for a race inside one LGA)
  *   locate(lat, lng) -> { lga, ward } | null      optional: lets the card total units by ward
  *
  * `regions` is keyed by LGA name, `wards` by LGA then ward: { value, label, description, color,

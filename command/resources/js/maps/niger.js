@@ -63,7 +63,7 @@ function complete(wards) {
 
 // --- The map --------------------------------------------------------------------------------
 
-export function mount(el, { title, regions, wards, onOpen, popover }) {
+export function mount(el, { title, regions, wards, onOpen, popover, focus = null }) {
     const map = new INISTMap(el, {
         title,
         data: rename(regions),
@@ -134,8 +134,16 @@ export function mount(el, { title, regions, wards, onOpen, popover }) {
     };
     document.addEventListener('click', follow);
 
+    // A race inside one LGA starts on that LGA's wards; the map's back button returns to the state.
+    const ready = focus
+        ? Promise.resolve(map.ready).then((ok) => {
+            if (ok !== null) map.openWardMap(ALIASES[focus] ?? focus);
+            return ok;
+        })
+        : map.ready;
+
     return {
-        ready: map.ready,
+        ready,
         // Refresh both levels; whichever is on screen repaints, the other is kept for later.
         update(next, nextWards) {
             map.setData(rename(next), { level: 'lgas' });

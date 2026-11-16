@@ -121,7 +121,7 @@ class RacesTest extends TestCase
 
         $this->actingAsUser($this->staff(Role::SituationRoom));
         $this->getJson("/api/v1/tally?election={$assembly->id}")->assertOk()
-            ->assertJsonPath('rule', 'plurality')->assertJsonPath('area_level', 'ward')->assertJsonPath('units', 2)
+            ->assertJsonPath('rule', 'plurality')->assertJsonPath('area_level', 'ward')->assertJsonPath('lga.id', $this->lgas['L1']->id)->assertJsonPath('units', 2)
             ->assertJsonPath('candidates.0.party', 'A')->assertJsonPath('candidates.0.votes', 210)->assertJsonPath('candidates.0.leads', true);
         $this->getJson('/api/v1/tally')->assertOk()->assertJsonPath('rule', 'spread')->assertJsonPath('candidates.0.party', 'B');
 

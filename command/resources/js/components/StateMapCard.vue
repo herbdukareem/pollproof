@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import HelpTip from './HelpTip.vue';
 import Icon from './Icon.vue';
 import { partyColour } from '../lib/parties';
 import { api } from '../lib/api';
@@ -9,7 +10,8 @@ import { num, pct } from '../lib/format';
 /**
  * The campaign's state, LGA by LGA, and ward by ward when an LGA is opened: our share against
  * the 25% line, how many units have reported, or who leads. `loader` is the state's map adapter
- * (see maps/index.js); `tally` is GET /tally. Ward figures add up units by their GPS.
+ * (see maps/index.js); `tally` is GET /tally. Ward figures add up units by their GPS. A race
+ * inside one LGA (tally.lga) opens on that LGA's wards.
  */
 const props = defineProps({
     loader: { type: Function, required: true },
@@ -24,7 +26,8 @@ const el = ref(null);
 const adapter = shallowRef(null);
 const map = shallowRef(null);
 const failed = ref(false);
-const metric = ref('share');
+// The 25% line is a win rule only for governor and president; other races open on who leads.
+const metric = ref(['spread', 'state_quarter'].includes(props.tally.rule) ? 'share' : 'lead');
 const points = shallowRef(null);
 
 const NAVY = '#13213c';
@@ -88,10 +91,21 @@ function entry(a, url, linkLabel) {
     return { value: Math.round(share * 1000) / 10, label: pct(share), color: shareHeat(share, t), description: `${share >= t ? 'Meets' : 'Below'} the ${pct(t)} line. ${line}.`, ...link };
 }
 
-const regions = computed(() => Object.fromEntries((props.tally.lgas ?? []).map((l) => [
-    l.name,
-    entry({ units: l.units, reported: l.units_reported, registered: l.registered ?? 0, accredited: l.accredited ?? 0, cast: l.cast ?? 0, rejected: l.rejected ?? 0, votes: l.votes ?? {} }, `/units?lga_id=${l.id}`, `Open ${l.name} units`),
-])));
+const totalsOf = (l) => ({ units: l.units, reported: l.units_reported, registered: l.registered ?? 0, accredited: l.accredited ?? 0, cast: l.cast ?? 0, rejected: l.rejected ?? 0, votes: l.votes ?? {} });
+/** A ward-level race (assembly seat, LGA chair, councillor): the one LGA it sits in. */
+const raceLga = computed(() => (props.tally.area_level === 'ward' ? props.tally.lga : null));
+const regions = computed(() => {
+    const areas = props.tally.lgas ?? [];
+    const lga = raceLga.value;
+    if (!lga) return Object.fromEntries(areas.map((l) => [l.name, entry(totalsOf(l), `/units?lga_id=${l.id}`, `Open ${l.name} units`)]));
+    // The tally is by ward here; add the wards up into their LGA for the state view.
+    const sum = { units: 0, reported: 0, registered: 0, accredited: 0, cast: 0, rejected: 0, votes: {} };
+    for (const w of areas.map(totalsOf)) {
+        for (const k of ['units', 'reported', 'registered', 'accredited', 'cast', 'rejected']) sum[k] += w[k];
+        for (const [code, n] of Object.entries(w.votes)) sum.votes[code] = (sum.votes[code] ?? 0) + n;
+    }
+    return { [lga.name]: entry(sum, `/units?lga_id=${lga.id}`, `Open ${lga.name} units`) };
+});
 
 /** Units added up by the map's own wards, placed by GPS. */
 const wardTotals = computed(() => {
@@ -234,6 +248,8 @@ onMounted(async () => {
             wards: wards.value ?? {},
             onOpen: (to) => router.push(to),
             popover,
+            // A race inside one LGA opens on that LGA's wards.
+            focus: raceLga.value?.name ?? null,
         });
         if ((await map.value.ready) === null) failed.value = true;
     } catch {
@@ -247,6 +263,8 @@ onBeforeUnmount(() => map.value?.destroy());
 
 // Full screen for the whole card: views, map and legend. Esc or the button leaves it.
 const card = ref(null);
+/** How to read the colours, for the help tip beside the title. */
+const legendNote = computed(() => (metric.value === 'share' ? 'Darker means further from the line.' : metric.value === 'lead' ? 'Paler is a narrow lead; full colour is 30 points or more ahead.' : ''));
 const full = ref(false);
 const canFull = typeof document !== 'undefined' && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 function toggleFull() {
@@ -268,7 +286,10 @@ onBeforeUnmount(() => {
 <template>
     <section id="map" ref="card" class="card scroll-mt-4 overflow-hidden px-5 pb-4" :class="full && 'pp-map-full'">
         <header class="-mx-5 mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-rule px-5 pt-4 pb-3">
-            <h2 class="card-title">{{ adapter?.name ?? 'State map' }}</h2>
+            <h2 class="card-title inline-flex items-center gap-2">
+                {{ raceLga ? `${raceLga.name} wards` : adapter?.name ?? 'State map' }}
+                <HelpTip label="How to read the map">{{ VIEWS.find((v) => v.key === metric).sub }} {{ legendNote }} Click an area for its figures; double-click an LGA for its wards.</HelpTip>
+            </h2>
             <div class="flex items-center gap-2">
                 <div role="tablist" aria-label="What the map shows" class="seg">
                     <button
@@ -284,18 +305,18 @@ onBeforeUnmount(() => {
                 <button
                     v-if="canFull"
                     type="button"
-                    class="btn-ghost h-8 shrink-0 gap-1.5 px-2.5 text-[13px]"
+                    class="btn-ghost h-8 w-8 shrink-0 justify-center px-0"
                     :title="full ? 'Leave full screen (Esc)' : 'Show the map full screen'"
+                    :aria-label="full ? 'Leave full screen' : 'Show the map full screen'"
                     @click="toggleFull"
                 >
-                    <Icon :name="full ? 'shrink' : 'expand'" :size="15" />{{ full ? 'Exit full screen' : 'Full screen' }}
+                    <Icon :name="full ? 'shrink' : 'expand'" :size="15" />
                 </button>
             </div>
         </header>
-        <p class="text-[13px] text-ink-2">{{ VIEWS.find((v) => v.key === metric).sub }} Click an area for its figures; double-click an LGA for its wards.</p>
 
         <p v-if="failed" class="rounded-lg bg-mist p-6 text-center text-sm text-ink-2">The map couldn't load. The tracker beside it has the same figures.</p>
-        <div v-else class="pp-state-map -mx-2" :class="full ? 'min-h-0 flex-1' : 'h-[520px]'">
+        <div v-else class="pp-state-map -mx-2" :class="full ? 'min-h-0 flex-1' : 'h-[460px]'">
             <div ref="el" class="h-full"></div>
         </div>
 
@@ -307,7 +328,7 @@ onBeforeUnmount(() => {
                     <span class="absolute top-3.5 h-4 w-0.5 -translate-x-1/2 bg-ink" :style="{ left: linePos }"></span>
                     <div class="mt-1 flex justify-between text-[11px]"><span>0%</span><span>{{ pct(TOP) }}+</span></div>
                 </div>
-                <p class="mt-1.5">{{ counts.met }} LGAs at the line or above, {{ counts.below }} below<template v-if="counts.none">, {{ counts.none }} with no results yet</template>. Darker means further from the line.</p>
+                <p class="mt-1.5 tabular-nums">{{ counts.met }} at or above · {{ counts.below }} below<template v-if="counts.none"> · {{ counts.none }} no results</template></p>
             </template>
             <template v-else-if="metric === 'reporting'">
                 <div class="max-w-[340px]">
@@ -321,7 +342,6 @@ onBeforeUnmount(() => {
                         <i class="h-3 w-7 rounded-sm" :style="{ background: `linear-gradient(to right, ${leadHeat(partyColor[c.party], 0)}, ${partyColor[c.party]})` }"></i>{{ c.name }}{{ c.is_ours ? ' (ours)' : '' }}, {{ counts.leads[c.party] ?? 0 }}
                     </span>
                 </div>
-                <p class="mt-1.5">Paler is a narrow lead; full colour is 30 points or more ahead.</p>
             </template>
         </div>
         <p v-if="adapter?.credit" class="mt-2 text-[11px] leading-snug text-ink-3">{{ adapter.credit }}</p>

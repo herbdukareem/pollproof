@@ -120,6 +120,8 @@ final class TallyService
             'election' => self::race($election),
             'rule' => $rule,
             'area_level' => $byWard ? 'ward' : 'lga',
+            // The one LGA a ward-level race sits in, so the map can open on its wards.
+            'lga' => $byWard ? Lga::whereIn('id', $lgaIds)->first(['id', 'name'])?->only(['id', 'name']) : null,
             'units' => (int) collect($unitCounts)->sum('units'),
             'units_reported' => (int) collect($unitCounts)->sum('reported'),
             'lga_count' => $areaCount,
