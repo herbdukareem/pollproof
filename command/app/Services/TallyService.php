@@ -107,6 +107,7 @@ final class TallyService
                 'candidate' => $party->pivot->candidate,
                 'is_ours' => $party->is_ours,
                 'logo' => $party->logo_url,
+                'photo' => $election->candidatePhotoUrl($party),
                 'votes' => $totals[$party->code],
                 'share' => $share,
                 'lgas_meeting_threshold' => $met,
@@ -156,7 +157,7 @@ final class TallyService
             $tally = collect($votes[$e->id] ?? [])->mapWithKeys(fn ($v) => [$v->code => (int) $v->votes]);
             $all = $tally->sum();
             $ballot = $e->parties->map(fn ($p) => [
-                'party' => $p->code, 'name' => $p->name, 'candidate' => $p->pivot->candidate, 'is_ours' => $p->is_ours, 'logo' => $p->logo_url,
+                'party' => $p->code, 'name' => $p->name, 'candidate' => $p->pivot->candidate, 'is_ours' => $p->is_ours, 'logo' => $p->logo_url, 'photo' => $e->candidatePhotoUrl($p),
                 'votes' => (int) ($tally[$p->code] ?? 0), 'share' => $all > 0 ? round(($tally[$p->code] ?? 0) / $all, 4) : 0.0,
             ])->sortByDesc('votes')->values();
             $ours = $ballot->firstWhere('is_ours', true);

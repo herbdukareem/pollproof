@@ -73,10 +73,21 @@ class Election extends Model
         return $this->hasMany(ElectionArea::class);
     }
 
-    /** The parties on this race's ballot, in ballot order, each with its candidate. */
+    /** The parties on this race's ballot, in ballot order, each with its candidate and their photo. */
     public function parties(): BelongsToMany
     {
-        return $this->belongsToMany(Party::class)->withPivot('candidate', 'sort_order')->orderByPivot('sort_order')->orderBy('parties.sort_order');
+        return $this->belongsToMany(Party::class)->withPivot('candidate', 'photo_path', 'sort_order')->orderByPivot('sort_order')->orderBy('parties.sort_order');
+    }
+
+    /**
+     * Where the command room loads a candidate's photo in this race; null without one. The
+     * version changes with each upload, so the photo can be cached.
+     */
+    public function candidatePhotoUrl(Party $party): ?string
+    {
+        $path = $party->pivot?->photo_path;
+
+        return $path ? "/api/v1/elections/{$this->id}/parties/{$party->id}/photo?v=".substr(md5($path), 0, 8) : null;
     }
 
     public function results(): HasMany

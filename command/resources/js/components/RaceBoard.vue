@@ -155,6 +155,7 @@ function showTip(e, p) {
                                     <ul class="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
                                         <li v-for="p in r.parties" :key="p.party" class="flex items-center gap-2 text-[13.5px]">
                                             <i class="h-2.5 w-2.5 shrink-0 rounded-[2px]" :style="{ background: p.colour }"></i>
+                                            <img v-if="p.photo" :src="p.photo" :alt="p.candidate || p.name" class="h-5 w-5 shrink-0 rounded-full bg-[#eceef2] object-cover" loading="lazy" />
                                             <span :class="p.is_ours ? 'font-[680] text-ink' : 'text-ink-2'">{{ p.candidate || p.name }}</span>
                                             <span v-if="p.is_ours" class="rounded bg-[#eceff3] px-1.5 py-px text-[11px] font-[600] text-ink-2">ours</span>
                                             <span class="fig font-[650] text-ink">{{ pct(p.share) }}</span>

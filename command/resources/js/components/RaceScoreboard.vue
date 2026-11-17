@@ -208,11 +208,11 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 <p v-if="verdict.html" class="mt-1.5 text-[15px] leading-snug text-ink-2 [&_b]:font-[700] [&_b]:text-ink" v-html="verdict.html"></p>
                 <p v-else class="mt-1.5 text-[15px] leading-snug text-ink-2">{{ verdict.text }}</p>
             </div>
-            <!-- Our party's logo, uploaded under Admin, Campaign. -->
+            <!-- Our candidate in this race (Setup, Races), else our party's logo (Admin, Campaign). -->
             <img
-                v-if="ours?.logo"
-                :src="ours.logo"
-                :alt="`${ours.name} logo`"
+                v-if="ours?.photo || ours?.logo"
+                :src="ours.photo || ours.logo"
+                :alt="ours.photo ? `${ours.candidate || ours.name}` : `${ours.name} logo`"
                 class="relative mt-3 -mb-5 h-20 w-20 shrink-0 rounded-full object-cover @lg:-mb-6 @lg:h-[88px] @lg:w-[88px]"
             />
         </div>
@@ -329,9 +329,15 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
                 @keydown.esc="unpin"
             >
                 <span class="flex min-w-0 items-center gap-2">
-                    <PartyMark :code="c.party" :name="c.name" :logo="c.logo" :colour="partyColour(c.party, candidates)" :size="22" />
-                    <span class="truncate text-[14.5px]" :class="c.is_ours ? 'font-[720] text-ink' : 'text-ink'">{{ c.candidate || c.name }}</span>
-                    <span v-if="c.is_ours" class="shrink-0 rounded-full bg-navy px-2 py-0.5 text-[10.5px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
+                    <PartyMark :code="c.party" :name="c.candidate || c.name" :photo="c.photo" :logo="c.logo" :colour="partyColour(c.party, candidates)" :size="c.candidate ? 30 : 22" />
+                    <span class="min-w-0">
+                        <span class="block truncate text-[14.5px] leading-tight" :class="c.is_ours ? 'font-[720] text-ink' : 'text-ink'">{{ c.candidate || c.name }}</span>
+                        <span v-if="c.candidate" class="flex min-w-0 items-center gap-1.5 text-[12px] leading-tight text-ink-3">
+                            <span class="truncate">{{ c.name }}</span>
+                            <span v-if="c.is_ours" class="shrink-0 rounded-full bg-navy px-1.5 py-px text-[9.5px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
+                        </span>
+                    </span>
+                    <span v-if="c.is_ours && !c.candidate" class="shrink-0 rounded-full bg-navy px-2 py-0.5 text-[10.5px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
                 </span>
                 <span class="fig text-right text-[15px] font-[700] text-ink @lg:order-3">{{ pct(share(c), 1) }}</span>
                 <span class="col-span-2 block h-2.5 overflow-hidden rounded-full bg-[#eceef2] @lg:order-2 @lg:col-span-1">
@@ -345,8 +351,11 @@ const areaLabel = computed(() => (props.race?.area && props.race.area !== 'Whole
         <HoverCard :anchor="hovered?.rect ?? null" :width="290">
             <template v-if="hovered">
                 <div class="flex min-w-0 items-center gap-2">
-                    <PartyMark :code="hovered.c.party" :name="hovered.c.name" :logo="hovered.c.logo" :colour="partyColour(hovered.c.party, candidates)" :size="24" />
-                    <span class="truncate text-[14px] font-[700] text-ink">{{ hovered.c.candidate || hovered.c.name }}</span>
+                    <PartyMark :code="hovered.c.party" :name="hovered.c.candidate || hovered.c.name" :photo="hovered.c.photo" :logo="hovered.c.logo" :colour="partyColour(hovered.c.party, candidates)" :size="hovered.c.candidate ? 34 : 24" />
+                    <span class="min-w-0">
+                        <span class="block truncate text-[14px] leading-tight font-[700] text-ink">{{ hovered.c.candidate || hovered.c.name }}</span>
+                        <span v-if="hovered.c.candidate" class="block truncate text-[12px] leading-tight text-ink-3">{{ hovered.c.name }}</span>
+                    </span>
                     <span v-if="hovered.c.is_ours" class="shrink-0 rounded-full bg-navy px-1.5 py-px text-[10px] font-[700] tracking-[0.06em] text-white uppercase">Ours</span>
                 </div>
                 <div class="mt-1.5 flex items-center justify-between gap-3">

@@ -9,11 +9,15 @@ use App\Models\Party;
 use App\Models\Ward;
 use App\Services\AuditLogger;
 use App\Services\TallyService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The races a campaign is fighting. Everyone in the command room can list them (for the race
@@ -78,9 +82,62 @@ class ElectionController extends Controller
         abort_if($election->results()->exists(), 422, 'This race already has results recorded, so it cannot be removed.');
         abort_if(Election::where('campaign_id', $election->campaign_id)->count() === 1, 422, 'A campaign needs at least one race.');
         $this->audit->log($request->user(), 'race.deleted', $election, ['name' => $election->name], $request->ip());
+        $photos = $election->parties->pluck('pivot.photo_path')->filter()->all();
         $election->delete();
+        $this->disk()->delete($photos);
 
         return response()->json(['deleted' => true]);
+    }
+
+    /** Upload or replace a candidate's photo in this race (JPEG, PNG or WebP, up to 5 MB). */
+    public function uploadPhoto(Request $request, Election $election, Party $party): JsonResponse
+    {
+        $onBallot = $this->onBallot($request, $election, $party);
+        $request->validate(['photo' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120']], ['photo.max' => 'Use a photo under 5 MB.']);
+        $file = $request->file('photo');
+        $path = $file->storeAs("campaigns/{$election->campaign_id}/candidates", "{$election->id}-{$party->id}-".Str::random(8).'.'.($file->extension() ?: 'jpg'), config('pollproof.evidence_disk'));
+        $old = $onBallot->pivot->photo_path;
+        $election->parties()->updateExistingPivot($party->id, ['photo_path' => $path]);
+        if ($old) {
+            $this->disk()->delete($old);
+        }
+        $this->audit->log($request->user(), 'race.candidate_photo_updated', $election, ['party' => $party->code], $request->ip());
+
+        return response()->json($this->present($election->fresh(['areas', 'parties'])->loadCount('results')));
+    }
+
+    public function removePhoto(Request $request, Election $election, Party $party): JsonResponse
+    {
+        $onBallot = $this->onBallot($request, $election, $party);
+        if ($old = $onBallot->pivot->photo_path) {
+            $election->parties()->updateExistingPivot($party->id, ['photo_path' => null]);
+            $this->disk()->delete($old);
+            $this->audit->log($request->user(), 'race.candidate_photo_removed', $election, ['party' => $party->code], $request->ip());
+        }
+
+        return response()->json($this->present($election->fresh(['areas', 'parties'])->loadCount('results')));
+    }
+
+    /** The photo itself, for anyone in the command room. */
+    public function photo(Request $request, Election $election, Party $party): StreamedResponse
+    {
+        $path = $this->onBallot($request, $election, $party)->pivot->photo_path;
+        abort_unless($path && $this->disk()->exists($path), 404);
+
+        return $this->disk()->response($path, null, ['Cache-Control' => 'private, max-age=86400']);
+    }
+
+    /** The party as it stands on this race's ballot, with its candidate; 404 for anything else. */
+    private function onBallot(Request $request, Election $election, Party $party): Party
+    {
+        abort_unless($election->campaign_id === $request->user()->campaign_id, 404);
+
+        return $election->parties()->whereKey($party->id)->first() ?? abort(404);
+    }
+
+    private function disk(): Filesystem
+    {
+        return Storage::disk(config('pollproof.evidence_disk'));
     }
 
     private function validated(Request $request, ?Election $race = null): array
@@ -169,7 +226,10 @@ class ElectionController extends Controller
         if ($missing->isNotEmpty()) {
             throw ValidationException::withMessages(['parties' => Party::whereIn('id', $missing)->pluck('code')->implode(', ').' already have votes in this race and must stay on the ballot.']);
         }
+        // A party taken off the ballot takes its candidate's photo with it.
+        $dropped = $race->parties()->whereNotIn('parties.id', array_keys($ballot))->get()->pluck('pivot.photo_path')->filter()->all();
         $race->parties()->sync($ballot);
+        $this->disk()->delete($dropped);
     }
 
     private function present(Election $e): array
@@ -180,7 +240,7 @@ class ElectionController extends Controller
             'has_results' => ($e->results_count ?? 0) > 0,
             'lga_ids' => $e->areas->whereNull('ward_id')->pluck('lga_id')->values(),
             'ward_ids' => $e->areas->whereNotNull('ward_id')->pluck('ward_id')->values(),
-            'parties' => $e->parties->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'is_ours' => $p->is_ours, 'candidate' => $p->pivot->candidate])->values(),
+            'parties' => $e->parties->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'is_ours' => $p->is_ours, 'candidate' => $p->pivot->candidate, 'photo' => $e->candidatePhotoUrl($p), 'logo' => $p->logo_url])->values(),
             'lga_names' => Lga::whereIn('id', $e->areas->pluck('lga_id')->unique())->orderBy('code')->pluck('name')->values(),
         ];
     }

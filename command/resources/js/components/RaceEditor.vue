@@ -52,7 +52,8 @@ watch(() => props.open, (open) => {
         // Every party, ticked if on this ballot; a new race starts with them all.
         ballot: parties.map((p) => {
             const on = r ? r.parties.find((x) => x.id === p.id) : null;
-            return { ...p, on: r ? !!on : true, candidate: on?.candidate ?? '' };
+            // photo: the saved one; file/preview: one picked here, uploaded on save; drop: remove it on save.
+            return { ...p, on: r ? !!on : true, candidate: on?.candidate ?? '', photo: on?.photo ?? null, file: null, preview: null, drop: false };
         }),
     });
     nameTouched.value = !!r;
@@ -130,6 +131,33 @@ const suggestedCode = computed(() => {
 watch(suggestedName, (v) => { if (!nameTouched.value) form.name = v; });
 watch(suggestedCode, (v) => { if (!codeTouched.value) form.code = v; });
 
+// A candidate's photo: picked here, shown at once, uploaded when the race is saved.
+const photoInput = ref(null);
+const photoFor = ref(null);
+const photoError = ref('');
+function pickPhoto(p) {
+    photoFor.value = p;
+    photoError.value = '';
+    photoInput.value.value = '';
+    photoInput.value.click();
+}
+function onPhoto(e) {
+    const file = e.target.files?.[0];
+    const p = photoFor.value;
+    if (!file || !p) return;
+    if (file.size > 5 * 1024 * 1024) {
+        photoError.value = `${p.code}: use a photo under 5 MB.`;
+        return;
+    }
+    if (p.preview) URL.revokeObjectURL(p.preview);
+    Object.assign(p, { file, preview: URL.createObjectURL(file), drop: false });
+}
+function clearPhoto(p) {
+    if (p.preview) URL.revokeObjectURL(p.preview);
+    Object.assign(p, { file: null, preview: null, drop: !!p.photo });
+}
+const shownPhoto = (p) => p.preview ?? (p.drop ? null : p.photo);
+
 const ourOn = computed(() => form.ballot?.some((p) => p.is_ours && p.on));
 const areaReady = computed(() => ({
     state: true,
@@ -149,7 +177,17 @@ async function save() {
         parties: form.ballot.filter((p) => p.on).map((p) => ({ id: p.id, candidate: p.candidate?.trim() || null })),
     };
     try {
-        const saved = props.race ? await api.patch(`elections/${props.race.id}`, body) : await api.post('elections', body);
+        let saved = props.race ? await api.patch(`elections/${props.race.id}`, body) : await api.post('elections', body);
+        // Then the photos picked or removed, now the race (and its ballot) exists.
+        for (const p of form.ballot.filter((x) => x.on)) {
+            if (p.file) {
+                const fd = new FormData();
+                fd.append('photo', p.file);
+                saved = await api.post(`elections/${saved.id}/parties/${p.id}/photo`, fd);
+            } else if (p.drop) {
+                saved = await api.delete(`elections/${saved.id}/parties/${p.id}/photo`);
+            }
+        }
         emit('saved', saved);
     } catch (e) {
         errors.value = Object.keys(e.errors ?? {}).length ? Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k.split('.')[0], v[0]])) : { form: e.message };
@@ -278,12 +316,37 @@ async function save() {
                             <span class="truncate text-ink-2">{{ p.name }}</span>
                             <span v-if="p.is_ours" class="rounded bg-[#eceff3] px-1.5 py-px text-[11.5px] font-[600] text-ink-2">ours</span>
                         </label>
-                        <input v-if="p.on" v-model="p.candidate" class="field h-9 sm:w-[220px]" :placeholder="p.is_ours ? 'Our candidate\'s name' : 'Candidate (optional)'" maxlength="120" :aria-label="`${p.code} candidate`" />
+                        <span v-if="p.on" class="flex items-center gap-2">
+                            <span class="relative shrink-0">
+                                <button
+                                    type="button"
+                                    class="group grid h-9 w-9 place-items-center overflow-hidden rounded-full focus-visible:ring-2 focus-visible:ring-navy/40 focus-visible:outline-none"
+                                    :class="shownPhoto(p) ? '' : 'border border-dashed border-ink-3 text-ink-3 hover:border-ink hover:text-ink'"
+                                    :title="shownPhoto(p) ? `Change the ${p.code} candidate's photo` : `Add the ${p.code} candidate's photo`"
+                                    :aria-label="shownPhoto(p) ? `Change the ${p.code} candidate's photo` : `Add the ${p.code} candidate's photo`"
+                                    @click="pickPhoto(p)"
+                                >
+                                    <img v-if="shownPhoto(p)" :src="shownPhoto(p)" alt="" class="h-full w-full object-cover" />
+                                    <Icon v-else name="image" :size="15" />
+                                </button>
+                                <button
+                                    v-if="shownPhoto(p)"
+                                    type="button"
+                                    class="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-ink text-white hover:bg-bad"
+                                    :aria-label="`Remove the ${p.code} candidate's photo`"
+                                    title="Remove photo"
+                                    @click="clearPhoto(p)"
+                                ><Icon name="x" :size="9" /></button>
+                            </span>
+                            <input v-model="p.candidate" class="field h-9 sm:w-[220px]" :placeholder="p.is_ours ? 'Our candidate\'s name' : 'Candidate (optional)'" maxlength="120" :aria-label="`${p.code} candidate`" />
+                        </span>
                     </li>
                 </ul>
                 <p v-if="!ourOn" class="mt-1.5 text-[12.5px] text-action">Our party must be on the ballot.</p>
                 <p v-else-if="errors.parties" class="mt-1.5 text-[12.5px] text-bad">{{ errors.parties }}</p>
-                <p v-else class="mt-1.5 text-[12.5px] text-ink-2">Candidate names show on the overview and on the agent's result sheet.</p>
+                <p v-else-if="photoError" class="mt-1.5 text-[12.5px] text-bad">{{ photoError }}</p>
+                <p v-else class="mt-1.5 text-[12.5px] text-ink-2">Each race has its own candidates. Names show on the overview and the agent's result sheet; photos on the overview.</p>
+                <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onPhoto" />
             </fieldset>
 
             <!-- 4. Its name, code and day. -->
