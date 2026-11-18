@@ -112,7 +112,7 @@ final class Speech
     {
         return match ($entry->level) {
             CollationEntry::WARD => ($w = Ward::with('lga')->find($entry->scope_id))
-                ? self::plain($w->name).' ward collation sheet, in '.self::plain($w->lga->name)
+                ? self::plain($w->name).' ward collation sheet'.($w->lga ? ', in '.self::plain($w->lga->name) : '')
                 : 'ward collation sheet',
             CollationEntry::LGA => ($l = Lga::find($entry->scope_id)) ? self::plain($l->name).' LGA collation sheet' : 'LGA collation sheet',
             default => 'state collation sheet',

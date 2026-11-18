@@ -104,6 +104,7 @@ function pick(e) {
 }
 
 const status = (c) => {
+    if (c.scope_missing) return ['neutral', 'Area removed'];
     if (Object.keys(c.differences).length) return c.coverage_complete ? ['bad', 'Mismatch'] : ['warn', 'Differs, units missing'];
     return c.coverage_complete ? ['good', 'Match'] : ['neutral', 'Partial match'];
 };
@@ -173,7 +174,7 @@ async function submit() {
                                 @click="pick(e)"
                                 @keydown.enter="pick(e)"
                             >
-                                <td class="td"><div class="font-[620]">{{ e.comparison.scope }}</div><div class="text-[12.5px] text-ink-2 tabular-nums">{{ levelLabel[e.comparison.level] }}, {{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported<template v-if="e.announced_at">, announced {{ dateTime(e.announced_at) }}</template></div></td>
+                                <td class="td"><div class="font-[620]">{{ e.comparison.scope }}</div><div class="text-[12.5px] text-ink-2 tabular-nums">{{ levelLabel[e.comparison.level] }}, <template v-if="e.comparison.scope_missing">no longer in the structure</template><template v-else>{{ e.comparison.units_reported }} of {{ e.comparison.units_in_scope }} units reported</template><template v-if="e.announced_at">, announced {{ dateTime(e.announced_at) }}</template></div></td>
                                 <td class="td fig text-right text-[15px] font-[600]">{{ num(e.comparison.our_total_cast) }}</td>
                                 <td class="td fig text-right text-[15px] font-[600]">{{ num(e.comparison.declared_total_cast) }}</td>
                                 <td class="td">
@@ -199,7 +200,8 @@ async function submit() {
                 </div>
                 <h2 class="text-[19px] leading-tight font-[700]">{{ picked.comparison.scope }}</h2>
                 <p class="text-[13.5px] leading-relaxed text-ink-2">
-                    <template v-if="Object.keys(picked.comparison.differences).length">
+                    <template v-if="picked.comparison.scope_missing">This sheet was entered for a {{ picked.comparison.level === 'lga' ? 'LGA' : 'ward' }} that has since been taken out of the polling-unit structure, so there are no unit results to check it against.</template>
+                    <template v-else-if="Object.keys(picked.comparison.differences).length">
                         The declared sheet differs from the {{ picked.comparison.units_reported }} signed unit results beneath it<template v-if="!picked.comparison.coverage_complete">, though {{ picked.comparison.units_in_scope - picked.comparison.units_reported }} units haven't reported yet</template>.
                     </template>
                     <template v-else-if="picked.comparison.coverage_complete">The declared sheet matches every signed unit result beneath it.</template>

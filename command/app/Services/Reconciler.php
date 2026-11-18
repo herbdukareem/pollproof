@@ -109,7 +109,9 @@ final class Reconciler
     {
         $unitIds = $this->unitIdsInScope($entry->election, $entry->level, $entry->scope_id);
         $ours = $this->ourFigures($entry->election, $unitIds);
-        $complete = $ours['units_reported'] === count($unitIds);
+        // A sheet whose ward or LGA has since been taken out of the structure has nothing to check against.
+        $missing = $this->scopeMissing($entry);
+        $complete = ! $missing && $ours['units_reported'] === count($unitIds);
 
         $diffs = [];
         foreach (array_unique(array_merge(array_keys($entry->votes), array_keys($ours['votes']))) as $code) {
@@ -132,6 +134,7 @@ final class Reconciler
             'units_in_scope' => count($unitIds),
             'units_reported' => $ours['units_reported'],
             'coverage_complete' => $complete,
+            'scope_missing' => $missing,
         ];
 
         return $comparison;
@@ -225,16 +228,29 @@ final class Reconciler
             ->first();
     }
 
+    /**
+     * The ward or LGA a sheet was declared for. Collation sheets name their area by id without a
+     * foreign key, so an area removed from the structure afterwards (a re-import, or rows deleted in
+     * the database) leaves the sheet pointing at nothing; it is labelled as such rather than failing.
+     */
     private function scopeLabel(CollationEntry $entry): string
     {
         return match ($entry->level) {
-            CollationEntry::WARD => (function () use ($entry) {
-                $ward = Ward::with('lga')->find($entry->scope_id);
-
-                return "{$ward->name} ({$ward->lga->name})";
-            })(),
-            CollationEntry::LGA => Lga::find($entry->scope_id)->name,
+            CollationEntry::WARD => ($ward = Ward::with('lga')->find($entry->scope_id))
+                ? $ward->name.($ward->lga ? " ({$ward->lga->name})" : '')
+                : "Removed ward (#{$entry->scope_id})",
+            CollationEntry::LGA => Lga::find($entry->scope_id)?->name ?? "Removed LGA (#{$entry->scope_id})",
             default => $entry->election->isStatewide() ? 'State' : $entry->election->name,
+        };
+    }
+
+    /** True when the sheet's ward or LGA is no longer in the structure. */
+    public function scopeMissing(CollationEntry $entry): bool
+    {
+        return match ($entry->level) {
+            CollationEntry::WARD => ! Ward::whereKey($entry->scope_id)->exists(),
+            CollationEntry::LGA => ! Lga::whereKey($entry->scope_id)->exists(),
+            default => false,
         };
     }
 }

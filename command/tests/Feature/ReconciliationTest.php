@@ -4,8 +4,12 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Alert;
+use App\Models\CollationEntry;
+use App\Models\Lga;
+use App\Models\PollingUnit;
 use App\Models\ResultSubmission;
 use App\Models\User;
+use App\Models\Ward;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsElection;
 use Tests\TestCase;
@@ -48,6 +52,28 @@ class ReconciliationTest extends TestCase
         ])->assertCreated()->assertJsonPath('comparison.differences', []);
 
         $this->assertSame(0, Alert::where('status', 'open')->count());
+    }
+
+    public function test_sheets_whose_ward_or_lga_was_deleted_still_list_and_can_be_cleared(): void
+    {
+        $this->actingAsUser($this->staff(Role::DataOfficer));
+        foreach ([['ward', $this->wards['L3']->id], ['lga', $this->lgas['L3']->id]] as [$level, $id]) {
+            $this->postJson('/api/v1/collation-entries', ['level' => $level, 'scope_id' => $id, 'votes' => ['A' => 10], 'announced_at' => '2027-02-06T20:07:00Z'])->assertCreated();
+        }
+        // The L3 area is deleted straight from the database afterwards (not through the app).
+        PollingUnit::where('ward_id', $this->wards['L3']->id)->delete();
+        Ward::whereKey($this->wards['L3']->id)->delete();
+        Lga::whereKey($this->lgas['L3']->id)->delete();
+
+        $this->actingAsUser($this->staff(Role::SituationRoom));
+        $rows = $this->getJson('/api/v1/collation-entries')->assertOk()->json('data');
+        $this->assertEqualsCanonicalizing(["Removed ward (#{$this->wards['L3']->id})", "Removed LGA (#{$this->lgas['L3']->id})"], array_column(array_column($rows, 'comparison'), 'scope'));
+        $this->assertSame([true, true], array_column(array_column($rows, 'comparison'), 'scope_missing'));
+        $this->assertSame([false, false], array_column(array_column($rows, 'comparison'), 'coverage_complete'));
+
+        $this->artisan('pollproof:collation-orphans')->expectsOutputToContain('2 sheet(s) point at a ward or LGA')->assertSuccessful();
+        $this->artisan('pollproof:collation-orphans --delete')->expectsConfirmation('Delete these 2 collation sheet(s)? Their figures are kept in the audit log.', 'yes')->assertSuccessful();
+        $this->assertSame(0, CollationEntry::count());
     }
 
     public function test_a_collation_agent_can_only_enter_their_own_centre(): void

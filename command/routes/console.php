@@ -3,8 +3,11 @@
 use App\Enums\Role;
 use App\Models\Announcement;
 use App\Models\Campaign;
+use App\Models\CollationEntry;
+use App\Models\Lga;
 use App\Models\User;
 use App\Models\VideoClip;
+use App\Models\Ward;
 use App\Services\AgentAppBuild;
 use App\Services\AuditLogger;
 use App\Services\ElectionWatch;
@@ -24,6 +27,37 @@ Artisan::command('pollproof:import-structure {campaign : Campaign ID} {file : Pa
         $this->warn("{$summary['missing_gps']} units have no GPS point; check-in cannot be verified there until one is set.");
     }
 })->purpose('Import or update a campaign\'s LGAs, wards and polling units from CSV');
+
+Artisan::command('pollproof:collation-orphans {--delete : Remove them, after asking}', function (AuditLogger $audit) {
+    // Collation sheets name their ward or LGA by id, without a foreign key, so deleting areas in the
+    // database (rather than re-importing, which keeps them) leaves sheets pointing at nothing.
+    $orphans = CollationEntry::with('election')->get()->filter(fn ($e) => match ($e->level) {
+        CollationEntry::WARD => ! Ward::whereKey($e->scope_id)->exists(),
+        CollationEntry::LGA => ! Lga::whereKey($e->scope_id)->exists(),
+        default => false,
+    })->values();
+    if ($orphans->isEmpty()) {
+        $this->info('Every collation sheet points at a ward or LGA that exists.');
+
+        return;
+    }
+    $this->table(['Sheet', 'Campaign', 'Race', 'Level', 'Missing area id', 'Announced'], $orphans->map(fn ($e) => [
+        $e->id, $e->campaign_id, $e->election?->name, $e->level, $e->scope_id, $e->announced_at?->toDateTimeString(),
+    ])->all());
+    if (! $this->option('delete')) {
+        $this->line("{$orphans->count()} sheet(s) point at a ward or LGA no longer in the structure. Run again with --delete to remove them.");
+
+        return;
+    }
+    if (! $this->confirm("Delete these {$orphans->count()} collation sheet(s)? Their figures are kept in the audit log.")) {
+        return;
+    }
+    foreach ($orphans as $e) {
+        $audit->log(null, 'collation.orphan_removed', $e, ['level' => $e->level, 'scope_id' => $e->scope_id, 'votes' => $e->votes, 'announced_at' => (string) $e->announced_at], null, $e->campaign_id);
+        $e->delete();
+    }
+    $this->info("Removed {$orphans->count()} sheet(s).");
+})->purpose('List (or with --delete remove) collation sheets whose ward or LGA was deleted from the structure');
 
 Artisan::command('pollproof:verify-audit {campaign : Campaign ID}', function (AuditLogger $audit) {
     $r = $audit->verify((int) $this->argument('campaign'));
