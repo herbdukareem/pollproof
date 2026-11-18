@@ -30,13 +30,22 @@ export async function signInWithCode(code) {
     return finishSignIn();
 }
 
+const failure = (message) => Object.assign(new Error(message), { firstError() { return this.message; } });
+
 async function finishSignIn() {
-    const user = await loadSession();
-    if (!user) {
-        // Signed in, but the API did not accept the session cookie: the host is missing from SANCTUM_STATEFUL_DOMAINS.
-        throw Object.assign(new Error('Signed in, but this address is not allowed to use the API. Check SANCTUM_STATEFUL_DOMAINS.'), { firstError() { return this.message; } });
+    try {
+        session.user = await api.get('me');
+        return session.user;
+    } catch (e) {
+        session.user = null;
+        // Only a 401 means the API ignored the session cookie (this address isn't one of the app's own).
+        if (e.status === 401) throw failure('Signed in, but this address is not allowed to use the API. Check SANCTUM_STATEFUL_DOMAINS.');
+        // Anything else is the server failing to load the account, most often an update whose
+        // database changes haven't been applied yet.
+        throw failure(`Signed in, but the server couldn't load your account (error ${e.status ?? 'network'}). If the site was just updated, run php artisan migrate --force on the server; otherwise see storage/logs.`);
+    } finally {
+        session.loaded = true;
     }
-    return user;
 }
 
 export async function signOut() {

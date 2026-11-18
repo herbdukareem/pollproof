@@ -49,6 +49,25 @@ class WebSessionTest extends TestCase
         $this->assertFalse(EnsureFrontendRequestsAreStateful::fromFrontend($other));
     }
 
+    public function test_the_apps_own_host_stays_stateful_when_the_setting_names_another(): void
+    {
+        $_ENV['SANCTUM_STATEFUL_DOMAINS'] = $_SERVER['SANCTUM_STATEFUL_DOMAINS'] = 'pollproof.example';
+        try {
+            config(['sanctum' => require config_path('sanctum.php')]);
+        } finally {
+            unset($_ENV['SANCTUM_STATEFUL_DOMAINS'], $_SERVER['SANCTUM_STATEFUL_DOMAINS']);
+        }
+
+        $own = Request::create('http://app.pollproof.example/api/v1/me', server: ['HTTP_REFERER' => 'http://app.pollproof.example/overview']);
+        $this->assertTrue(EnsureFrontendRequestsAreStateful::fromFrontend($own));
+
+        $listed = Request::create('http://app.pollproof.example/api/v1/me', server: ['HTTP_REFERER' => 'http://pollproof.example/']);
+        $this->assertTrue(EnsureFrontendRequestsAreStateful::fromFrontend($listed));
+
+        $other = Request::create('http://app.pollproof.example/api/v1/me', server: ['HTTP_REFERER' => 'http://elsewhere.example/']);
+        $this->assertFalse(EnsureFrontendRequestsAreStateful::fromFrontend($other));
+    }
+
     public function test_field_staff_cannot_use_the_web_sign_in(): void
     {
         $this->agentFor('PU1', ['email' => 'agent@test.ng', 'password' => 'password']);

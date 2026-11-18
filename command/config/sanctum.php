@@ -18,13 +18,13 @@ return [
     |
     */
 
+    // The command-room web app is served by this same Laravel app, so its own host is always
+    // stateful, even when SANCTUM_STATEFUL_DOMAINS lists other hosts (or the wrong one).
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s%s',
+        '%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
         Sanctum::currentApplicationUrlWithPort(),
-        // The command-room web app is served by this same Laravel app, so its own host is always stateful.
-        Sanctum::currentRequestHost(),
-    ))),
+    )).Sanctum::currentRequestHost()),
 
     /*
     |--------------------------------------------------------------------------
